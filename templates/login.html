@@ -1,0 +1,33 @@
+
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">{% endblock %}
+{% block content %}
+<main class="login-section">
+    <div class="auth-card">
+        <h2>Iniciar Sesion</h2>
+        <form class="auth-form" method="post">
+            <div class="field">
+                <label class="label" for="email">Direccion de correo Electronico</label>
+                <input class="input" id="email" name="email" type="email" required>
+            </div>
+            <div class="field">
+                <label class="label" for="password">Contraseña</label>
+                <input class="input" id="password" name="password" type="password" required>
+            </div>
+            <div class="remember-field">
+                <input type="checkbox" id="remember" name="remember">
+                <label for="remember">Recordar</label>
+            </div>
+            <div class="forgot-password">
+                <a href="#">¿Has olvidado tu contraseña?</a>
+            </div>
+            <button class="submit-btn" type="submit">Entrar</button>
+        </form>
+    </div>
+    <div class="curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</main>
+{% endblock %}

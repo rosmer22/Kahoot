@@ -1,0 +1,25 @@
+<header class="main-header">
+        <div class="header-inner">
+            <!-- Izquierda: Logo y Nombre -->
+            <div class="left cluster">
+                <a class="avatar" href="{{ url_for('home') }}" aria-label="Inicio"></a>
+                <a class="brand-title" href="{{ url_for('home') }}">RoBot</a>
+            </div>
+
+            <!-- Centro: Barra de Búsqueda -->
+            <div class="center cluster">
+                 <form class="search-container" action="{{ url_for('explore') }}" method="get">
+                    <input type="text" name="q" placeholder="Busca tu Cuestionario Favorito">
+                    <button type="submit" class="icon-button search-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Derecha: Botones de Acción -->
+            <div class="right cluster">
+                <a href="{{ url_for('login') }}" class="pill grey">Iniciar Sesion</a>
+                <a href="{{ url_for('register') }}" class="pill grey">Registrarme</a>
+            </div>
+        </div>
+    </header>

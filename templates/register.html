@@ -1,0 +1,31 @@
+
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}">{% endblock %}
+{% block content %}
+<main class="register-section">
+    <div class="auth-card">
+        <h2>Crear Cuenta</h2>
+        <form class="auth-form" method="post">
+            <div class="field">
+                <label class="label" for="remail">Direccion de correo Electronico</label>
+                <input class="input" id="remail" name="email" type="email" required>
+            </div>
+            <div class="field">
+                <label class="label" for="ruser">Nombre de Usuario*</label>
+                <input class="input" id="ruser" name="username" type="text" required>
+            </div>
+            <div class="field">
+                <label class="label" for="rpass">Contraseña*</label>
+                <input class="input" id="rpass" name="password" type="password" required>
+            </div>
+            <button class="submit-btn" type="submit">Registrarme</button>
+        </form>
+        <p class="helper-text">Al continuar aceptas las <a href="#">condiciones de uso</a> y la <a href="#">política de privacidad</a>.</p>
+    </div>
+    <div class="curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</main>
+{% endblock %}

@@ -1,0 +1,49 @@
+
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">{% endblock %}
+{% block content %}
+<main class="hero-section">
+    <h1 class="hero-title">RoBot</h1>
+    <p class="hero-subtitle">Bridge classroom realities and curriculum expectations with the platform that's AI-supported, but teacher-first.</p>
+    <div class="carousel-container">
+        <div class="carousel-arrow">&#11164;</div>
+        <div class="carousel-cards">
+            <div class="card"><div class="card-image-placeholder"></div><div class="card-name">Nombre</div></div>
+            <div class="card"><div class="card-image-placeholder"></div><div class="card-name">Nombre</div></div>
+            <div class="card"><div class="card-image-placeholder"></div><div class="card-name">Nombre</div></div>
+        </div>
+        <div class="carousel-arrow">&#11166;</div>
+    </div>
+    <div class="curve">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path></svg>
+    </div>
+</main>
+
+<section class="features-section">
+    <div class="feature-row">
+        <div class="feature-text">
+            <h2>RoBot</h2>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque augue nisi, gravida et congue nec, rhoncus vel nisi. Praesent ac consectetur erat. Nam id neque dui. Nullam lacinia justo at rutrum pharetra. Morbi hendrerit non turpis mattis fringilla. Donec vel magna suscipit, vulputate mi at, condimentum diam.</p>
+        </div>
+        <div class="feature-image-placeholder"></div>
+    </div>
+    <div class="feature-row">
+        <div class="feature-text">
+            <h2>RoBot</h2>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque augue nisi, gravida et congue nec, rhoncus vel nisi. Praesent ac consectetur erat. Nam id neque dui. Nullam lacinia justo at rutrum pharetra. Morbi hendrerit non turpis mattis fringilla. Donec vel magna suscipit, vulputate mi at, condimentum diam.</p>
+        </div>
+        <div class="feature-image-placeholder"></div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="cta-curve">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M1200 0L0 0 0 60.16C156.35 25.72 389.34-21.28 600 15.33 810.66 51.94 1043.65 94.28 1200 60.16z" class="shape-fill"></path>
+        </svg>
+    </div>
+    <h2 class="cta-title">Aprende Temas con RoBot</h2>
+    <button class="cta-button">Empieza</button>
+</section>
+{% endblock %}
+{% block page_js %}<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}

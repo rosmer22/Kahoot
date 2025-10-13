@@ -1,0 +1,111 @@
+/* --- Estilos Generales --- */
+:root {
+  --color-naranja: #fdd867;
+  --color-fondo-claro: #f0f0f0;
+}
+
+/* --- Hero Section --- */
+.explore-hero {
+  background-color: var(--color-naranja);
+  text-align: center;
+  padding: 4rem 2rem 35rem;
+  position: relative;
+  margin: 0;
+  margin-bottom: -30rem;
+  z-index: 0;
+}
+
+.explore-hero h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  color: #3a3a3a;
+  z-index: 1;
+  position: relative;
+  font-family: 'Roboto Slab', serif;
+}
+
+/* --- Curva --- */
+.explore-hero .curve {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  line-height: 0;
+  z-index: 0;
+}
+
+.explore-hero .curve svg {
+  position: relative;
+  display: block;
+  width: calc(100% + 1.3px);
+  height: 180px;
+}
+
+.explore-hero .curve .shape-fill {
+  fill: var(--color-fondo-claro);
+}
+
+/* --- Grid de Resultados --- */
+.grid-results {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 0 1rem;
+  margin: -3rem auto 2rem;
+  max-width: 1200px;
+  position: relative;
+  z-index: 10;
+}
+
+.result {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.result:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+
+.result .thumb {
+  height: 110px;
+  background: #d1d5db;
+  border-radius: 8px 8px 0 0;
+}
+
+.result .name {
+  text-align: center;
+  padding: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 0 0 8px 8px;
+}
+
+.more {
+  text-align: center;
+  margin: 1rem 0 2rem;
+  position: relative;
+  z-index: 10;
+}
+
+@media (max-width: 800px) {
+  .grid-results {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .explore-hero h1 {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .grid-results {
+    grid-template-columns: 1fr;
+  }
+}

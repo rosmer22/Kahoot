@@ -1,0 +1,11 @@
+<header class="site-header">
+  <div class="container">
+    {% if creating_quiz %}
+      {% include '_header_editor.html' %}
+    {% elif is_auth %}
+      {% include '_header_auth.html' %}
+    {% else %}
+      {% include '_header_guest.html' %}
+    {% endif %}
+  </div>
+</header>

@@ -1,0 +1,37 @@
+<header class="main-header">
+    <div class="header-inner">
+        <!-- Izquierda: Logo y Nombre -->
+        <div class="left cluster">
+            <a class="avatar" href="{{ url_for('home') }}" aria-label="Inicio"></a>
+            <a class="brand-title" href="{{ url_for('home') }}">RoBot</a>
+        </div>
+
+        <!-- Centro: Barra de Búsqueda -->
+        <div class="center cluster">
+            <form class="search-container" action="{{ url_for('explore') }}" method="get">
+                <input type="text" name="q" placeholder="Busca tu Cuestionario Favorito">
+                <button type="submit" class="icon-button search-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Derecha: Botones de Creación y Perfil -->
+        <div class="right cluster creation-buttons">
+            <a href="{{ url_for('editor') }}" class="btn btn-create">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Crea un cuestionario</span>
+            </a>
+            <div class="dropdown" style="position:relative">
+                <button id="avatarBtn" class="icon-button profile-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuList">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </button>
+                <div id="menuList" class="menu-list" role="menu" aria-labelledby="avatarBtn">
+                    <a href="{{ url_for('my_quizzes') }}" role="menuitem">Mis Cuestionarios</a>
+                    <a href="{{ url_for('settings') }}" role="menuitem">Configuración</a>
+                    <a href="{{ url_for('logout') }}" role="menuitem">Cerrar Sesión</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

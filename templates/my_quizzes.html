@@ -1,0 +1,60 @@
+
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/my_quizzes.css') }}">{% endblock %}
+{% block content %}
+<section class="quizzes-hero">
+  <h1>Mis Cuestionarios</h1>
+  <div class="curve">
+    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+    </svg>
+  </div>
+</section>
+
+<section class="container lists">
+  <h3>Creados por mí</h3>
+  {% if created and created|length > 0 %}
+  <div class="cards">
+    {% for q in created %}
+    <article class="card" data-quiz-id="{{ q.id }}">
+      <div class="thumb" {% if q.imagen_portada %}style="background-image: url('{{ url_for('static', filename='uploads/' + q.imagen_portada) }}');"{% endif %}>
+        {% if not q.imagen_portada %}
+          <div class="thumb-placeholder">📝</div>
+        {% endif %}
+      </div>
+      <div class="card-content">
+        <div class="title">{{ q.titulo }}</div>
+        <div class="quiz-info">
+          <span class="quiz-pin">📌 PIN: {{ q.pin }}</span>
+          <span class="quiz-questions">❓ {{ q.num_preguntas }} pregunta{{ 's' if q.num_preguntas != 1 else '' }}</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn-edit" data-quiz-id="{{ q.id }}">✏️ Editar</button>
+          <button class="btn-delete" data-quiz-id="{{ q.id }}">🗑️ Eliminar</button>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>📭 Aún no has creado ningún cuestionario</p>
+    <a href="{{ url_for('editor') }}" class="btn">+ Crear mi primer cuestionario</a>
+  </div>
+  {% endif %}
+
+  <h3>Completados por mí</h3>
+  {% if completed and completed|length > 0 %}
+  <div class="cards soft">
+    {% for q in completed %}
+    <article class="card"><div class="thumb"></div><div class="title">{{ q.title }}</div></article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>📋 Aún no has completado ningún cuestionario</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+{% block page_js %}<script src="{{ url_for('static', filename='js/my_quizzes.js') }}"></script>{% endblock %}

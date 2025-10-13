@@ -1,0 +1,203 @@
+:root {
+    --color-principal-naranja: #fca94d;
+    --color-secundario-amarillo: #fdd867;
+    --color-fondo-elementos: #eeeeee;
+    --color-borde-elementos: #dcdcdc;
+    --color-texto: #333333;
+    --color-placeholder: #a0a0a0;
+    --color-fondo-claro: #f0f0f0;
+    --color-verde-cta: #c4d89f;
+    --color-verde-boton: #d4e555;
+    --color-azul-footer: #8cb6b6;
+    --color-footer-fondo: #4a4a4a;
+}
+
+
+
+/* --- Contenedor Principal --- */
+.main-container {
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* --- Reset para eliminar espacios --- */
+.page-main {
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+}
+
+/* --- Sección de Héroe (Sección Amarilla) --- */
+.hero-section {
+    background-color: var(--color-secundario-amarillo);
+    text-align: center;
+    padding: 4rem 2rem 10rem;
+    position: relative;
+    margin: 0;
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    margin: 0;
+    font-weight: bold;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    margin: 1rem auto 3rem;
+    max-width: 600px;
+    line-height: 1.6;
+}
+
+.carousel-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+}
+
+.carousel-arrow {
+    font-size: 2.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+}
+
+.carousel-cards {
+    display: flex;
+    gap: 2rem;
+}
+
+.card {
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 280px;
+    padding: 1rem;
+}
+
+.card-image-placeholder {
+    background-color: var(--color-fondo-elementos);
+    height: 160px;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.card-name {
+    background-color: white;
+    padding: 1rem;
+    text-align: left;
+    font-size: 1.1rem;
+    border: 1px solid var(--color-borde-elementos);
+    border-radius: 8px;
+    margin: 0;
+}
+
+.curve {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+}
+
+.curve svg {
+    position: relative;
+    display: block;
+    width: calc(100% + 1.3px);
+    height: 180px;
+}
+
+.curve .shape-fill {
+    fill: var(--color-fondo-claro);
+}
+
+/* --- Secciones de Características --- */
+.features-section {
+    padding: 6rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6rem;
+}
+
+.feature-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4rem;
+}
+
+.feature-row:nth-child(even) {
+    flex-direction: row-reverse;
+}
+
+.feature-image-placeholder {
+    width: 450px;
+    height: 300px;
+    background-color: #e0e0e0;
+    border-radius: 12px;
+}
+
+.feature-text {
+    max-width: 450px;
+}
+
+.feature-text h2 {
+    font-size: 2.5rem;
+    margin-top: 0;
+}
+
+.feature-text p {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    color: #555;
+}
+
+/* --- Sección CTA --- */
+.cta-section {
+    background-color: var(--color-verde-cta);
+    padding: 8rem 2rem;
+    text-align: center;
+    position: relative;
+}
+
+.cta-title {
+    font-size: 2.8rem;
+    margin: 0 0 2rem 0;
+    font-weight: bold;
+}
+
+.cta-button {
+    background-color: var(--color-verde-boton);
+    color: var(--color-texto);
+    border: none;
+    padding: 1rem 3rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.cta-curve {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+}
+
+.cta-curve svg {
+    position: relative;
+    display: block;
+    width: calc(100% + 1.3px);
+    height: 100px;
+}
+
+.cta-curve .shape-fill {
+    fill: var(--color-fondo-claro);
+}
+
+/* --- Footer eliminado - ahora está en base.css --- */

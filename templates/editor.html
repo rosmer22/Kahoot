@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">{% endblock %}
+
+{% block header %}
+  {% include "_header_editor.html" %}
+{% endblock %}
+
+{% block content %}
+
+<!-- Barra secundaria de controles del editor -->
+<div class="editor-subbar">
+  <div class="subbar-inner">
+    <button class="icon-btn-square" id="toggleSidebarBtn">☰</button>
+    <select class="subbar-select select-question-type">
+      <option value="multiple">Opción Múltiple</option>
+      <option value="simple">Selección Simple</option>
+      <option value="verdadero-falso">Verdadero/Falso</option>
+    </select>
+    <div class="spacer"></div>
+    <select class="subbar-select select-points">
+      <option value="1">✔ 1 punto</option>
+      <option value="2">✔ 2 puntos</option>
+      <option value="3">✔ 3 puntos</option>
+      <option value="4">✔ 4 puntos</option>
+      <option value="5">✔ 5 puntos</option>
+    </select>
+    <select class="subbar-select select-time">
+      <option value="10">⏱ 10 Segundos</option>
+      <option value="20">⏱ 20 Segundos</option>
+      <option value="30" selected>⏱ 30 Segundos</option>
+      <option value="45">⏱ 45 Segundos</option>
+      <option value="60">⏱ 60 Segundos</option>
+      <option value="90">⏱ 90 Segundos</option>
+    </select>
+  </div>
+</div>
+
+<!-- Panel lateral de preguntas -->
+<div class="questions-sidebar" id="questionsSidebar">
+  <div class="sidebar-header">
+    <h3>1 Pregunta</h3>
+    <button class="sidebar-close" id="closeSidebarBtn">✕</button>
+  </div>
+  <div class="sidebar-content">
+    <div class="question-card">
+      <div class="question-preview">
+        <div class="question-preview-text"></div>
+        <div class="question-preview-answers"></div>
+      </div>
+      <button class="delete-question-btn" title="Eliminar pregunta">🗑</button>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn-add-question" id="addQuestionBtn">+ Añadir Pregunta</button>
+  </div>
+</div>
+
+<!-- Overlay para cerrar el sidebar -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<section class="container editor-wrap">
+  <div class="panel shadow">
+    <div class="question pink">
+      <textarea class="question-text" placeholder="Escriba la Pregunta aqui"></textarea>
+    </div>
+
+    <div class="answers-row" id="answersContainer">
+      <!-- Las alternativas se generan dinámicamente con JavaScript -->
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn slim" id="addAnswerBtn">+ Agregar Alternativa</button>
+    </div>
+  </div>
+</section>
+
+<!-- Modal de Configuración del Cuestionario -->
+<div id="config-backdrop" class="modal-backdrop hidden" aria-hidden="true"></div>
+<div id="config-modal" class="config-modal hidden" role="dialog" aria-modal="true" aria-labelledby="cfgTitle">
+  <div class="config-head">
+    <div class="cfg-left"><span class="cfg-gear">⚙</span> <span id="cfgTitle">Configuración del Cuestionario</span></div>
+    <div class="cfg-actions">
+      <button id="cfgCancel" class="pill grey">Cancelar</button>
+      <button id="cfgDone" class="pill grey">Listo</button>
+    </div>
+  </div>
+  <div class="config-body">
+    <aside class="cfg-nav">
+      <button class="cfg-tab active" data-tab="basic">Información Básica</button>
+      <button class="cfg-tab" data-tab="live">Juego en Vivo</button>
+      <div class="cfg-filler"></div>
+    </aside>
+    <section class="cfg-content">
+      <!-- Tab: Básico -->
+      <div class="tab-panel" data-panel="basic">
+        <div class="panel-grid">
+          <div class="panel-left">
+            <div class="field-block">
+              <label class="cfg-label">Título</label>
+              <p class="cfg-hint">Ingresa un título para tu cuestionario</p>
+              <input id="cfgTitleInput" class="cfg-input" placeholder="Ej. Matemática 1° Básico">
+            </div>
+            <div class="field-block">
+              <label class="cfg-label">Descripción (Opcional)</label>
+              <p class="cfg-hint">Incluye una breve descripción de tu cuestionario</p>
+              <textarea id="cfgDescInput" class="cfg-textarea" rows="5"></textarea>
+            </div>
+          </div>
+          <div class="panel-right">
+            <div class="cover-card">
+              <h4>Imagen de Portada</h4>
+              <p class="cfg-hint">Añade una imagen de portada.</p>
+              <label class="dropzone" id="cfgDrop">
+                <input id="cfgFile" type="file" accept="image/*" hidden>
+                <div class="drop-inner">
+                  <div class="drop-icon">🖼</div>
+                  <div>Arrastre aquí la imagen</div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Tab: Juego en Vivo -->
+      <div class="tab-panel hidden" data-panel="live">
+        <div class="field-block">
+          <label class="cfg-label">Tiempo por pregunta</label>
+          <select id="cfgTimer" class="cfg-input">
+            <option>30 Segundos</option>
+            <option>60 Segundos</option>
+            <option>90 Segundos</option>
+          </select>
+        </div>
+        <div class="field-block">
+          <label class="cfg-label">Puntaje por pregunta</label>
+          <select id="cfgPoints" class="cfg-input">
+            <option>1 punto</option>
+            <option>2 puntos</option>
+            <option>5 puntos</option>
+          </select>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<input type="hidden" id="cuestionario_id" value="{{ cuestionario.id if cuestionario else '' }}">
+<script>
+  // Cargar datos del cuestionario si existe
+  {% if cuestionario %}
+  window.cuestionarioData = {{ cuestionario | tojson | safe }};
+  {% endif %}
+</script>
+{% endblock %}
+{% block page_js %}<script src="{{ url_for('static', filename='js/editor.js') }}"></script>{% endblock %}

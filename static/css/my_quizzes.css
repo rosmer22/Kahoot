@@ -1,0 +1,230 @@
+/* --- Estilos Generales --- */
+:root {
+  --color-naranja: #fdd867;
+  --color-fondo-claro: #f0f0f0;
+}
+
+/* --- Hero Section --- */
+.quizzes-hero {
+  background-color: var(--color-naranja);
+  text-align: center;
+  padding: 4rem 2rem 31rem;
+  position: relative;
+  margin: 0;
+  margin-bottom: -30rem;
+  z-index: 0;
+}
+
+.quizzes-hero h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  color: #3a3a3a;
+  z-index: 1;
+  position: relative;
+}
+
+/* --- Curva --- */
+.quizzes-hero .curve {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  line-height: 0;
+  z-index: 0;
+}
+
+.quizzes-hero .curve svg {
+  position: relative;
+  display: block;
+  width: calc(100% + 1.3px);
+  height: 180px;
+}
+
+.quizzes-hero .curve .shape-fill {
+  fill: var(--color-fondo-claro);
+}
+
+/* --- Contenedor de Listas --- */
+.lists {
+  display: grid;
+  gap: 1rem;
+  margin: -18rem auto 2rem;
+  max-width: 1200px;
+  padding: 0 1rem;
+  position: relative;
+  z-index: 10;
+}
+
+.lists h3 {
+  font-size: 1.5rem;
+  color: #333;
+  margin: 1.5rem 0 0.75rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  background: #f2f2f2;
+  border: 1px dashed #c9c9c9;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.cards.soft {
+  background: #f6ecec;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+}
+
+.card .thumb {
+  height: 140px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card .thumb-placeholder {
+  font-size: 3rem;
+  opacity: 0.8;
+}
+
+.card-content {
+  padding: 1rem;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #1f2937;
+  margin-bottom: 0.75rem;
+  text-align: left;
+}
+
+.quiz-info {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.quiz-pin, .quiz-questions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.btn-edit, .btn-delete {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.btn-edit {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #2563eb;
+}
+
+.btn-delete {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #dc2626;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 2px dashed #d1d5db;
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+.empty-state .btn {
+  background: #3b82f6;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  display: inline-block;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.empty-state .btn:hover {
+  background: #2563eb;
+}
+
+.load-more {
+  display: block;
+  margin: 0.25rem auto 1rem;
+  border-radius: 8px;
+  background: #bfbfbf;
+  border: 1px solid #9ca3af;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+
+.load-more:hover {
+  background: #a8a8a8;
+}
+
+@media (max-width: 800px) {
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .quizzes-hero h1 {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
