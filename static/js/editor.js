@@ -98,6 +98,9 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
 
   // Agregar nueva pregunta
   function addNewQuestion() {
+    // Primero guardar la pregunta actual
+    saveCurrentQuestion();
+    
     const newQuestion = {
       text: '',
       type: 'multiple',
@@ -181,36 +184,123 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     const questionTypeSelect = document.querySelector('.select-question-type');
     const pointsSelect = document.querySelector('.select-points');
     const timeSelect = document.querySelector('.select-time');
+    const answersContainer = document.getElementById('answersContainer');
 
-    if (questionText) questionText.value = question.text;
-    if (questionTypeSelect) questionTypeSelect.value = question.type;
+    // Limpiar completamente el texto de la pregunta
+    if (questionText) questionText.value = question.text || '';
     if (pointsSelect) pointsSelect.value = question.points;
     if (timeSelect) timeSelect.value = question.time;
+    
+    // Limpiar el contenedor de respuestas completamente
+    answersContainer.innerHTML = '';
+    
+    // Actualizar el tipo de pregunta
+    if (questionTypeSelect) questionTypeSelect.value = question.type;
 
-    // Disparar evento change para actualizar el tipo de pregunta
-    if (questionTypeSelect) {
-      questionTypeSelect.dispatchEvent(new Event('change'));
+    // Recrear las alternativas según el tipo
+    const answerCount = question.answers.length;
+    
+    if (question.type === 'verdadero-falso') {
+      // Crear alternativas de Verdadero/Falso
+      const verdadero = document.createElement('div');
+      verdadero.className = 'answer pink';
+      verdadero.innerHTML = `
+        <div class="answer-head">
+          <button class="tiny-btn delete-answer-btn" title="Eliminar" style="display:none;">🗑</button>
+          <span class="check">✔</span>
+        </div>
+        <input class="answer-input" placeholder="Escriba la alternativa aqui" value="Verdadero" readonly>
+      `;
+      
+      const falso = document.createElement('div');
+      falso.className = 'answer pink';
+      falso.innerHTML = `
+        <div class="answer-head">
+          <button class="tiny-btn delete-answer-btn" title="Eliminar" style="display:none;">🗑</button>
+          <span class="check">✔</span>
+        </div>
+        <input class="answer-input" placeholder="Escriba la alternativa aqui" value="Falso" readonly>
+      `;
+      
+      answersContainer.appendChild(verdadero);
+      answersContainer.appendChild(falso);
+      
+      // Marcar la correcta
+      if (question.answers[0] && question.answers[0].isCorrect) {
+        verdadero.classList.add('selected');
+      }
+      if (question.answers[1] && question.answers[1].isCorrect) {
+        falso.classList.add('selected');
+      }
+    } else {
+      // Crear alternativas normales
+      for (let i = 0; i < answerCount; i++) {
+        const answer = document.createElement('div');
+        answer.className = 'answer pink';
+        answer.innerHTML = `
+          <div class="answer-head">
+            <button class="tiny-btn delete-answer-btn" title="Eliminar">🗑</button>
+            <span class="check">✔</span>
+          </div>
+          <input class="answer-input" placeholder="Escriba la alternativa aqui" value="">
+        `;
+        
+        // Establecer el texto y si es correcta
+        const input = answer.querySelector('.answer-input');
+        if (input && question.answers[i]) {
+          input.value = question.answers[i].text || '';
+        }
+        
+        if (question.answers[i] && question.answers[i].isCorrect) {
+          answer.classList.add('selected');
+        }
+        
+        answersContainer.appendChild(answer);
+      }
     }
-
-    // Esperar a que se regeneren las alternativas
-    setTimeout(() => {
-      const answersContainer = document.getElementById('answersContainer');
-      const answerElements = answersContainer.querySelectorAll('.answer');
-
-      question.answers.forEach((answer, i) => {
-        if (answerElements[i]) {
-          const input = answerElements[i].querySelector('.answer-input');
-          if (input && !input.hasAttribute('readonly')) {
-            input.value = answer.text;
-          }
-          if (answer.isCorrect) {
-            answerElements[i].classList.add('selected');
+    
+    // Re-adjuntar eventos a todas las alternativas
+    const allAnswers = answersContainer.querySelectorAll('.answer');
+    allAnswers.forEach(answer => {
+      // Evento de clic para seleccionar
+      answer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('delete-answer-btn') || 
+            e.target.classList.contains('answer-input') ||
+            e.target.tagName === 'INPUT') {
+          return;
+        }
+        
+        const isSelected = this.classList.contains('selected');
+        const currentMode = questionTypeSelect ? questionTypeSelect.value : 'multiple';
+        
+        if (currentMode === 'multiple') {
+          // Opción Múltiple: Se pueden seleccionar varias
+          if (isSelected) {
+            this.classList.remove('selected');
           } else {
-            answerElements[i].classList.remove('selected');
+            this.classList.add('selected');
           }
+        } else {
+          // Selección Simple o Verdadero/Falso: Solo una
+          allAnswers.forEach(ans => ans.classList.remove('selected'));
+          this.classList.add('selected');
         }
       });
-    }, 100);
+
+      // Evento de eliminar (solo para alternativas normales)
+      const deleteBtn = answer.querySelector('.delete-answer-btn');
+      if (deleteBtn && question.type !== 'verdadero-falso') {
+        deleteBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const currentCount = answersContainer.querySelectorAll('.answer').length;
+          if (currentCount <= 2) {
+            alert('Debe haber al menos 2 alternativas');
+            return;
+          }
+          answer.remove();
+        });
+      }
+    });
   };
 
   // Event listeners
@@ -591,8 +681,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     });
   }
 
-  // Inicializar
-  initializeAnswers();
+  // NO inicializar alternativas aquí - lo hace loadQuestion()
 })();
 
 // Auto-guardar al escribir en la pregunta
