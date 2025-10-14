@@ -165,6 +165,21 @@
 .drop-icon{font-size:1.6rem}
 .tab-panel.hidden{display:none}
 
+/* Privacy Options */
+.privacy-options{display:flex;flex-direction:column;gap:1rem;margin-top:1rem}
+.privacy-option{display:block;background:#fff;border:2px solid #d1d5db;border-radius:12px;padding:1.25rem;cursor:pointer;transition:all 0.2s ease}
+.privacy-option:hover{border-color:#ff9f2a;background:#fff9f0}
+.privacy-option input[type="radio"]{display:none}
+.privacy-option input[type="radio"]:checked + .option-content{background:#fff9f0}
+.privacy-option:has(input[type="radio"]:checked){border-color:#ff9f2a}
+.option-content{display:flex;gap:1.25rem;align-items:center;transition:all 0.2s ease}
+.option-icon{font-size:2.5rem;color:#6b7280;width:50px;height:50px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.privacy-option input[type="radio"]:checked + .option-content .option-icon{color:#ff9f2a}
+.option-text{flex:1}
+.option-text strong{display:block;font-size:1.1rem;margin-bottom:0.25rem;color:#1f2937}
+.option-text p{margin:0;font-size:0.9rem;color:#6b7280;line-height:1.4}
+.privacy-option input[type="radio"]:checked + .option-content .option-text strong{color:#ff9f2a}
+
 /* ===== Panel Lateral de Preguntas ===== */
 .questions-sidebar {
   position: fixed;

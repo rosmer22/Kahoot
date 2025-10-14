@@ -38,8 +38,10 @@ def crear_cuestionario(db, data, files, upload_folder):
         descripcion = data.get('descripcion', '').strip()
         preguntas_data = data.get('preguntas', [])
         pin = data.get('pin', '').strip()  # Obtener PIN del frontend
+        estado = data.get('estado', 'publico').strip()  # Obtener estado de privacidad (publico/privado)
         
         print(f"DEBUG: PIN recibido del frontend: '{pin}'")  # Debug
+        print(f"DEBUG: Estado de privacidad: '{estado}'")  # Debug
         
         # Validaciones
         if not titulo:
@@ -74,14 +76,15 @@ def crear_cuestionario(db, data, files, upload_folder):
         query_cuestionario = """
             INSERT INTO cuestionarios 
             (user_id, titulo, descripcion, imagen_portada, pin, estado)
-            VALUES (%s, %s, %s, %s, %s, 'borrador')
+            VALUES (%s, %s, %s, %s, %s, %s)
         """
         cursor.execute(query_cuestionario, (
             user_id,
             titulo,
             descripcion if descripcion else None,
             imagen_portada,
-            pin
+            pin,
+            estado  # Guardar el estado de privacidad
         ))
         cuestionario_id = cursor.lastrowid
         
@@ -179,6 +182,7 @@ def actualizar_cuestionario(db, cuestionario_id, data, files, upload_folder):
         titulo = data.get('titulo', '').strip()
         descripcion = data.get('descripcion', '').strip()
         preguntas_data = data.get('preguntas', [])
+        estado = data.get('estado', 'publico').strip()  # Obtener estado de privacidad
         
         # Validaciones
         if not titulo:
@@ -202,13 +206,14 @@ def actualizar_cuestionario(db, cuestionario_id, data, files, upload_folder):
         # Actualizar cuestionario
         query_update = """
             UPDATE cuestionarios 
-            SET titulo = %s, descripcion = %s, imagen_portada = %s
+            SET titulo = %s, descripcion = %s, imagen_portada = %s, estado = %s
             WHERE id = %s
         """
         cursor.execute(query_update, (
             titulo,
             descripcion if descripcion else None,
             imagen_portada,
+            estado,  # Actualizar el estado de privacidad
             cuestionario_id
         ))
         

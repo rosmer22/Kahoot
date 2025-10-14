@@ -142,8 +142,27 @@ def my_quizzes():
 
 @app.route('/explore')
 def explore():
-    items = [{'title': f'Resultado {i+1}'} for i in range(9)]
+    # Obtener cuestionarios públicos de la base de datos
+    db = bd.obtener_conexion()
+    cursor = db.cursor()
+    
+    cursor.execute("""
+        SELECT id, titulo, pin, descripcion, imagen_portada 
+        FROM cuestionarios 
+        WHERE estado = 'publico'
+        ORDER BY created_at DESC
+    """)
+    
+    items = cursor.fetchall()
+    cursor.close()
+    db.close()
+    
     return render_template('explore.html', title='Explorar', items=items)
+
+@app.route('/join')
+def join_quiz():
+    """Página para unirse a un cuestionario usando un PIN"""
+    return render_template('join.html', title='Unirse a Cuestionario')
 
 @app.route('/editor')
 def editor():

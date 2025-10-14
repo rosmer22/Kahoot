@@ -15,15 +15,6 @@
   z-index: 0;
 }
 
-.explore-hero h1 {
-  margin: 0;
-  font-size: 2.5rem;
-  color: #3a3a3a;
-  z-index: 1;
-  position: relative;
-  font-family: 'Roboto Slab', serif;
-}
-
 /* --- Curva --- */
 .explore-hero .curve {
   position: absolute;
@@ -79,12 +70,40 @@
   border-radius: 8px 8px 0 0;
 }
 
-.result .name {
-  text-align: center;
-  padding: 0.5rem;
+.result .info {
+  padding: 0.75rem;
   border-top: 1px solid #e5e7eb;
   background: #f9fafb;
   border-radius: 0 0 8px 8px;
+}
+
+.result .name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.result .pin-badge {
+  display: inline-block;
+  background: #ff9f2a;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.no-results {
+  text-align: center;
+  margin: 2rem 0;
+  color: #6b7280;
+  font-size: 1.1rem;
+  position: relative;
+  z-index: 10;
+}
+
+.no-results.hidden {
+  display: none;
 }
 
 .more {
@@ -92,6 +111,13 @@
   margin: 1rem 0 2rem;
   position: relative;
   z-index: 10;
+}
+
+/* --- Footer ajuste para explore --- */
+footer {
+  position: relative;
+  z-index: 10;
+  margin-top: 4rem;
 }
 
 @media (max-width: 800px) {

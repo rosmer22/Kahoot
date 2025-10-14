@@ -3,7 +3,6 @@
 {% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/explore.css') }}">{% endblock %}
 {% block content %}
 <section class="explore-hero">
-  <h1>Cuestionarios</h1>
   <div class="curve">
     <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
       <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
@@ -11,14 +10,24 @@
   </div>
 </section>
 
-<section class="container grid-results">
-  {% for item in items %}
-  <article class="result">
-    <div class="thumb"></div>
-    <div class="name">Nombre</div>
-  </article>
-  {% endfor %}
+<section class="container grid-results" id="resultsGrid">
+  {% if items %}
+    {% for item in items %}
+    <article class="result" data-name="{{ item.titulo }}" data-pin="{{ item.pin }}">
+      <div class="thumb"></div>
+      <div class="info">
+        <div class="name">{{ item.titulo }}</div>
+        <div class="pin-badge">PIN: {{ item.pin }}</div>
+      </div>
+    </article>
+    {% endfor %}
+  {% endif %}
 </section>
 
+{% if not items %}
+<p class="container no-results" id="noResultsInitial">Sin Cuestionarios Disponibles</p>
+{% endif %}
+<p class="container no-results hidden" id="noResults">No se encontraron cuestionarios</p>
 <p class="container more"><a href="#" class="link-underline">Ver más resultados</a></p>
 {% endblock %}
+{% block page_js %}<script src="{{ url_for('static', filename='js/explore.js') }}"></script>{% endblock %}

@@ -2,9 +2,7 @@
     <div class="header-inner">
         <!-- Izquierda: Logo y Nombre -->
         <div class="left cluster">
-            <a class="avatar" href="{{ url_for('home') }}" aria-label="Inicio">
-                <img src="static/img/robot_ico.png" alt="Logo de la página" >
-            </a>
+            <a class="avatar" href="{{ url_for('home') }}" aria-label="Inicio"></a>
             <a class="brand-title" href="{{ url_for('home') }}">RoBot</a>
         </div>
 
@@ -20,6 +18,10 @@
 
         <!-- Derecha: Botones de Creación y Perfil -->
         <div class="right cluster creation-buttons">
+            <a href="{{ url_for('join_quiz') }}" class="btn btn-join">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+                <span>Unirme</span>
+            </a>
             <a href="{{ url_for('editor') }}" class="btn btn-create">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 <span>Crea un cuestionario</span>

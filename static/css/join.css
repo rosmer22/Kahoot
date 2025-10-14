@@ -1,0 +1,272 @@
+:root {
+    --color-secundario-amarillo: #fdd867;
+    --color-fondo-claro: #f0f0f0;
+    --color-texto: #333333;
+    --color-gris-claro-tarjeta: #e9e9e9;
+    --color-naranja: #ff9f2a;
+    --color-naranja-hover: #e68a1f;
+}
+
+/* Sección principal igual que login */
+.join-section {
+    background-color: var(--color-secundario-amarillo);
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4rem 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Card similar a auth-card del login */
+.join-card {
+    background-color: var(--color-gris-claro-tarjeta);
+    padding: 2.5rem 3rem;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 580px;
+    z-index: 1;
+    border: 1px solid #ddd;
+}
+
+/* Icono centrado */
+.join-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    background: var(--color-naranja);
+    border-radius: 50%;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 4px 15px rgba(255, 159, 42, 0.3);
+}
+
+.join-icon svg {
+    color: white;
+}
+
+/* Título */
+.join-card h2 {
+    text-align: center;
+    font-size: 2.2rem;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: var(--color-texto);
+}
+
+/* Subtítulo */
+.join-subtitle {
+    text-align: center;
+    color: #666;
+    font-size: 1rem;
+    margin-bottom: 2rem;
+}
+
+/* Formulario */
+.join-form {
+    margin-top: 1.5rem;
+}
+
+/* Grupo de input con botón integrado */
+.pin-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 2px solid var(--color-naranja);
+    border-radius: 50px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.pin-input-group:focus-within {
+    border-color: var(--color-naranja);
+    box-shadow: 0 0 0 4px rgba(255, 159, 42, 0.15);
+}
+
+.pin-code-input {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    border: none;
+    background: transparent;
+    color: var(--color-texto);
+    text-transform: uppercase;
+    box-sizing: border-box;
+}
+
+.pin-code-input:focus {
+    outline: none;
+}
+
+.pin-code-input::placeholder {
+    color: #9ca3af;
+    text-transform: none;
+}
+
+/* Botón dentro del input (estilo naranja) */
+.btn-unir {
+    background: var(--color-naranja);
+    color: white;
+    border: none;
+    padding: 0.85rem 2.5rem;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 4px;
+    white-space: nowrap;
+}
+
+.btn-unir:hover {
+    background: var(--color-naranja-hover);
+}
+
+.btn-unir:active {
+    transform: scale(0.98);
+}
+
+.btn-unir:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Error Message */
+.error-message {
+  padding: 1rem 1.5rem;
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 0.875rem;
+  text-align: center;
+  animation: shake 0.5s ease;
+}
+
+.error-message.hidden {
+  display: none;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
+}
+
+/* Error message */
+.error-message {
+    padding: 1rem 1.5rem;
+    background-color: #fee2e2;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    color: #991b1b;
+    font-size: 0.95rem;
+    text-align: center;
+    animation: shake 0.5s ease;
+}
+
+.error-message.hidden {
+    display: none;
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-10px);
+    }
+    75% {
+        transform: translateX(10px);
+    }
+}
+
+/* Footer */
+.join-footer {
+    margin-top: 2rem;
+    text-align: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid #d0d0d0;
+}
+
+.join-footer p {
+    color: #666;
+    font-size: 1rem;
+}
+
+.join-footer a {
+    color: var(--color-naranja);
+    text-decoration: underline;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.join-footer a:hover {
+    color: var(--color-naranja-hover);
+}
+
+/* Curva decorativa (igual que login) */
+.join-section .curve { 
+    position: absolute; 
+    bottom: -1px; 
+    left: 0; 
+    width: 100%; 
+    overflow: hidden; 
+    line-height: 0; 
+    z-index: 0;
+}
+
+.join-section .curve svg { 
+    position: relative; 
+    display: block; 
+    width: calc(100% + 1.3px); 
+    height: 180px; 
+}
+
+.join-section .curve .shape-fill { 
+    fill: var(--color-fondo-claro); 
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .join-card {
+        padding: 2rem 1.5rem;
+    }
+
+    .join-card h2 {
+        font-size: 1.8rem;
+    }
+
+    .pin-code-input {
+        font-size: 0.95rem;
+        padding: 0.9rem 1.2rem;
+    }
+
+    .btn-unir {
+        padding: 0.75rem 1.75rem;
+        font-size: 1rem;
+    }
+
+    .join-icon {
+        width: 64px;
+        height: 64px;
+    }
+
+    .join-icon svg {
+        width: 40px;
+        height: 40px;
+    }
+}

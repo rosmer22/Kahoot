@@ -462,6 +462,15 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     if (pinInput && data.pin) {
       pinInput.value = data.pin;
     }
+    
+    // Cargar el estado de privacidad
+    const cfgPublico = document.getElementById('cfgPublico');
+    const cfgPrivado = document.getElementById('cfgPrivado');
+    if (data.estado === 'privado' && cfgPrivado) {
+      cfgPrivado.checked = true;
+    } else if (cfgPublico) {
+      cfgPublico.checked = true;
+    }
   }
 
   // Make "Configuración" button reopen modal
@@ -741,6 +750,10 @@ function guardarCuestionario() {
   const descripcion = document.getElementById('cfgDescInput').value.trim();
   const imagenFile = document.getElementById('cfgFile').files[0];
   const cuestionarioId = document.getElementById('cuestionario_id').value;
+  
+  // Obtener configuración de privacidad
+  const privacyPublico = document.getElementById('cfgPublico');
+  const estado = privacyPublico && privacyPublico.checked ? 'publico' : 'privado';
 
   // Validar que haya un título
   if (!titulo) {
@@ -788,7 +801,8 @@ function guardarCuestionario() {
     titulo: titulo,
     descripcion: descripcion,
     preguntas: questions,
-    pin: pin  // Incluir el PIN del encabezado
+    pin: pin,  // Incluir el PIN del encabezado
+    estado: estado  // Incluir el estado de privacidad
   };
 
   // Determinar si es creación o actualización
@@ -808,6 +822,7 @@ function guardarCuestionario() {
     requestData.append('descripcion', descripcion);
     requestData.append('preguntas', JSON.stringify(questions));
     requestData.append('pin', pin);  // Incluir el PIN del encabezado
+    requestData.append('estado', estado);  // Incluir el estado de privacidad
     requestData.append('imagen_portada', imagenFile);
     console.log('Enviando como FormData con PIN:', pin);  // Debug
   } else {

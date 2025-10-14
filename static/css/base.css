@@ -5,7 +5,6 @@
   --pill:#dcdcdc; --pill-txt:#222; --pill-br:#c9c9c9;
   --footer-top:#7bb4ad; --footer-bottom:#6ba6a0; --accent:#a6d500;
   --color-azul-footer:#8cb6b6; --color-footer-fondo:#4a4a4a;
-  --color-verde-cta: #c4d89f;
 }
 html,body{margin:0;padding:0}
 body{font-family:Georgia, 'Times New Roman', Times, serif; color:var(--ink); background:#f3f3f3; line-height:1.5}
@@ -22,19 +21,16 @@ body{font-family:Georgia, 'Times New Roman', Times, serif; color:var(--ink); bac
 .page-main{min-height:60vh}
 
 /* Footer */
-footer{background-color:var(--color-azul-footer);color:white;padding:4rem 4rem 0; position: relative;}
-.footer-content{ display:flex;justify-content:space-between;flex-wrap:wrap;gap:2rem;padding-bottom:3rem;}
-/*.footer-content{display:flex;justify-content:space-between;flex-wrap:wrap;gap:2rem;padding-bottom:3rem}*/
+footer{background-color:var(--color-azul-footer);color:white;padding:4rem 4rem 0}
+.footer-content{display:flex;justify-content:space-between;flex-wrap:wrap;gap:2rem;padding-bottom:3rem}
 .footer-column h4{margin-top:0;font-size:1.2rem;margin-bottom:1rem}
 .footer-column ul{list-style:none;padding:0;margin:0}
 .footer-column li{margin-bottom:0.5rem}
 .footer-column a{color:white;text-decoration:none;font-size:1rem}
 .footer-social{display:flex;flex-direction:column;align-items:flex-start}
-.social-icons{display:flex;gap:1rem;}/*margin-top:1rem*/
+.social-icons{display:flex;gap:1rem;margin-top:1rem}
 .social-icons a{color:white}
 .social-icons svg{width:24px;height:24px}
-.logo_footer{text-align: center}
-.logo_footer img{width: 116px}
 .footer-bottom{background-color:var(--color-footer-fondo);text-align:center;padding:1rem;margin:0 -4rem}
 .footer-bottom p{margin:0;font-size:0.9rem}
 .hero{background:linear-gradient(180deg,#ffd36a 0%,#fff 100%);position:relative;padding-top:0}
@@ -131,5 +127,3 @@ footer{background-color:var(--color-azul-footer);color:white;padding:4rem 4rem 0
     max-width:none;
   }
 }
-
-.cta-curve .shape-fill-footer { fill: var(--color-verde-cta);}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/join.css') }}">{% endblock %}
+{% block content %}
+
+<main class="join-section">
+    <div class="join-card">
+        <div class="join-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </div>
+        <h2>Unirse a un Cuestionario</h2>
+        <p class="join-subtitle">Ingresa el código de participación para comenzar</p>
+        
+        <form id="joinForm" class="join-form">
+            <div class="pin-input-group">
+                <input 
+                    type="text" 
+                    id="pinInput" 
+                    class="pin-code-input" 
+                    placeholder="Introducir un código de participación" 
+                    maxlength="6"
+                    autocomplete="off"
+                    required
+                >
+                <button type="submit" class="btn-unir">Unir</button>
+            </div>
+
+            <div id="errorMessage" class="error-message hidden"></div>
+        </form>
+
+        <div class="join-footer">
+            <p>¿No tienes un código? <a href="{{ url_for('explore') }}">Explora cuestionarios públicos</a></p>
+        </div>
+    </div>
+    
+    <div class="curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</main>
+
+{% endblock %}
+{% block page_js %}<script src="{{ url_for('static', filename='js/join.js') }}"></script>{% endblock %}

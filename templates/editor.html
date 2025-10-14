@@ -87,7 +87,7 @@
   <div class="config-body">
     <aside class="cfg-nav">
       <button class="cfg-tab active" data-tab="basic">Información Básica</button>
-      <button class="cfg-tab" data-tab="live">Juego en Vivo</button>
+      <button class="cfg-tab" data-tab="privacy">Privacidad</button>
       <div class="cfg-filler"></div>
     </aside>
     <section class="cfg-content">
@@ -121,23 +121,33 @@
           </div>
         </div>
       </div>
-      <!-- Tab: Juego en Vivo -->
-      <div class="tab-panel hidden" data-panel="live">
+      <!-- Tab: Privacidad -->
+      <div class="tab-panel hidden" data-panel="privacy">
         <div class="field-block">
-          <label class="cfg-label">Tiempo por pregunta</label>
-          <select id="cfgTimer" class="cfg-input">
-            <option>30 Segundos</option>
-            <option>60 Segundos</option>
-            <option>90 Segundos</option>
-          </select>
-        </div>
-        <div class="field-block">
-          <label class="cfg-label">Puntaje por pregunta</label>
-          <select id="cfgPoints" class="cfg-input">
-            <option>1 punto</option>
-            <option>2 puntos</option>
-            <option>5 puntos</option>
-          </select>
+          <label class="cfg-label">Visibilidad del Cuestionario</label>
+          <p class="cfg-hint">Controla quién puede ver tu cuestionario en la página de explorar</p>
+          <div class="privacy-options">
+            <label class="privacy-option">
+              <input type="radio" name="privacy" value="publico" id="cfgPublico" checked>
+              <div class="option-content">
+                <div class="option-icon"><i class="fas fa-globe"></i></div>
+                <div class="option-text">
+                  <strong>Público</strong>
+                  <p>Aparece en la página de explorar. Todos los usuarios pueden encontrarlo y acceder con el PIN.</p>
+                </div>
+              </div>
+            </label>
+            <label class="privacy-option">
+              <input type="radio" name="privacy" value="privado" id="cfgPrivado">
+              <div class="option-content">
+                <div class="option-icon"><i class="fas fa-lock"></i></div>
+                <div class="option-text">
+                  <strong>Privado</strong>
+                  <p>No aparece en explorar. Solo accesible mediante el PIN que tú compartes.</p>
+                </div>
+              </div>
+            </label>
+          </div>
         </div>
       </div>
     </section>
