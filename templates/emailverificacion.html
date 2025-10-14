@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>Verificación de correo</h2>
+  <form method="POST">
+    <input type="text" name="codigo" placeholder="Código recibido por correo" required>
+    <button type="submit">Verificar</button>
+  </form>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <p>{{ message }}</p>
+    {% endfor %}
+  {% endwith %}
+</body>
+</html>
