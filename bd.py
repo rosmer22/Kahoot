@@ -5,6 +5,6 @@ def obtener_conexion():
                                 port=3327,
                                 user='root',
                                 password='',
-                                db='kahoot',
+                                db='robot',
                                 charset='utf8mb4',
                                 cursorclass=pymysql.cursors.DictCursor)
