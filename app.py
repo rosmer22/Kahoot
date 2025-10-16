@@ -144,6 +144,12 @@ def verify_email():
     if not email:
         return redirect(url_for('register'))
 
+    # Validar si el correo ya pertenece a un usuario registrado
+    if user_controller.obtener_usuario_por_email(email):
+        session.pop('email_verificacion', None)
+        flash('Ya tienes una cuenta con este correo. Por favor, inicia sesión.', 'info')
+        return redirect(url_for('login'))
+
     if request.method == 'POST':
         codigo_ingresado = request.form.get('codigo')
         datos = usuarios_pendientes.get(email)

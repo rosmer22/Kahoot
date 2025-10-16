@@ -66,6 +66,19 @@
 .carousel-cards {
     display: flex;
     gap: 2rem;
+    overflow-x: scroll;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    cursor: grab;
+}
+
+.carousel-cards::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+.carousel-cards.active {
+    cursor: grabbing;
+    cursor: -webkit-grabbing;
 }
 
 .card {
@@ -74,6 +87,8 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     width: 280px;
     padding: 1rem;
+    flex-shrink: 0;
+    scroll-snap-align: center;
 }
 
 .card-image-placeholder {

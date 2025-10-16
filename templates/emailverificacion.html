@@ -1,16 +1,199 @@
-<!DOCTYPE html>
-<html>
-<body>
-  <h2>Verificación de correo</h2>
-  <form method="POST">
-    <input type="text" name="codigo" placeholder="Código recibido por correo" required>
-    <button type="submit">Verificar</button>
-  </form>
+{% extends "base.html" %}
+{% block page_css %}
+    <meta name="description" content="Verifica tu correo electrónico ingresando el código de 6 dígitos que te enviamos" />
+    <meta name="author" content="Verificación Segura" />
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for category, message in messages %}
-      <p>{{ message }}</p>
-    {% endfor %}
-  {% endwith %}
-</body>
-</html>
+    <meta property="og:title" content="Verificación de Correo - Código de Seguridad" />
+    <meta property="og:description" content="Verifica tu correo electrónico de forma rápida y segura" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <style>
+        :root {
+            /* Variables de color consistentes con login.css */
+            --color-secundario-amarillo: #fdd867;
+            --color-fondo-claro: #f0f0f0;
+            --color-texto: #333333;
+            --color-gris-claro-tarjeta: #e9e9e9;
+            --color-gris-boton: #b0b0b0;
+            --color-borde-input: #b8b8b8;
+        }
+
+        .verification-section {
+            background-color: var(--color-fondo-claro); /* Fondo neutro y claro */
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 4rem 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .auth-card {
+            background-color: var(--color-gris-claro-tarjeta);
+            padding: 2.5rem 3rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 480px;
+            z-index: 1;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        .auth-card h2 {
+            text-align: center;
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: var(--color-texto);
+        }
+
+        .auth-card .subtitle {
+            color: #666;
+            margin-bottom: 2.5rem;
+            font-size: 1.1rem;
+        }
+
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .auth-form .field {
+            text-align: left;
+        }
+
+        .auth-form .label {
+            display: block;
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+            color: #555;
+            font-size: 1.1rem;
+        }
+
+        .auth-form .input {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid var(--color-borde-input);
+            background-color: #fff;
+            border-radius: 12px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            text-align: center; /* Centrar el texto del código */
+            letter-spacing: 0.5rem; /* Espaciar los dígitos */
+        }
+
+        .auth-form .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 12px;
+            background-color: var(--color-gris-boton);
+            color: #444;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 1rem;
+        }
+
+        .auth-form .submit-btn:hover {
+            background-color: #a0a0a0;
+        }
+
+        /* Contenedor para los mensajes flash */
+        .flash-messages-container {
+            margin-top: 2rem;
+            text-align: center;
+        }
+
+        .flash-message {
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            border: 1px solid transparent;
+        }
+
+        .flash-success {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+
+        .flash-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        .flash-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+
+        /* Curva decorativa */
+        .verification-section .curve { 
+            position: absolute; 
+            bottom: -1px; 
+            left: 0; 
+            width: 100%; 
+            overflow: hidden; 
+            line-height: 0; 
+            z-index: 0; 
+        }
+        .verification-section .curve svg { 
+            position: relative; 
+            display: block; 
+            width: calc(100% + 1.3px); 
+            height: 180px; 
+        }
+        .verification-section .curve .shape-fill { 
+            fill: var(--color-fondo-claro); 
+        }
+    </style>
+{% endblock %}
+{% block content %}
+<main class="verification-section">
+    <div class="auth-card">
+        <h2>Verificación de Correo</h2>
+        <p class="subtitle">Ingresa el código que enviamos a tu bandeja de entrada.</p>
+        
+        <form class="auth-form" method="POST">
+            <div class="field">
+                <label class="label" for="codigo">Código de 6 dígitos</label>
+                <input class="input" type="text" id="codigo" name="codigo" placeholder="123456" required maxlength="6" pattern="\d{6}" title="El código debe tener 6 dígitos.">
+            </div>
+            <button class="submit-btn" type="submit">Verificar</button>
+        </form>
+
+        <!-- Contenedor para los mensajes flash -->
+        <div class="flash-messages-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <!-- Curva decorativa -->
+    <div class="curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</main>
+{% endblock %}

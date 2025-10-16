@@ -1,52 +1,75 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const slider = document.querySelector('.carousel-cards');
+    if (!slider) return;
 
-(() => {
-  const track = document.getElementById('carousel-track');
-  const prev = document.querySelector('.carousel .prev');
-  const next = document.querySelector('.carousel .next');
-  const viewport = document.querySelector('.carousel-viewport');
-  if (!track || !viewport) return;
-  const items = Array.from(track.children);
-  let index = 0, itemWidth = 0;
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+    let walk = 0;
 
-  function measure(){
-    const first = items[0]; if (!first) return;
-    const gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap) || 0;
-    itemWidth = first.getBoundingClientRect().width + gap;
-  }
-  function snap(i){
-    index = Math.max(0, Math.min(i, items.length - 1));
-    const maxT = (items.length * itemWidth) - viewport.getBoundingClientRect().width;
-    const raw = index * itemWidth;
-    const x = Math.max(0, Math.min(raw, maxT));
-    track.style.transform = `translateX(${-x}px)`;
-    items.forEach((el, idx) => el.setAttribute('aria-selected', idx === index ? 'true' : 'false'));
-  }
-  function step(dir){
-    const visible = Math.max(1, Math.round(viewport.getBoundingClientRect().width / itemWidth));
-    snap(index + dir * visible);
-  }
-  prev && prev.addEventListener('click', () => step(-1));
-  next && next.addEventListener('click', () => step(1));
-  viewport.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft') step(-1);
-    if (e.key === 'ArrowRight') step(1);
-  });
-  let sx=0,cx=0,drag=false,base=0;
-  function cur(){
-    const t = getComputedStyle(track).transform;
-    if (t && t !== 'none'){ const m = new DOMMatrixReadOnly(t); return m.m41; }
-    return 0;
-  }
-  function start(x){ drag=true; sx=cx=x; base=cur(); track.style.transition='none'; }
-  function move(x){ if(!drag) return; cx=x; const d=cx-sx; track.style.transform=`translateX(${base+d}px)`; }
-  function end(){ if(!drag) return; drag=false; track.style.transition=''; const d=cx-sx; if (Math.abs(d) > itemWidth*0.3){ step(d>0?-1:1); } else { snap(index); } }
-  viewport.addEventListener('mousedown', e=>start(e.clientX));
-  window.addEventListener('mousemove', e=>move(e.clientX));
-  window.addEventListener('mouseup', end);
-  viewport.addEventListener('touchstart', e=>start(e.touches[0].clientX), {passive:true});
-  window.addEventListener('touchmove', e=>move(e.touches[0].clientX), {passive:true});
-  window.addEventListener('touchend', end);
-  const ro = new ResizeObserver(()=>{ measure(); snap(index); });
-  ro.observe(viewport);
-  measure(); snap(0);
-})();
+    const end = () => {
+        if (!isDown) return;
+        isDown = false;
+        slider.classList.remove('active');
+
+        // Lógica de "snap"
+        const card = slider.querySelector('.card');
+        if (!card) return;
+
+        const cardWidth = card.offsetWidth;
+        const snapThreshold = cardWidth * 0.3; // 30% del ancho de la tarjeta
+
+        // Determinar la tarjeta más cercana
+        const currentScroll = slider.scrollLeft;
+        let targetIndex;
+
+        if (walk < -snapThreshold) { // Deslizó hacia la izquierda (ver siguiente)
+            targetIndex = Math.ceil(currentScroll / cardWidth);
+        } else if (walk > snapThreshold) { // Deslizó hacia la derecha (ver anterior)
+            targetIndex = Math.floor(currentScroll / cardWidth);
+        } else {
+            targetIndex = Math.round(currentScroll / cardWidth);
+        }
+
+        const targetScroll = targetIndex * cardWidth;
+        slider.scrollTo({
+            left: targetScroll,
+            behavior: 'smooth'
+        });
+    };
+
+    const start = (e) => {
+        isDown = true;
+        slider.classList.add('active');
+        startX = (e.pageX || e.touches[0].pageX) - slider.offsetLeft;
+        scrollLeft = slider.scrollLeft;
+        walk = 0; // Resetear el recorrido en cada inicio
+    };
+
+    const move = (e) => {
+        if (!isDown) return;
+        e.preventDefault(); // Evita la selección de texto
+        const x = (e.pageX || e.touches[0].pageX) - slider.offsetLeft;
+        walk = (x - startX); // Distancia total del arrastre
+        slider.scrollLeft = scrollLeft - walk;
+    };
+
+    // Eventos de Mouse
+    slider.addEventListener('mousedown', start);
+    slider.addEventListener('mouseleave', end);
+    slider.addEventListener('mouseup', end);
+    slider.addEventListener('mousemove', move);
+
+    // Eventos Táctiles
+    slider.addEventListener('touchstart', start, { passive: false });
+    slider.addEventListener('touchend', end);
+    slider.addEventListener('touchcancel', end);
+    slider.addEventListener('touchmove', move, { passive: false });
+
+    // Flechas de navegación (opcional, pero buena práctica mantenerlas funcionales)
+    const prevArrow = document.querySelector('.carousel-arrow:first-of-type');
+    const nextArrow = document.querySelector('.carousel-arrow:last-of-type');
+
+    prevArrow?.addEventListener('click', () => slider.scrollBy({ left: -slider.clientWidth, behavior: 'smooth' }));
+    nextArrow?.addEventListener('click', () => slider.scrollBy({ left: slider.clientWidth, behavior: 'smooth' }));
+});
