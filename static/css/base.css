@@ -130,5 +130,28 @@ footer{background-color:var(--color-azul-footer);color:white;padding:4rem 4rem 0
     max-width:none;
   }
 }
+/*Ajustes para el footer*/
+.foot-curve {
+    position: absolute;
+    top: -125px;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    overflow:  hidden;
+    line-height: 0;
+}
 
-.cta-curve .shape-fill-footer { fill: var( --color-white-cta);}
+.foot-curve svg {
+    position: relative;
+    display: block;
+    width: calc(100% + 1.3px);
+    height: 180px;
+}
+
+.foot-curve .shape-fill {
+    fill: var( --color-azul-footer);
+}
+
+.container.editor-wrap{
+padding-bottom: 5rem;
+}
