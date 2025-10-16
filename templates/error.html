@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error del Sistema - RoBot!</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}"><!-- Asegúrate de vincular tu CSS aquí -->
+</head>
+<body>
+  <main class="page-main" style="display: flex; align-items: center; justify-content: center; padding: 1rem 1rem;">
+    <div style="max-width: 600px; text-align: center; background: white; padding: 2rem 2rem; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1);">
+     
+      <div style="margin-inline:auto; font-size: 2rem;">⚠️</div>
+      
+      <h1 style=" font-size: 2rem; color: var(--ink);">Error del Sistema</h1>
+       <img src="{{ url_for('static', filename='img/roboto_error.png') }}" alt="img-robor-error" width="100px">
+      <p style="margin: 1rem 0; color: var(--muted);">
+        Lo sentimos, ha ocurrido un error interno en nuestro sistema. Nuestro equipo técnico ha sido notificado y está trabajando para resolverlo.
+      </p>
+
+      <div class="pill grey" style="margin: 1.5rem auto; display: inline-block;">
+        <strong>Error:</strong>
+      </div>
+
+      <div style="text-align: left; margin-top: 1rem; color: var(--muted); font-size: 0.95rem;">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <ul style="margin-top: 10px; padding-left: 20px;">
+              {% for message in messages %}
+                <li>{{ message }}</li>
+              {% endfor %}
+              <li>El servicio de base de datos está temporalmente indisponible</li>
+              <li>La estructura de la base de datos ha cambiado</li>
+              <li>Problemas de conexión con el servidor</li>
+            </ul>
+          {% else %}
+            <p>No se han encontrado detalles adicionales del error.</p>
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      <a href="{{ url_for('home') }}" class="btn-wide" style="margin-top: 2rem; background: var(--accent); color: var(--color-white-cta); text-decoration: none; display: inline-block; text-align: center;">
+        Volver al Inicio
+      </a>
+
+      <p style="margin-top: 2rem; font-size: 0.9rem; color: var(--muted);">
+        Código de error: <strong>SYS-500</strong>
+      </p>
+    </div>
+  </main>
+</body>
+</html>

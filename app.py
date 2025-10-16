@@ -53,6 +53,9 @@ def inject_globals():
 def home():
     return render_template('home.html', title='RoBot')
 
+@app.errorhandler(Exception)#agregando la pagina de error
+def handle_exception(e):
+        return  render_template('error.html', title='Error')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
