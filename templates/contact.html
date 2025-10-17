@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">{% endblock %}
+{% block content %}
+<main class="page-main contact-page">
+    <div class="container contact-container">
+
+        <h2 class="contact-title">Contáctanos</h2>
+        <p class="contact-text">
+            Si tienes alguna pregunta o comentario, completa el siguiente formulario y te responderemos lo antes
+            posible.
+        </p>
+
+        <form action="/enviar_contacto" method="POST" class="contact-form">
+
+            <div class="form-group">
+                <label for="nombre">Nombre completo</label>
+                <input type="text" id="nombre" name="nombre" class="pill-input" placeholder="Ingresa tu nombre"
+                    required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Correo electrónico</label>
+                <input type="email" id="email" name="email" class="pill-input" placeholder="ejemplo@correo.com"
+                    required>
+            </div>
+
+            <div class="form-group">
+                <label for="asunto">Asunto</label>
+                <input type="text" id="asunto" name="asunto" class="pill-input" placeholder="Motivo del mensaje"
+                    required>
+            </div>
+
+            <div class="form-group">
+                <label for="mensaje">Mensaje</label>
+                <textarea id="mensaje" name="mensaje" rows="5" class="pill-input"
+                    placeholder="Escribe tu mensaje aquí..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn-wide btn-contact">
+                Enviar mensaje
+            </button>
+
+        </form>
+
+    </div>
+</main>
+{% endblock %}
+{% block page_js %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}

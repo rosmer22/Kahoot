@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">{% endblock %}
+{% block content %}
+
+<main class="page-main about-page">
+  <div class="container about-container">
+
+    <h2 class="about-title">Nuestro Equipo</h2>
+    <p class="about-text">
+      Conoce a los desarrolladores detrás del proyecto. Somos un grupo apasionado por la tecnología y la innovación.
+    </p>
+
+    <div class="team-grid">
+
+      <div class="team-card">
+        <img src="static/img/dev1.jpg" alt="Programador 1" class="team-photo">
+        <h3 class="team-name">María López</h3>
+        <p class="team-role">Desarrolladora Backend</p>
+        <p class="team-desc">Especialista en Python, Flask y bases de datos. Le encanta optimizar código y diseñar APIs eficientes.</p>
+      </div>
+
+      <div class="team-card">
+        <img src="static/img/dev2.jpg" alt="Programador 2" class="team-photo">
+        <h3 class="team-name">Carlos Sandoval</h3>
+        <p class="team-role">Desarrollador Frontend</p>
+        <p class="team-desc">Experto en HTML, CSS y JavaScript. Disfruta crear interfaces limpias y accesibles.</p>
+      </div>
+
+      <div class="team-card">
+        <img src="static/img/dev3.jpg" alt="Programador 3" class="team-photo">
+        <h3 class="team-name">Lucía Rivera</h3>
+        <p class="team-role">Diseñadora UI/UX</p>
+        <p class="team-desc">Apasionada por la experiencia del usuario. Transforma ideas en diseños atractivos y funcionales.</p>
+      </div>
+
+            <div class="team-card">
+        <img src="static/img/dev1.jpg" alt="Programador 1" class="team-photo">
+        <h3 class="team-name">María López</h3>
+        <p class="team-role">Desarrolladora Backend</p>
+        <p class="team-desc">Especialista en Python, Flask y bases de datos. Le encanta optimizar código y diseñar APIs eficientes.</p>
+      </div>
+
+      <div class="team-card">
+        <img src="static/img/dev2.jpg" alt="Programador 2" class="team-photo">
+        <h3 class="team-name">Carlos Sandoval</h3>
+        <p class="team-role">Desarrollador Frontend</p>
+        <p class="team-desc">Experto en HTML, CSS y JavaScript. Disfruta crear interfaces limpias y accesibles.</p>
+      </div>
+
+      <div class="team-card">
+        <img src="static/img/dev3.jpg" alt="Programador 3" class="team-photo">
+        <h3 class="team-name">Lucía Rivera</h3>
+        <p class="team-role">Diseñadora UI/UX</p>
+        <p class="team-desc">Apasionada por la experiencia del usuario. Transforma ideas en diseños atractivos y funcionales.</p>
+      </div>
+      
+    </div>
+  </div>
+</main>
+
+
+{% endblock %}
+{% block page_js %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}

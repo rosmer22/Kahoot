@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">{% endblock %}
+{% block content %}
+
+    <main class="page-main main-container">
+        <section class="hero-section">
+            <h1 class="hero-title">SOBRE NOSOTROS – ROBOT</h1>
+            <p class="hero-subtitle">
+                <a href="#mision">Misión</a> |
+                <a href="#historia">Historia</a> |
+                <a href="#valores">Valores</a> |
+                <a href="#equipo">Equipo</a>
+            </p>
+
+            <div class="curve">
+                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path
+                        d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19
+                           c-82.26-17.24-168.06-13.2-250.45,0
+                           C393,31,311.48,72,228.35,92.83,
+                           161.53,109.5,79.27,117.72,0,120H1200
+                           C1118.35,117.72,1042.39,109.5,985.66,92.83Z"
+                        class="shape-fill"></path>
+                </svg>
+            </div>
+        </section>
+
+        <section class="features-section">
+            <div class="feature-row">
+                <div class="feature-text" style="max-width: 800px;">
+                    <h2>Quiénes somos</h2>
+                    <p><strong>Robot</strong> es una plataforma educativa desarrollada en la
+                        <strong>Universidad Santo Toribio de Mogrovejo (USAT)</strong> que busca fomentar la educación
+                        y hacer el aprendizaje divertido.</p>
+                    <p>Está diseñada para que profesores y estudiantes puedan crear, compartir y participar en quizzes
+                        interactivos, promoviendo el aprendizaje colaborativo y la motivación dentro del aula
+                        universitaria.</p>
+                    <p>Nuestro objetivo es hacer que cada sesión de aprendizaje sea más dinámica, participativa y
+                        significativa, combinando la tecnología con la educación.</p>
+                    <p>Con Robot, transformamos el aula tradicional en un espacio de aprendizaje activo donde los estudiantes
+                        no solo reciben información, sino que participan activamente en su proceso educativo. La plataforma permite
+                        crear cuestionarios personalizados, realizar evaluaciones en tiempo real y obtener retroalimentación inmediata,
+                        facilitando así un aprendizaje más efectivo y motivador.</p>
+                    <p>Nuestra visión es democratizar el acceso a herramientas educativas de calidad que permitan a docentes
+                        y estudiantes explorar nuevas metodologías de enseñanza-aprendizaje, preparándolos para los desafíos
+                        del mundo actual.</p>
+                </div>
+            </div>
+
+            <div id="mision" class="feature-row">
+                <div class="feature-text" style="max-width: 800px;">
+                    <h2>Misión</h2>
+                    <p><em>"Fomentar la educación y hacer el aprendizaje divertido."</em></p>
+                    <p>En <strong>Robot</strong>, creemos que aprender no debe ser aburrido. Queremos transformar la
+                        manera en que los estudiantes adquieren conocimiento mediante experiencias interactivas y
+                        participativas, donde la curiosidad, la creatividad y el juego sean el motor del aprendizaje.</p>
+                    <p>Nuestra misión va más allá de simplemente digitalizar la educación. Buscamos crear un ecosistema
+                        donde cada estudiante pueda desarrollar su máximo potencial a través de metodologías innovadoras
+                        que combinan el entretenimiento con el rigor académico.</p>
+                    <p>Trabajamos día a día para que cada quiz, cada pregunta y cada interacción en nuestra plataforma
+                        inspire a los estudiantes a seguir aprendiendo, explorar nuevos temas y desarrollar un amor genuino
+                        por el conocimiento que los acompañe toda su vida.</p>
+                </div>
+            </div>
+
+            <div id="historia" class="feature-row">
+                <div class="feature-text" style="max-width: 800px;">
+                    <h2>Historia</h2>
+                    <p>El proyecto <strong>Robot</strong> nació en el año 2025, dentro del curso de
+                        <em>Desarrollo de Aplicaciones Web</em> en la <strong>Universidad Santo Toribio de Mogrovejo
+                            (USAT)</strong>.</p>
+                    <p>Fue creado como una iniciativa académica para demostrar cómo las herramientas tecnológicas pueden
+                        integrarse en el aula y potenciar la enseñanza universitaria.</p>
+                    <p>Desde su origen, Robot ha tenido como propósito conectar a docentes y alumnos a través del
+                        aprendizaje activo, impulsando una nueva forma de enseñar y evaluar conocimientos.</p>
+                    <p>Lo que comenzó como un proyecto de curso universitario rápidamente se convirtió en una herramienta
+                        valiosa para la comunidad académica de la USAT. Los primeros usuarios fueron profesores y estudiantes
+                        que vieron en Robot una oportunidad para renovar sus métodos de enseñanza y evaluación.</p>
+                    <p>A lo largo de su desarrollo, el equipo ha trabajado en implementar las mejores prácticas de desarrollo
+                        web, diseño de experiencia de usuario y metodologías ágiles, convirtiendo a Robot en un ejemplo de
+                        cómo la innovación tecnológica puede surgir desde las aulas universitarias.</p>
+                </div>
+            </div>
+
+            <div id="valores" class="feature-row">
+                <div class="feature-text" style="max-width: 800px;">
+                    <h2>Valores</h2>
+                    <ul class="company-section">
+                        <li>🎮 <strong>Aprendizaje lúdico:</strong> creemos que el juego es una poderosa herramienta
+                            para aprender.</li>
+                        <li>💡 <strong>Innovación:</strong> buscamos nuevas formas de enseñar y aprender mediante la
+                            tecnología.</li>
+                        <li>🤝 <strong>Colaboración:</strong> fomentamos el trabajo conjunto entre docentes y
+                            estudiantes.</li>
+                        <li>🌍 <strong>Inclusión:</strong> todos los estudiantes deben tener la oportunidad de aprender
+                            de manera accesible y divertida.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div id="comunidad" class="feature-row">
+                <div class="feature-text" style="max-width: 800px;">
+                    <h2>Nuestra comunidad</h2>
+                    <p><strong>Robot</strong> está diseñada para el entorno académico de la USAT, permitiendo que los
+                        profesores creen quizzes personalizados y los compartan con sus alumnos o colegas docentes.</p>
+                    <p>Cada cuestionario busca reforzar el conocimiento y promover la participación activa en clase,
+                        transformando el aprendizaje en una experiencia entretenida y educativa.</p>
+                    <p>Nuestra comunidad está compuesta por docentes innovadores que buscan nuevas formas de conectar con
+                        sus estudiantes, y estudiantes curiosos que desean aprender de manera más dinámica y colaborativa.</p>
+                    <p>La plataforma fomenta la colaboración entre profesores, quienes pueden compartir sus mejores quizzes
+                        y estrategias pedagógicas, creando así un repositorio de conocimiento colectivo que beneficia a toda
+                        la comunidad educativa de la USAT.</p>
+                </div>
+            </div>
+
+            <div id="ubicacion" class="feature-row">
+                <div class="feature-text" style="max-width: 800px;">
+                    <h2>Ubicación</h2>
+                    <p>📍 Chiclayo, Lambayeque, Perú</p>
+                    <p><strong>Universidad Santo Toribio de Mogrovejo – USAT</strong></p>
+                </div>
+            </div>
+
+            <div id="equipo" class="feature-row">
+                <div class="feature-text" style="max-width: 800px;">
+                    <h2>Equipo de desarrollo</h2>
+                    <p>(Ver sección <a href="/Desarrolladores" class="link-underline">Nuestro Equipo</a> para conocer a los integrantes del
+                        proyecto).</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <div class="cta-curve">
+                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path
+                        d="M216.24 27.37C159.51 10.7 83.55 2.48 1.9.2h1200c-79.27 
+                        2.28-161.53 10.5-228.35 27.17C890.42 48.2 808.9 89.2 708.51 
+                        106.01c-82.39 13.2-168.19 17.24-250.45 0C378.12 89.2 295.23 
+                        48.2 216.24 27.37Z"
+                        class="shape-fill"></path>
+                </svg>
+            </div>
+
+            <h2 class="cta-title">"Fomentar la educación y hacer el aprendizaje divertido."</h2>
+            <button class="cta-button" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+                Volver arriba
+            </button>
+        </section>
+    </main>
+
+    {% endblock %}
+
+    {% block page_js %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}

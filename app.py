@@ -53,7 +53,7 @@ def inject_globals():
 def home():
     return render_template('home.html', title='RoBot')
 
-@app.errorhandler(Exception)#agregando la pagina de error
+#@app.errorhandler(Exception)#agregando la pagina de error
 def handle_exception(e):
         return  render_template('error.html', title='Error')
 
@@ -401,7 +401,17 @@ def eliminar_cuestionario(cuestionario_id):
     db.close()
     return response
 
+@app.route('/Contactanos')
+def Contactanos():
+    return render_template('contact.html')
 
+@app.route('/Nosotros')
+def Nosotros():
+    return render_template('about_us.html')
+
+@app.route('/Desarrolladores')
+def Desarrolladores():
+    return render_template('developers.html')
 # =====================
 #  Main
 # =====================
