@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">{% endblock %}
+{% block content %}
+ <main class="page-main">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <h1 class="hero-title">🧩 Soporte Técnico</h1>
+            <p class="hero-subtitle">
+                Estamos aquí para ayudarte. Encuentra nuestros canales de contacto 
+                y consejos útiles para resolver cualquier inconveniente.
+            </p>
+            
+            <!-- Curva decorativa -->
+            <div class="curve">
+                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M1298 0V129H2V5C139 63 209 42 330 44 467 29 545 28 631 33 853 54 879 58 1057 47Z" class="shape-fill"></path>
+                </svg>
+            </div>
+        </section>
+
+        <!-- Support Section -->
+        <section class="support-section">
+            <div class="support-grid">
+                <!-- Correo -->
+                <div class="contact-card">
+                    <div class="contact-icon">📧</div>
+                    <h3>Correo Electrónico</h3>
+                    <p class="contact-info">
+                        Escríbenos a:<br>
+                        <a href="mailto:soporte@robot-usat.edu.pe" class="contact-link">
+                            soporte@robot-usat.edu.pe
+                        </a>
+                    </p>
+                </div>
+
+                <!-- Teléfono -->
+                <div class="contact-card">
+                    <div class="contact-icon">📞</div>
+                    <h3>Teléfono</h3>
+                    <p class="contact-info">
+                        Llámanos al:<br>
+                        <a href="tel:+51987654321" class="contact-link">
+                            +51 987 654 321
+                        </a>
+                    </p>
+                </div>
+
+                <!-- Horario -->
+                <div class="contact-card">
+                    <div class="contact-icon">🕐</div>
+                    <h3>Horario de Atención</h3>
+                    <p class="contact-info">
+                        Lunes a Viernes<br>
+                        8:00 a.m. - 6:00 p.m.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tips Section -->
+            <div class="tips-section">
+                <h2>💡 Consejos Útiles</h2>
+                <ul class="tips-list">
+                    <li class="tip-item">
+                        <span class="tip-icon">🔄</span>
+                        Si la página no carga correctamente, intenta actualizar el navegador.
+                    </li>
+                    <li class="tip-item">
+                        <span class="tip-icon">🌐</span>
+                        Verifica tu conexión a Internet antes de iniciar un quiz.
+                    </li>
+                    <li class="tip-item">
+                        <span class="tip-icon">🔑</span>
+                        Si olvidaste tu contraseña, usa la opción "Recuperar acceso" en la pantalla de Login.
+                    </li>
+                    <li class="tip-item">
+                        <span class="tip-icon">📝</span>
+                        Para reportar errores o sugerencias, envíanos un correo con una breve descripción del problema.
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </main>
+    {% endblock %}
+
+    {% block page_js %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}

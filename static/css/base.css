@@ -330,6 +330,9 @@ footer {
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  z-index: 1; 
+  margin-top: -6rem; 
+  position: relative
 }
 
 .contact-title {
@@ -449,5 +452,210 @@ footer {
   text-decoration: underline;
   color: var(--ink);
 }
+/* ========================================
+   ESTILOS PARA PREGUNTAS FRECUENTES (FAQ)
+   ======================================== */
 
+.faq-section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+}
+
+.faq-item {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: box-shadow 0.3s ease;
+}
+
+.faq-item:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.faq-question {
+    padding: 1.5rem 2rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    background: white;
+    border: none;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.2s ease;
+}
+
+.faq-question:hover {
+    background-color: #fafafa;
+}
+
+.faq-icon {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--color-principal-naranja);
+    transition: transform 0.3s ease;
+}
+
+.faq-item.active .faq-icon {
+    transform: rotate(45deg);
+}
+
+.faq-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    padding: 0 2rem;
+}
+
+.faq-item.active .faq-answer {
+    max-height: 300px;
+    padding: 0 2rem 1.5rem 2rem;
+}
+
+.faq-answer p {
+    margin: 0;
+    line-height: 1.7;
+    color: #555;
+}
+
+
+/* ========================================
+   ESTILOS PARA SOPORTE TÉCNICO
+   ======================================== */
+
+.support-section {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+}
+
+.support-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-bottom: 4rem;
+}
+
+.contact-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.contact-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.contact-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.contact-card h3 {
+    font-size: 1.3rem;
+    margin: 0 0 0.8rem 0;
+    color: var(--ink);
+}
+
+.contact-info {
+    font-size: 1rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.contact-link {
+    color: var(--color-principal-naranja);
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.contact-link:hover {
+    text-decoration: underline;
+}
+
+.tips-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.tips-section h2 {
+    font-size: 2rem;
+    margin: 0 0 1.5rem 0;
+    color: var(--ink);
+    text-align: center;
+}
+
+.tips-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tip-item {
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 1rem;
+    background: #fafafa;
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    line-height: 1.6;
+    transition: background-color 0.2s ease;
+}
+
+.tip-item:hover {
+    background: #f0f0f0;
+}
+
+.tip-item:last-child {
+    margin-bottom: 0;
+}
+
+.tip-icon {
+    margin-right: 0.5rem;
+}
+
+
+/* ========================================
+   RESPONSIVE PARA AMBAS PÁGINAS
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* FAQ Responsive */
+    .faq-section {
+        padding: 3rem 1.5rem;
+    }
+
+    .faq-question {
+        padding: 1.2rem 1.5rem;
+        font-size: 1rem;
+    }
+
+    /* Soporte Responsive */
+    .support-section {
+        padding: 3rem 1.5rem;
+    }
+
+    .support-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tips-section {
+        padding: 2rem 1.5rem;
+    }
+
+    .tip-item {
+        padding: 1rem;
+    }
+}
 

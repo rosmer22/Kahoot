@@ -468,6 +468,14 @@ def Nosotros():
 @app.route('/Desarrolladores')
 def Desarrolladores():
     return render_template('developers.html')
+
+@app.route('/Preguntas_Frecuentes')
+def Preguntas_Frecuentes():
+    return render_template('faq.html')
+
+@app.route('/Soporte_Tecnico')
+def Soporte_Tecnico():
+    return render_template('technical_support.html')
 # =====================
 #  Main
 # =====================
