@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/empezar.css') }}">{% endblock %}
+{% block content %}
+<section class="start-hero">
+  <div class="hero-content">
+    <h1>¡Prepárate para Jugar!</h1>
+    <p>Unirse a un cuestionario de RoBot es fácil y rápido. Sigue estos simples pasos.</p>
+  </div>
+  <div class="curve">
+    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+    </svg>
+  </div>
+</section>
+
+<section class="steps-container">
+  <h2>¿Cómo funciona?</h2>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-icon">1</div>
+      <h3 class="step-title">Recibe el PIN</h3>
+      <p class="step-description">Tu profesor te compartirá un PIN de 6 dígitos para unirte al juego.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-icon">2</div>
+      <h3 class="step-title">Ingresa el PIN</h3>
+      <p class="step-description">Haz clic en "Unirme" en el menú principal e introduce el PIN del juego.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-icon">3</div>
+      <h3 class="step-title">¡A Jugar!</h3>
+      <p class="step-description">¡Listo! Responde las preguntas antes de que se acabe el tiempo y demuestra lo que sabes.</p>
+    </div>
+  </div>
+</section>
+
+<section class="join-cta">
+  <h2>¿Ya tienes tu PIN?</h2>
+  <p>¡No esperes más! Únete a la partida ahora mismo.</p>
+  <a href="{{ url_for('join_quiz') }}" class="cta-button">Unirme a un Cuestionario</a>
+</section>
+
+{% endblock %}

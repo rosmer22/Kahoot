@@ -23,7 +23,7 @@
         }
 
         .verification-section {
-            background-color: var(--color-fondo-claro); /* Fondo neutro y claro */
+            background-color: var(--color-secundario-amarillo); /* Fondo amarillo como en login */
             flex-grow: 1;
             display: flex;
             justify-content: center;
@@ -157,7 +157,7 @@
             height: 180px; 
         }
         .verification-section .curve .shape-fill { 
-            fill: var(--color-fondo-claro); 
+            fill: var(--color-fondo-claro); /* Relleno que coincide con el fondo de la sección de abajo */
         }
     </style>
 {% endblock %}
@@ -174,6 +174,22 @@
             </div>
             <button class="submit-btn" type="submit">Verificar</button>
         </form>
+
+        <div class="resend-container">
+            <p>¿No recibiste el código?</p>
+            <button id="resend-code-btn" class="resend-btn">Reenviar código</button>
+        </div>
+
+        <style>
+            .resend-container {
+                margin-top: 2rem;
+                font-size: 0.95rem;
+            }
+            .resend-btn {
+                background: none; border: none; color: #007bff; text-decoration: underline; cursor: pointer; font-size: inherit; padding: 0;
+            }
+            .resend-btn:disabled { color: #6c757d; cursor: not-allowed; text-decoration: none; }
+        </style>
 
         <!-- Contenedor para los mensajes flash -->
         <div class="flash-messages-container">
@@ -196,4 +212,55 @@
         </svg>
     </div>
 </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const resendBtn = document.getElementById('resend-code-btn');
+    const flashContainer = document.querySelector('.flash-messages-container');
+
+    resendBtn.addEventListener('click', function() {
+        // Deshabilitar el botón y mostrar estado de carga
+        resendBtn.disabled = true;
+        const originalText = resendBtn.textContent;
+        resendBtn.textContent = 'Enviando...';
+
+        fetch("{{ url_for('resend_verification_code') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Limpiar mensajes anteriores
+            flashContainer.innerHTML = '';
+
+            // Crear y mostrar el nuevo mensaje flash
+            const flashDiv = document.createElement('div');
+            flashDiv.textContent = data.message;
+            flashDiv.classList.add('flash-message');
+            if (data.success) {
+                flashDiv.classList.add('flash-info'); // O 'flash-success'
+            } else {
+                flashDiv.classList.add('flash-error');
+            }
+            flashContainer.appendChild(flashDiv);
+
+            // Iniciar un temporizador para reactivar el botón
+            let countdown = 30;
+            resendBtn.textContent = `Reenviar en ${countdown}s`;
+            const interval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    resendBtn.textContent = `Reenviar en ${countdown}s`;
+                } else {
+                    clearInterval(interval);
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = originalText;
+                }
+            }, 1000);
+        });
+    });
+});
+</script>
 {% endblock %}

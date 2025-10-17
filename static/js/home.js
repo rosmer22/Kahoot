@@ -1,6 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.querySelector('.carousel-cards');
+    const heroSection = document.querySelector('.hero-section'); // Contenedor del carrusel
     if (!slider) return;
+
+    // Obtener el ancho de una tarjeta y el espacio entre ellas para cálculos precisos
+    const card = slider.querySelector('.card');
+    const cardStyle = card ? getComputedStyle(card) : null;
+    const cardWidth = card ? card.offsetWidth + parseFloat(cardStyle?.marginRight || 0) + parseFloat(cardStyle?.marginLeft || 0) : 0;
 
     let isDown = false;
     let startX;
@@ -8,27 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
     let walk = 0;
 
     const end = () => {
-        if (!isDown) return;
+        if (!isDown) return; // Solo actuar si el arrastre se inició
         isDown = false;
         slider.classList.remove('active');
 
-        // Lógica de "snap"
-        const card = slider.querySelector('.card');
-        if (!card) return;
-
-        const cardWidth = card.offsetWidth;
-        const snapThreshold = cardWidth * 0.3; // 30% del ancho de la tarjeta
+        // Lógica de "snap" mejorada
+        if (!cardWidth) return;
+        const snapThreshold = cardWidth * 0.2; // Umbral más pequeño para mayor sensibilidad
 
         // Determinar la tarjeta más cercana
         const currentScroll = slider.scrollLeft;
-        let targetIndex;
+        const startIndex = Math.round(scrollLeft / cardWidth); // Tarjeta inicial antes del arrastre
 
-        if (walk < -snapThreshold) { // Deslizó hacia la izquierda (ver siguiente)
-            targetIndex = Math.ceil(currentScroll / cardWidth);
-        } else if (walk > snapThreshold) { // Deslizó hacia la derecha (ver anterior)
-            targetIndex = Math.floor(currentScroll / cardWidth);
+        let targetIndex = startIndex;
+        if (walk < -snapThreshold) { // Deslizó hacia la izquierda (ver siguiente tarjeta)
+            targetIndex = startIndex + 1;
+        } else if (walk > snapThreshold) { // Deslizó hacia la derecha (ver tarjeta anterior)
+            targetIndex = startIndex - 1;
         } else {
-            targetIndex = Math.round(currentScroll / cardWidth);
+            targetIndex = Math.round(currentScroll / cardWidth); // Si el arrastre es corto, ir a la más cercana
         }
 
         const targetScroll = targetIndex * cardWidth;
@@ -39,6 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const start = (e) => {
+        // IMPORTANTE: Solo iniciar el arrastre si el clic se origina en el carrusel o sus flechas.
+        // Esto evita que el script bloquee otros enlaces como el botón "Empieza".
+        if (!e.target.closest('.carousel-container')) {
+            return;
+        }
+
         isDown = true;
         slider.classList.add('active');
         startX = (e.pageX || e.touches[0].pageX) - slider.offsetLeft;
@@ -47,29 +57,31 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const move = (e) => {
-        if (!isDown) return;
-        e.preventDefault(); // Evita la selección de texto
+        if (!isDown) return; // Si no se está arrastrando, no hacer nada.
+        e.preventDefault(); // IMPORTANTE: Prevenir la acción por defecto SOLO cuando se está arrastrando.
         const x = (e.pageX || e.touches[0].pageX) - slider.offsetLeft;
         walk = (x - startX); // Distancia total del arrastre
         slider.scrollLeft = scrollLeft - walk;
     };
 
     // Eventos de Mouse
-    slider.addEventListener('mousedown', start);
-    slider.addEventListener('mouseleave', end);
-    slider.addEventListener('mouseup', end);
-    slider.addEventListener('mousemove', move);
+    heroSection.addEventListener('mousedown', start);
+    heroSection.addEventListener('mouseleave', end);
+    heroSection.addEventListener('mouseup', end);
+    heroSection.addEventListener('mousemove', move);
 
     // Eventos Táctiles
-    slider.addEventListener('touchstart', start, { passive: false });
-    slider.addEventListener('touchend', end);
-    slider.addEventListener('touchcancel', end);
-    slider.addEventListener('touchmove', move, { passive: false });
+    heroSection.addEventListener('touchstart', start, { passive: false });
+    heroSection.addEventListener('touchend', end);
+    heroSection.addEventListener('touchcancel', end);
+    heroSection.addEventListener('touchmove', move, { passive: false });
 
-    // Flechas de navegación (opcional, pero buena práctica mantenerlas funcionales)
+    // Flechas de navegación mejoradas para usar el ancho de la tarjeta
     const prevArrow = document.querySelector('.carousel-arrow:first-of-type');
     const nextArrow = document.querySelector('.carousel-arrow:last-of-type');
 
-    prevArrow?.addEventListener('click', () => slider.scrollBy({ left: -slider.clientWidth, behavior: 'smooth' }));
-    nextArrow?.addEventListener('click', () => slider.scrollBy({ left: slider.clientWidth, behavior: 'smooth' }));
+    if (cardWidth > 0) {
+        prevArrow?.addEventListener('click', () => slider.scrollBy({ left: -cardWidth, behavior: 'smooth' }));
+        nextArrow?.addEventListener('click', () => slider.scrollBy({ left: cardWidth, behavior: 'smooth' }));
+    }
 });
