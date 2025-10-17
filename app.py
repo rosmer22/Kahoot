@@ -1,10 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
 from controllers import user_controller, quiz_controller
 from werkzeug.security import check_password_hash
+from werkzeug.exceptions import HTTPException
 from flask_mail import Mail, Message
 import random
 import datetime
 import bd
+import logging
 import os
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -21,6 +23,9 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'valentinoandca@gmail.com')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'gcdl wgwf lego lmin')  # contraseña de aplicación
 mail = Mail(app)
+
+# Configuración básica de logging para registrar errores en la consola
+logging.basicConfig(level=logging.ERROR)
 
 # Almacén temporal de usuarios pendientes de verificación
 # {email: {"username": str, "password": str, "codigo": int, "expira": datetime}}
@@ -53,13 +58,28 @@ def inject_globals():
 def home():
     return render_template('home.html', title='RoBot')
 
-@app.errorhandler(Exception)#agregando la pagina de error
-def handle_exception(e):
-        return  render_template('error.html', title='Error')
+@app.errorhandler(404)
+def page_not_found(e):
+    """Maneja errores 404 (Página no encontrada)."""
+    return render_template('404.html', title='Página no encontrada'), 404
 
-# @app.route('/empezar')
-# def about():
-#     return render_template('empezar.html', title='Empezar')
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Maneja excepciones no capturadas para evitar que la aplicación se caiga."""
+    # Si es una excepción HTTP estándar (como 404, 401, etc.), deja que Flask la maneje.
+    if isinstance(e, HTTPException):
+        return e
+
+    # Para cualquier otra excepción (errores 500), regístrala y muestra la página de error.
+    app.logger.error(f"Error no manejado: {e}", exc_info=True)
+    flash("Ha ocurrido un error inesperado en el servidor. Nuestro equipo ha sido notificado.", "error")
+    return render_template('error.html', title='Error del Sistema'), 500
+
+
+@app.route('/empezar', methods=['GET'])
+def empezar():
+     return render_template('empezar.html', title='Empezar')
+
 
 
 @app.route('/login', methods=['GET', 'POST'])

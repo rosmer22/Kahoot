@@ -1,52 +1,41 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Error del Sistema - RoBot!</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}"><!-- Asegúrate de vincular tu CSS aquí -->
-</head>
-<body>
-  <main class="page-main" style="display: flex; align-items: center; justify-content: center; padding: 1rem 1rem;">
-    <div style="max-width: 600px; text-align: center; background: white; padding: 2rem 2rem; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1);">
-     
-      <div style="margin-inline:auto; font-size: 2rem;">⚠️</div>
-      
-      <h1 style=" font-size: 2rem; color: var(--ink);">Error del Sistema</h1>
-       <img src="{{ url_for('static', filename='img/roboto_error.png') }}" alt="img-robor-error" width="100px">
-      <p style="margin: 1rem 0; color: var(--muted);">
-        Lo sentimos, ha ocurrido un error interno en nuestro sistema. Nuestro equipo técnico ha sido notificado y está trabajando para resolverlo.
-      </p>
+{% extends "base.html" %}
 
-      <div class="pill grey" style="margin: 1.5rem auto; display: inline-block;">
-        <strong>Error:</strong>
-      </div>
+{% block content %}
+<main class="page-main" style="display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; text-align: center;">
+    <div style="max-width: 500px;">
+        <img src="{{ url_for('static', filename='img/roboto_error.png') }}" alt="Robot con error" width="150" style="margin-bottom: 2rem;">
+        
+        <h1 style="font-size: 3rem; color: var(--ink); margin: 0;">Error 500</h1>
+        <p style="font-size: 1.5rem; color: var(--muted); margin-top: 0.5rem;">Error Interno del Servidor</p>
+        
+        <p style="margin: 2rem 0; color: var(--muted-dark);">
+            Lo sentimos, algo salió mal en nuestros servidores. Nuestro equipo técnico ya ha sido notificado y está trabajando para solucionarlo.
+        </p>
 
-      <div style="text-align: left; margin-top: 1rem; color: var(--muted); font-size: 0.95rem;">
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            <ul style="margin-top: 10px; padding-left: 20px;">
-              {% for message in messages %}
-                <li>{{ message }}</li>
-              {% endfor %}
-              <li>El servicio de base de datos está temporalmente indisponible</li>
-              <li>La estructura de la base de datos ha cambiado</li>
-              <li>Problemas de conexión con el servidor</li>
-            </ul>
-          {% else %}
-            <p>No se han encontrado detalles adicionales del error.</p>
-          {% endif %}
+        <!-- Mostrar mensajes flash si existen -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; text-align: left;">
+                    <strong>Detalles:</strong>
+                    <ul style="margin-top: 10px; padding-left: 20px; margin-bottom: 0;">
+                    {% for category, message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
         {% endwith %}
-      </div>
 
-      <a href="{{ url_for('home') }}" class="btn-wide" style="margin-top: 2rem; background: var(--accent); color: var(--color-white-cta); text-decoration: none; display: inline-block; text-align: center;">
-        Volver al Inicio
-      </a>
-
-      <p style="margin-top: 2rem; font-size: 0.9rem; color: var(--muted);">
-        Código de error: <strong>SYS-500</strong>
-      </p>
+        <a href="{{ url_for('home') }}" class="btn-wide" style="background: var(--accent); color: var(--color-white-cta); text-decoration: none; display: inline-block; text-align: center;">
+            Volver al Inicio
+        </a>
     </div>
-  </main>
-</body>
-</html>
+</main>
+
+<style>
+    .page-main {
+        flex-grow: 1;
+        background-color: var(--color-fondo-claro);
+    }
+</style>
+{% endblock %}
