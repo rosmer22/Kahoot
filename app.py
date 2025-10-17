@@ -61,7 +61,7 @@ def home():
 @app.errorhandler(404)
 def page_not_found(e):
     """Maneja errores 404 (Página no encontrada)."""
-    return render_template('404.html', title='Página no encontrada'), 404
+    return render_template('error.html', title='Página no encontrada'), 404
 
 @app.errorhandler(Exception)
 def handle_exception(e):

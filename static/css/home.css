@@ -1,5 +1,6 @@
 :root {
     --color-principal-naranja: #fca94d;
+    --color-principal-naranja-hover: #e89a45; /* Añadido para hover */
     --color-secundario-amarillo: #fdd867;
     --color-fondo-elementos: #eeeeee;
     --color-borde-elementos: #dcdcdc;
@@ -7,6 +8,7 @@
     --color-placeholder: #a0a0a0;
     --color-fondo-claro: #f0f0f0;
     --color-verde-cta: #c4d89f;
+    --color-verde-cta-hover: #b1c38d; /* Añadido para hover */
     --color-verde-boton: #d4e555;
     --color-azul-footer: #8cb6b6;
     --color-footer-fondo: #4a4a4a;
@@ -14,17 +16,11 @@
 
 
 
-/* --- Contenedor Principal --- */
-.main-container {
-    width: 100%;
-    overflow-x: hidden;
-}
-
 /* --- Reset para eliminar espacios --- */
 .page-main {
     margin: 0;
     padding: 0;
-    min-height: 0;
+    min-height: 0; /* Este reset es útil si .page-main tiene estilos por defecto */
 }
 
 /* --- Sección de Héroe (Sección Amarilla) --- */
@@ -61,6 +57,7 @@
     font-weight: bold;
     cursor: pointer;
     user-select: none;
+    transition: color 0.2s ease-in-out;
 }
 
 .carousel-cards {
@@ -193,6 +190,12 @@
     border-radius: 50px;
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.cta-button:hover {
+    background-color: var(--color-verde-cta-hover);
+    transform: translateY(-2px);
 }
 
 .cta-curve {

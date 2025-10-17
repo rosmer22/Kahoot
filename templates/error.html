@@ -1,41 +1,116 @@
 {% extends "base.html" %}
 
+{% block page_css %}
+<style>
+    :root {
+        /* Definimos las variables de color para esta página */
+        --color-secundario-amarillo: #fdd867;
+        --color-fondo-claro: #f0f0f0;
+    }
+
+    .error-section {
+        background-color: var(--color-secundario-amarillo); /* Fondo amarillo como en login */
+        flex-grow: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 4rem 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden; /* Para contener la curva */
+    }
+
+    .error-card {
+        background-color: #ffffff;
+        padding: 2.5rem 3rem;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 500px;
+        border: 1px solid #ddd;
+        z-index: 1; /* Para que esté sobre la curva */
+    }
+
+    .error-card img {
+        margin-bottom: 1.5rem;
+    }
+
+    .error-card h1 {
+        font-size: 2.5rem;
+        color: var(--ink);
+        margin: 0;
+    }
+
+    .error-card .subtitle {
+        font-size: 1.25rem;
+        color: var(--muted);
+        margin-top: 0.5rem;
+    }
+
+    .error-card .message {
+        margin: 2rem 0;
+        color: var(--muted-dark);
+        line-height: 1.6;
+    }
+
+    .error-card .btn-home {
+        background: var(--accent);
+        color: var(--color-white-cta);
+        text-decoration: none;
+        display: inline-block;
+        padding: 0.8rem 2.5rem;
+        border-radius: 50px;
+        font-weight: bold;
+        transition: transform 0.2s;
+    }
+    .error-card .btn-home:hover {
+        transform: translateY(-2px);
+    }
+
+    /* Estilos para la curva decorativa */
+    .error-section .curve {
+        position: absolute;
+        bottom: -1px; /* Posicionamos la curva abajo */
+        left: 0;
+        width: 100%;
+        overflow: hidden;
+        line-height: 0;
+        z-index: 0; /* Detrás de la tarjeta */
+    }
+    .error-section .curve svg {
+        position: relative;
+        display: block;
+        width: calc(100% + 1.3px);
+        height: 180px; /* Tamaño estándar de la curva */
+    }
+    .error-section .curve .shape-fill {
+        fill: var(--color-fondo-claro); /* Color del fondo de la sección de abajo (footer) */
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<main class="page-main" style="display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; text-align: center;">
-    <div style="max-width: 500px;">
+<main class="error-section">
+    <div class="error-card">
         <img src="{{ url_for('static', filename='img/roboto_error.png') }}" alt="Robot con error" width="150" style="margin-bottom: 2rem;">
         
-        <h1 style="font-size: 3rem; color: var(--ink); margin: 0;">Error 500</h1>
-        <p style="font-size: 1.5rem; color: var(--muted); margin-top: 0.5rem;">Error Interno del Servidor</p>
+        <h1>Error del Sistema</h1>
+        <p class="subtitle">Algo no ha salido como esperábamos</p>
         
-        <p style="margin: 2rem 0; color: var(--muted-dark);">
+        <p class="message">
             Lo sentimos, algo salió mal en nuestros servidores. Nuestro equipo técnico ya ha sido notificado y está trabajando para solucionarlo.
         </p>
 
-        <!-- Mostrar mensajes flash si existen -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; text-align: left;">
-                    <strong>Detalles:</strong>
-                    <ul style="margin-top: 10px; padding-left: 20px; margin-bottom: 0;">
-                    {% for category, message in messages %}
-                        <li>{{ message }}</li>
-                    {% endfor %}
-                    </ul>
-                </div>
-            {% endif %}
-        {% endwith %}
-
-        <a href="{{ url_for('home') }}" class="btn-wide" style="background: var(--accent); color: var(--color-white-cta); text-decoration: none; display: inline-block; text-align: center;">
+        <a href="{{ url_for('home') }}" class="btn-home">
             Volver al Inicio
         </a>
     </div>
-</main>
 
-<style>
-    .page-main {
-        flex-grow: 1;
-        background-color: var(--color-fondo-claro);
-    }
-</style>
+    <!-- Curva decorativa en la parte inferior -->
+    <div class="curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</main>
 {% endblock %}
