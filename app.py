@@ -57,6 +57,11 @@ def home():
 def handle_exception(e):
         return  render_template('error.html', title='Error')
 
+# @app.route('/empezar')
+# def about():
+#     return render_template('empezar.html', title='Empezar')
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -168,6 +173,34 @@ def verify_email():
             flash('Código inválido o expirado ❌', 'error')
 
     return render_template('emailverificacion.html', title='Verificar correo')
+
+
+@app.route('/resend_code', methods=['POST'])
+def resend_verification_code():
+    """Reenvía un nuevo código de verificación al correo en sesión."""
+    email = session.get('email_verificacion')
+    if not email or email not in usuarios_pendientes:
+        return jsonify({'success': False, 'message': 'No hay una verificación pendiente o la sesión ha expirado.'}), 400
+
+    # Generar nuevo código y actualizar datos
+    codigo = random.randint(100000, 999999)
+    expira = datetime.datetime.now() + datetime.timedelta(minutes=10)
+
+    usuarios_pendientes[email]['codigo'] = codigo
+    usuarios_pendientes[email]['expira'] = expira
+
+    # Enviar correo con el nuevo código
+    try:
+        msg = Message(
+            'Nuevo Código de confirmación - RoBot',
+            sender=app.config['MAIL_USERNAME'],
+            recipients=[email]
+        )
+        msg.body = f"Tu nuevo código de confirmación es: {codigo}\nVálido por 10 minutos."
+        mail.send(msg)
+        return jsonify({'success': True, 'message': 'Se ha enviado un nuevo código a tu correo.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'No se pudo reenviar el correo: {e}'}), 500
 
 
 # =====================
