@@ -7,19 +7,21 @@
         --gap: 24px;
         position: relative;
         padding: 0 var(--gap);
-        max-width: 1000px; /* Ancho máximo del carrusel */
+        max-width: 1000px;
+        /* Ancho máximo del carrusel */
         margin: 0 auto;
     }
 
     .carousel .viewport {
-        overflow: hidden; /* Oculta las tarjetas que no caben */
+        overflow: hidden;
+        /* Oculta las tarjetas que no caben */
     }
 
     .carousel .track {
         display: grid;
         grid-auto-flow: column;
         gap: var(--gap);
-        
+
         /* Ancho de las tarjetas por defecto (móvil) */
         grid-auto-columns: calc(100% - (var(--gap) * 0));
 
@@ -31,15 +33,18 @@
         overflow-x: auto;
         scroll-snap-type: x mandatory;
         scroll-behavior: smooth;
-        scrollbar-width: none; /* Ocultar scrollbar en Firefox */
+        scrollbar-width: none;
+        /* Ocultar scrollbar en Firefox */
     }
 
     .carousel .track::-webkit-scrollbar {
-        display: none; /* Ocultar scrollbar en Chrome/Safari */
+        display: none;
+        /* Ocultar scrollbar en Chrome/Safari */
     }
 
     .carousel .card {
-        scroll-snap-align: start; /* Alinea cada tarjeta al inicio del viewport */
+        scroll-snap-align: start;
+        /* Alinea cada tarjeta al inicio del viewport */
         background-color: white;
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -85,15 +90,17 @@
 
     .carousel .nav:hover {
         background-color: #f0f0f0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .carousel .nav.prev {
-        left: -22px; /* Mitad del ancho del botón */
+        left: -22px;
+        /* Mitad del ancho del botón */
     }
 
     .carousel .nav.next {
-        right: -22px; /* Mitad del ancho del botón */
+        right: -22px;
+        /* Mitad del ancho del botón */
     }
 
     .carousel .nav[aria-disabled="true"] {
@@ -118,10 +125,10 @@
     }
 
     /* Asegurar que las curvas decorativas no interfieran con los clics */
-    .hero-section .curve, .cta-section .cta-curve {
+    .hero-section .curve,
+    .cta-section .cta-curve {
         pointer-events: none;
     }
-
 </style>
 {% endblock %}
 {% block content %}
@@ -129,7 +136,7 @@
     <h1 class="hero-title">RoBot</h1>
     <p class="hero-subtitle">Bridge classroom realities and curriculum expectations with the platform that's
         AI-supported, but teacher-first.</p>
-    
+
     <!-- Nuevo Carrusel -->
     <section class="carousel" aria-label="Lista de temas" tabindex="0">
         <button class="nav prev" aria-label="Anterior">‹</button>
@@ -158,16 +165,29 @@
     <div class="feature-row">
         <div class="feature-text">
             <h2>Crea Cuestionarios en Minutos</h2>
-            <p>Usa nuestro editor intuitivo para diseñar cuestionarios interactivos. Elige entre opción múltiple, selección simple o verdadero/falso. ¡La creatividad no tiene límites!</p>
+            <p>Usa nuestro editor intuitivo para diseñar cuestionarios interactivos. Elige entre opción múltiple,
+                selección simple o verdadero/falso. ¡La creatividad no tiene límites!</p>
         </div>
-        <img src="{{ url_for('static', filename='img/feature_editor.png') }}" alt="Vista previa del editor de cuestionarios" class="feature-image">
+        <img src="{{ url_for('static', filename='img/cuestionario.png') }}"
+            alt="Vista previa del editor de cuestionarios" class="feature-image">
     </div>
     <div class="feature-row">
         <div class="feature-text">
             <h2>Juega y Aprende en Vivo</h2>
-            <p>Comparte un PIN único con tus estudiantes para iniciar una partida en tiempo real. Fomenta la competencia sana y haz que el aprendizaje sea una experiencia emocionante.</p>
+            <p>Comparte un PIN único con tus estudiantes para iniciar una partida en tiempo real. Fomenta la competencia
+                sana y haz que el aprendizaje sea una experiencia emocionante.</p>
         </div>
-        <img src="{{ url_for('static', filename='img/feature_live_game.png') }}" alt="Vista previa de un juego en vivo en un dispositivo" class="feature-image">
+        <img src="{{ url_for('static', filename='img/vivo.gif') }}"
+            alt="Vista previa de un juego en vivo" class="feature-image">
+    </div>
+    <div class="feature-row">
+        <div class="feature-text">
+            <h2>Explora y Descubre</h2>
+            <p>Navega por una amplia biblioteca de cuestionarios públicos creados por otros usuarios. Encuentra nuevo
+                material de estudio y desafía tus conocimientos.</p>
+        </div>
+        <img src="{{ url_for('static', filename='img/movimiento.gif') }}"
+            alt="Vista previa animada de la página de exploración de cuestionarios" class="feature-image">
     </div>
 </section>
 
@@ -186,102 +206,102 @@
 {% endblock %}
 {% block page_js %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const carousel = document.querySelector('.carousel');
-    if (!carousel) return;
+    document.addEventListener('DOMContentLoaded', () => {
+        const carousel = document.querySelector('.carousel');
+        if (!carousel) return;
 
-    const track = carousel.querySelector('.track');
-    const prevButton = carousel.querySelector('.nav.prev');
-    const nextButton = carousel.querySelector('.nav.next');
+        const track = carousel.querySelector('.track');
+        const prevButton = carousel.querySelector('.nav.prev');
+        const nextButton = carousel.querySelector('.nav.next');
 
-    // --- Lógica de arrastre vs. clic ---
-    let isDragging = false;
-    let startX;
-    let scrollLeft;
-    let dragThreshold = 10; // Píxeles a mover para considerarlo un arrastre
+        // --- Lógica de arrastre vs. clic ---
+        let isDragging = false;
+        let startX;
+        let scrollLeft;
+        let dragThreshold = 10; // Píxeles a mover para considerarlo un arrastre
 
-    track.addEventListener('mousedown', (e) => {
-        isDragging = false; // Reiniciar en cada clic
-        startX = e.pageX - track.offsetLeft;
-        scrollLeft = track.scrollLeft;
-        track.style.cursor = 'grabbing';
+        track.addEventListener('mousedown', (e) => {
+            isDragging = false; // Reiniciar en cada clic
+            startX = e.pageX - track.offsetLeft;
+            scrollLeft = track.scrollLeft;
+            track.style.cursor = 'grabbing';
 
-        // Prevenir que un clic en un enlace inicie el arrastre
-        if (e.target.tagName === 'A') {
-            e.target.addEventListener('click', (ev) => {
-                if (isDragging) {
-                    ev.preventDefault();
-                }
-            }, { once: true });
-        }
+            // Prevenir que un clic en un enlace inicie el arrastre
+            if (e.target.tagName === 'A') {
+                e.target.addEventListener('click', (ev) => {
+                    if (isDragging) {
+                        ev.preventDefault();
+                    }
+                }, { once: true });
+            }
+        });
+
+        track.addEventListener('mousemove', (e) => {
+            if (startX === undefined) return; // No se ha iniciado el mousedown
+            const x = e.pageX - track.offsetLeft;
+            const walk = x - startX;
+
+            if (Math.abs(walk) > dragThreshold) {
+                isDragging = true;
+            }
+
+            track.scrollLeft = scrollLeft - walk;
+        });
+
+        const stopDragging = () => {
+            startX = undefined;
+            track.style.cursor = 'grab';
+        };
+
+        track.addEventListener('mouseup', stopDragging);
+        track.addEventListener('mouseleave', stopDragging);
+
+        // --- Lógica de Navegación ---
+        const updateNavButtons = () => {
+            if (!track || !prevButton || !nextButton) return;
+            // Un pequeño margen de 1px para evitar errores de redondeo
+            const atStart = track.scrollLeft <= 1;
+            const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+
+            prevButton.setAttribute('aria-disabled', atStart);
+            nextButton.setAttribute('aria-disabled', atEnd);
+        };
+
+        const navigate = (direction) => {
+            const scrollAmount = track.clientWidth * direction;
+            track.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        };
+
+        prevButton.addEventListener('click', () => navigate(-1));
+        nextButton.addEventListener('click', () => navigate(1));
+
+        // Actualizar botones al hacer scroll (manual o con flechas)
+        track.addEventListener('scroll', updateNavButtons);
+
+        // --- Soporte de Teclado ---
+        carousel.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                navigate(-1);
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                navigate(1);
+            }
+        });
+
+        // --- Inicialización y Observadores ---
+
+        // Usar ResizeObserver para actualizar los botones si el tamaño de la ventana cambia
+        const resizeObserver = new ResizeObserver(entries => {
+            // Se ejecuta cuando el tamaño del track cambia
+            updateNavButtons();
+        });
+
+        resizeObserver.observe(track);
+
+        // Llamada inicial para establecer el estado correcto de los botones
+        // Se usa un pequeño timeout para asegurar que el layout esté completo
+        setTimeout(updateNavButtons, 100);
     });
-
-    track.addEventListener('mousemove', (e) => {
-        if (startX === undefined) return; // No se ha iniciado el mousedown
-        const x = e.pageX - track.offsetLeft;
-        const walk = x - startX;
-        
-        if (Math.abs(walk) > dragThreshold) {
-            isDragging = true;
-        }
-
-        track.scrollLeft = scrollLeft - walk;
-    });
-
-    const stopDragging = () => {
-        startX = undefined;
-        track.style.cursor = 'grab';
-    };
-
-    track.addEventListener('mouseup', stopDragging);
-    track.addEventListener('mouseleave', stopDragging);
-
-    // --- Lógica de Navegación ---
-    const updateNavButtons = () => {
-        if (!track || !prevButton || !nextButton) return;
-        // Un pequeño margen de 1px para evitar errores de redondeo
-        const atStart = track.scrollLeft <= 1;
-        const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
-
-        prevButton.setAttribute('aria-disabled', atStart);
-        nextButton.setAttribute('aria-disabled', atEnd);
-    };
-
-    const navigate = (direction) => {
-        const scrollAmount = track.clientWidth * direction;
-        track.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-    };
-
-    prevButton.addEventListener('click', () => navigate(-1));
-    nextButton.addEventListener('click', () => navigate(1));
-
-    // Actualizar botones al hacer scroll (manual o con flechas)
-    track.addEventListener('scroll', updateNavButtons);
-
-    // --- Soporte de Teclado ---
-    carousel.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft') {
-            e.preventDefault();
-            navigate(-1);
-        } else if (e.key === 'ArrowRight') {
-            e.preventDefault();
-            navigate(1);
-        }
-    });
-
-    // --- Inicialización y Observadores ---
-
-    // Usar ResizeObserver para actualizar los botones si el tamaño de la ventana cambia
-    const resizeObserver = new ResizeObserver(entries => {
-        // Se ejecuta cuando el tamaño del track cambia
-        updateNavButtons();
-    });
-
-    resizeObserver.observe(track);
-
-    // Llamada inicial para establecer el estado correcto de los botones
-    // Se usa un pequeño timeout para asegurar que el layout esté completo
-    setTimeout(updateNavButtons, 100);
-});
 </script>
 {% endblock %}
