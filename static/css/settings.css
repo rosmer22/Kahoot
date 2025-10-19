@@ -1,4 +1,4 @@
-﻿/* --- Estilos Generales --- */
+/* --- Estilos Generales --- */
 :root {
   --color-naranja: #fdd867;
   --color-fondo-claro: #f0f0f0;
@@ -217,7 +217,7 @@
   cursor: not-allowed;
 }
 
-.btn-logout {
+.btn-logout, .btn-delete {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -235,7 +235,7 @@
   font-family: 'Roboto Slab', serif;
 }
 
-.btn-logout:hover {
+.btn-logout:hover, .btn-delete:hover {
   background-color: #e0e0e0;
 }
 
@@ -244,19 +244,19 @@
   .form-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .settings-hero h1 {
     font-size: 1.8rem;
   }
-  
+
   .card {
     padding: 1rem 1.5rem;
   }
-  
+
   .card-title {
     font-size: 1.25rem;
   }
-  
+
   .settings-container {
     padding: 0 0.5rem;
   }
