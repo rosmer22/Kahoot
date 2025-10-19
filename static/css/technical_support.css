@@ -1,0 +1,122 @@
+/* ========================================
+   ESTILOS PARA LA PÁGINA DE SOPORTE TÉCNICO
+   ======================================== */
+
+/* Estilo para la sección hero amarilla */
+.hero-section {
+    background-color: var(--yellow);
+    padding: 4rem 2rem 12rem; /* Más espacio para la curva */
+    position: relative;
+}
+
+.hero-section .hero-title,
+.hero-section .hero-subtitle {
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+}
+
+.hero-section .curve .shape-fill {
+    fill: #f3f3f3; /* Color del fondo del cuerpo */
+}
+
+.support-section {
+    max-width: 1000px;
+    margin: 3rem auto 0;
+}
+
+.support-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.contact-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: left; /* Alineación a la izquierda */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.contact-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.contact-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.contact-icon {
+    font-size: 3rem;
+    line-height: 1;
+}
+
+.contact-card h3 {
+    font-size: 1.3rem;
+    margin: 0;
+    color: var(--ink);
+}
+
+.contact-info {
+    font-size: 1rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0; /* Reseteo de margen */
+}
+
+.contact-link {
+    color: var(--orange);
+    text-decoration: none;
+    font-weight: bold;
+    word-break: break-all;
+}
+
+.contact-link:hover {
+    text-decoration: underline;
+}
+
+.tips-section {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tips-section h2 {
+    font-size: 2rem;
+    margin: 0 0 1.5rem 0;
+    color: var(--ink);
+    text-align: left; /* Alineación a la izquierda */
+}
+
+.tips-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 1rem;
+}
+
+.tip-item {
+    padding: 1rem 1.2rem;
+    background: white;
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    line-height: 1.6;
+}
+
+.tip-icon {
+    margin-right: 0.5rem;
+}

@@ -1,0 +1,82 @@
+/* ========================================
+   ESTILOS PARA LA PÁGINA DE CONTACTO
+   ======================================== */
+
+/* Estilo para la sección hero amarilla */
+.hero-section {
+    background-color: var(--yellow);
+    padding: 6rem 2rem 12rem; /* Más espacio para la tarjeta */
+    position: relative;
+}
+
+.hero-section .curve {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+}
+.hero-section .curve .shape-fill {
+    fill: #f3f3f3; /* Color del fondo del cuerpo */
+}
+
+/* ========================================
+   ESTILOS PARA LA TARJETA DE CONTACTO
+   ======================================== */
+
+.contact-card {
+    max-width: 700px;
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.6);
+    padding: 2.5rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.contact-title {
+    text-align: center;
+    font-family: 'Roboto Slab', serif;
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--ink);
+}
+
+.contact-text {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 2.5rem;
+    font-size: 1.1rem;
+}
+
+.contact-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    text-align: left; /* Alinea el label a la izquierda */
+    gap: .5rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #333;
+}
+
+.btn-contact {
+    background: var(--accent);
+    color: white;
+    font-weight: bold;
+    padding: 1rem;
+    font-size: 1.1rem;
+    transition: background-color 0.2s ease;
+}
+.btn-contact:hover {
+    background-color: #8cb300;
+}
