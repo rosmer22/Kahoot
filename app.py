@@ -8,9 +8,10 @@ import datetime
 import bd
 import logging
 import os
+import re
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = 'dev-secret-change-me'  # reemplazar en producción
+app.secret_key = 'dev-secret-change-me'
 
 # === Config generales ===
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -124,8 +125,8 @@ def logout():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        email = request.form.get('email')
-        username = request.form.get('username')
+        email = request.form.get('email').strip()
+        username = request.form.get('username').strip()
         password = request.form.get('password')
 
         # Validaciones previas
@@ -135,6 +136,16 @@ def register():
 
         if user_controller.obtener_usuario_por_email(email):
             flash('El correo electrónico ya está en uso', 'error')
+            return redirect(url_for('register'))
+
+        if not (email.endswith('@usat.edu.pe') or email.endswith('@usat.pe')):
+            flash('El correo debe pertenecer al dominio usat.edu.pe o usat.pe', 'error')
+            return redirect(url_for('register'))
+        # validación de minuscula, mayuscula, numero y caracter
+        pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&._-])[A-Za-z\d@$!%*?&._-]{8,}$'
+
+        if not re.match(pattern, password):
+            flash('La contraseña debe tener al menos 8 caracteres, incluir una mayúscula, una minúscula, un número y un carácter especial.', 'error')
             return redirect(url_for('register'))
 
         # Generar código de verificación
@@ -188,14 +199,35 @@ def verify_email():
         if datos and str(datos['codigo']) == codigo_ingresado and datetime.datetime.now() < datos['expira']:
             # Crear usuario definitivo
             user_controller.insertar_usuario(datos['username'], email, datos['password'])
+
+            # Recuperar el usuario recién creado
+            nuevo_usuario = user_controller.obtener_usuario_por_email(email)
+
+            # Eliminar datos temporales
             usuarios_pendientes.pop(email, None)
             session.pop('email_verificacion', None)
+
             flash('Cuenta verificada y creada correctamente ✅', 'success')
-            return redirect(url_for('login'))
+
+            # Iniciar sesión automáticamente con la nueva cuenta
+            if nuevo_usuario:
+                session['user_id'] = nuevo_usuario['id']
+                session['user'] = {
+                    'username': nuevo_usuario['username'],
+                    'email': nuevo_usuario['email'],
+                    'role': nuevo_usuario['role']
+                }
+
+                flash('¡Bienvenido!', 'success')
+                return redirect(url_for('home'))
+            else:
+                flash('Error al iniciar sesión automáticamente. Intenta iniciar sesión manualmente.', 'warning')
+                return redirect(url_for('login'))
         else:
             flash('Código inválido o expirado ❌', 'error')
 
     return render_template('emailverificacion.html', title='Verificar correo')
+
 
 
 @app.route('/resend_code', methods=['POST'])
@@ -479,6 +511,30 @@ def Soporte_Tecnico():
 # =====================
 #  Main
 # =====================
+
+@app.route('/delete_account', methods=['POST'])
+def delete_account():
+    """Eliminar la cuenta del usuario actual"""
+    if g.user is None:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+
+    user_id = g.user['id']
+
+    try:
+        db = bd.obtener_conexion()
+        success, message = user_controller.eliminar_usuario(db, user_id)
+        db.close()
+
+        if success:
+            session.clear()  # cerrar sesión tras eliminar cuenta
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+
+    except Exception as e:
+        print("Error al eliminar cuenta:", e)
+        return jsonify({'success': False, 'message': 'Error interno al eliminar cuenta'}), 500
+
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
