@@ -1,0 +1,102 @@
+/* ========================================
+   ESTILOS PARA LA PÁGINA "SOBRE NOSOTROS"
+   ======================================== */
+
+/* --- Sección Hero (Amarilla) --- */
+.hero-section {
+    background-color: var(--yellow);
+    padding: 4rem 2rem 10rem; /* Ajuste de padding */
+    position: relative;
+    font-family: 'Inter', sans-serif; /* Tipografía moderna */
+}
+
+.hero-section .curve .shape-fill {
+    fill: #f3f3f3; /* Color del fondo del cuerpo */
+}
+
+/* --- Contenedor principal del contenido --- */
+.about-content {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4rem; /* Espacio entre secciones de texto */
+}
+
+/* --- Estilo para cada bloque de sección de texto --- */
+.about-block {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 16px;
+    padding: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.about-block h2 {
+    font-family: 'Roboto Slab', serif;
+    font-size: 2.2rem;
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--ink);
+    border-bottom: 3px solid var(--orange);
+    padding-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.about-block p, .about-block li {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: #333;
+}
+
+.about-block p:last-child {
+    margin-bottom: 0;
+}
+
+/* --- Estilo específico para la sección de Valores --- */
+.values-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Dos columnas */
+    gap: 1.5rem;
+}
+
+.values-list li {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    border-left: 5px solid var(--accent);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.values-list li:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+}
+
+/* --- Sección inferior (Ubicación y Equipo) --- */
+.extra-info-section {
+    padding: 6rem 2rem;
+    background-color: #f3f3f3;
+}
+
+/* --- CTA (Call to Action) Final --- */
+.about-cta-section {
+    background-color: var(--color-verde-cta);
+    text-align: center;
+    padding: 6rem 2rem;
+    position: relative;
+}
+
+/* --- Responsividad --- */
+@media (max-width: 768px) {
+    .values-list {
+        grid-template-columns: 1fr; /* Una columna en móvil */
+    }
+
+    .about-block h2 {
+        font-size: 1.8rem;
+    }
+}
