@@ -1,5 +1,8 @@
 {% extends "base.html" %}
-{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}">
+{% endblock %}
 {% block content %}
  <main class="page-main">
         <!-- Hero Section -->
@@ -9,65 +12,64 @@
                 Encuentra respuestas rápidas a las dudas más comunes sobre Robot, 
                 la plataforma educativa interactiva de la USAT.
             </p>
-            
-            <!-- Curva decorativa -->
+
+            <!-- FAQ Section -->
+            <section class="faq-section">
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>¿Qué es Robot?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Robot es una plataforma educativa creada en la Universidad Santo Toribio de Mogrovejo (USAT) que permite a docentes y estudiantes participar en quizzes interactivos para hacer el aprendizaje más dinámico y divertido.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>¿Quiénes pueden usar Robot?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Robot está diseñado principalmente para profesores y alumnos de la USAT, pero puede adaptarse a cualquier institución educativa interesada en innovar su forma de enseñanza.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>¿Cómo puedo crear un quiz?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Solo necesitas iniciar sesión, dirigirte a la sección Crear Quiz, ingresar las preguntas y respuestas, y luego compartirlo con tus estudiantes.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>¿Necesito pagar para usar Robot?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>No. Robot es un proyecto académico gratuito desarrollado con fines educativos dentro de la USAT.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>¿Qué tipo de dispositivos son compatibles?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Robot funciona en computadoras, tablets y teléfonos móviles con conexión a Internet y navegador actualizado.</p>
+                    </div>
+                </div>
+            </section>
+
             <div class="curve">
-                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none" style="height: 110px;">
-                    <path d="M1298 0V129H2V5C139 63 209 42 330 44 467 29 545 28 631 33 853 54 879 58 1057 47Z" class="shape-fill"></path>
+                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
                 </svg>
-            </div>
-        </section>
-
-        <!-- FAQ Section -->
-        <section class="faq-section">
-            <div class="faq-item">
-                <button class="faq-question">
-                    <span>¿Qué es Robot?</span>
-                    <span class="faq-icon">+</span>
-                </button>
-                <div class="faq-answer">
-                    <p>Robot es una plataforma educativa creada en la Universidad Santo Toribio de Mogrovejo (USAT) que permite a docentes y estudiantes participar en quizzes interactivos para hacer el aprendizaje más dinámico y divertido.</p>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <button class="faq-question">
-                    <span>¿Quiénes pueden usar Robot?</span>
-                    <span class="faq-icon">+</span>
-                </button>
-                <div class="faq-answer">
-                    <p>Robot está diseñado principalmente para profesores y alumnos de la USAT, pero puede adaptarse a cualquier institución educativa interesada en innovar su forma de enseñanza.</p>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <button class="faq-question">
-                    <span>¿Cómo puedo crear un quiz?</span>
-                    <span class="faq-icon">+</span>
-                </button>
-                <div class="faq-answer">
-                    <p>Solo necesitas iniciar sesión, dirigirte a la sección Crear Quiz, ingresar las preguntas y respuestas, y luego compartirlo con tus estudiantes.</p>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <button class="faq-question">
-                    <span>¿Necesito pagar para usar Robot?</span>
-                    <span class="faq-icon">+</span>
-                </button>
-                <div class="faq-answer">
-                    <p>No. Robot es un proyecto académico gratuito desarrollado con fines educativos dentro de la USAT.</p>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <button class="faq-question">
-                    <span>¿Qué tipo de dispositivos son compatibles?</span>
-                    <span class="faq-icon">+</span>
-                </button>
-                <div class="faq-answer">
-                    <p>Robot funciona en computadoras, tablets y teléfonos móviles con conexión a Internet y navegador actualizado.</p>
-                </div>
             </div>
         </section>
     </main>
