@@ -1,6 +1,8 @@
 from bd import obtener_conexion
 from werkzeug.security import generate_password_hash, check_password_hash
 
+import psycopg2
+
 def insertar_usuario(username, email, password):
     conexion = obtener_conexion()
     with conexion.cursor() as cursor:
@@ -85,3 +87,14 @@ def actualizar_password(user_id, old_password, new_password):
     conexion.commit()
     conexion.close()
     return True, "Contraseña actualizada correctamente"
+
+def eliminar_usuario(db, user_id):
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        db.commit()
+        return True, "Tu cuenta ha sido eliminada exitosamente."
+    except psycopg2.Error as e:
+        db.rollback()
+        return False, f"Error al eliminar la cuenta: {e.pgerror}"
+
