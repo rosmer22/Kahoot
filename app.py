@@ -477,21 +477,18 @@ def crear_cuestionario():
     try:
         data = {}
 
-        print('DEBUG app.py: Content-Type:', request.content_type)
-        print('DEBUG app.py: is_json:', request.is_json)
-
         if request.is_json:
             json_data = request.get_json()
             data['titulo'] = json_data.get('titulo')
             data['descripcion'] = json_data.get('descripcion')
             data['preguntas'] = json_data.get('preguntas', [])
             data['pin'] = json_data.get('pin', '')
-            print(f"DEBUG app.py: PIN desde JSON: '{data['pin']}'")
+            data['estado'] = json_data.get('estado', 'publico')
         else:
             data['titulo'] = request.form.get('titulo')
             data['descripcion'] = request.form.get('descripcion')
             data['pin'] = request.form.get('pin', '')
-            print(f"DEBUG app.py: PIN desde FormData: '{data['pin']}'")
+            data['estado'] = request.form.get('estado', 'publico')
 
             import json
             preguntas_str = request.form.get('preguntas', '[]')
@@ -499,8 +496,6 @@ def crear_cuestionario():
                 data['preguntas'] = json.loads(preguntas_str) if preguntas_str else []
             except Exception:
                 data['preguntas'] = []
-
-        print('DEBUG app.py: Data keys ->', list(data.keys()))
 
         db = bd.obtener_conexion()
         response = quiz_controller.crear_cuestionario(db, data, request.files, app.config['UPLOAD_FOLDER'])
@@ -525,10 +520,12 @@ def actualizar_cuestionario(cuestionario_id):
             data['descripcion'] = json_data.get('descripcion')
             data['preguntas'] = json_data.get('preguntas', [])
             data['pin'] = json_data.get('pin', '')
+            data['estado'] = json_data.get('estado', 'publico')
         else:
             data['titulo'] = request.form.get('titulo')
             data['descripcion'] = request.form.get('descripcion')
             data['pin'] = request.form.get('pin', '')
+            data['estado'] = request.form.get('estado', 'publico')
 
             import json
             preguntas_str = request.form.get('preguntas', '[]')

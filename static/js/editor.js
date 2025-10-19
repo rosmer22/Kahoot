@@ -751,9 +751,9 @@ function guardarCuestionario() {
   const imagenFile = document.getElementById('cfgFile').files[0];
   const cuestionarioId = document.getElementById('cuestionario_id').value;
   
-  // Obtener configuración de privacidad
-  const privacyPublico = document.getElementById('cfgPublico');
-  const estado = privacyPublico && privacyPublico.checked ? 'publico' : 'privado';
+  // Obtener configuración de privacidad - verificar cuál radio está seleccionado
+  const radioPrivacidad = document.querySelector('input[name="privacy"]:checked');
+  const estado = radioPrivacidad ? radioPrivacidad.value : 'publico';
 
   // Validar que haya un título
   if (!titulo) {
@@ -794,8 +794,6 @@ function guardarCuestionario() {
   const pinInput = document.querySelector('.pin-input');
   const pin = pinInput ? pinInput.value : '';
 
-  console.log('PIN a enviar:', pin);  // Debug: verificar el PIN
-
   // Preparar datos para enviar
   const data = {
     titulo: titulo,
@@ -824,11 +822,9 @@ function guardarCuestionario() {
     requestData.append('pin', pin);  // Incluir el PIN del encabezado
     requestData.append('estado', estado);  // Incluir el estado de privacidad
     requestData.append('imagen_portada', imagenFile);
-    console.log('Enviando como FormData con PIN:', pin);  // Debug
   } else {
     requestData = JSON.stringify(data);
     headers['Content-Type'] = 'application/json';
-    console.log('Enviando como JSON:', data);  // Debug
   }
 
   // Mostrar indicador de carga solo en el botón Guardar del header

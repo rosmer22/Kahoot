@@ -65,24 +65,17 @@
     });
   });
 
-  // Hacer que toda la card sea clickeable para ver detalles
-  document.querySelectorAll('.card').forEach(card => {
+  // Hacer que solo las cards de "Completados" sean clickeables
+  // Las cards de "Creados por mí" solo deben usar los botones Editar/Eliminar
+  document.querySelectorAll('.cards.soft .card').forEach(card => {
     card.addEventListener('click', (e) => {
-      // No redirigir si se hizo clic en un botón
-      if (e.target.classList.contains('btn-edit') || 
-          e.target.classList.contains('btn-delete') ||
-          e.target.closest('.btn-edit') ||
-          e.target.closest('.btn-delete')) {
-        return;
-      }
-      
       const quizId = card.getAttribute('data-quiz-id');
       if (quizId) {
         window.location.href = `/quiz/${quizId}`;
       }
     });
     
-    // Añadir cursor pointer
+    // Añadir cursor pointer solo a las cards de completados
     card.style.cursor = 'pointer';
   });
 })();

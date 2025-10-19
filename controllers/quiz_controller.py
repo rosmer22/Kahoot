@@ -40,9 +40,6 @@ def crear_cuestionario(db, data, files, upload_folder):
         pin = data.get('pin', '').strip()  # Obtener PIN del frontend
         estado = data.get('estado', 'publico').strip()  # Obtener estado de privacidad (publico/privado)
         
-        print(f"DEBUG: PIN recibido del frontend: '{pin}'")  # Debug
-        print(f"DEBUG: Estado de privacidad: '{estado}'")  # Debug
-        
         # Validaciones
         if not titulo:
             return jsonify({'error': 'El título es obligatorio'}), 400
@@ -57,10 +54,7 @@ def crear_cuestionario(db, data, files, upload_folder):
         
         # Si no se proporciona PIN, generar uno
         if not pin:
-            print("DEBUG: PIN vacío, generando uno nuevo")  # Debug
             pin = generate_pin()
-        else:
-            print(f"DEBUG: Usando PIN del frontend: '{pin}'")  # Debug
         
         cursor = db.cursor()
         

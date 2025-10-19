@@ -83,12 +83,26 @@
   border-radius: 10px;
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s;
+}
+
+/* Solo las cards de "Completados" (soft) son clickeables en toda su área */
+.cards.soft .card {
   cursor: pointer;
 }
 
-.card:hover {
+.cards.soft .card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+}
+
+/* Las cards de "Creados por mí" tienen cursor normal, 
+   solo los botones son interactivos */
+.cards:not(.soft) .card {
+  cursor: default;
+}
+
+.cards:not(.soft) .card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .card .thumb {
