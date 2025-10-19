@@ -42,30 +42,50 @@
         /* Ocultar scrollbar en Chrome/Safari */
     }
 
-    .carousel .card {
+    .carousel .quiz-card {
         scroll-snap-align: start;
-        /* Alinea cada tarjeta al inicio del viewport */
         background-color: white;
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        padding: 1rem;
+        overflow: hidden; /* Para que la imagen respete el borde redondeado */
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
-    .carousel .card-image-placeholder {
-        background-color: #eeeeee;
+    .carousel .quiz-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .carousel .quiz-card-image {
+        background-color: #e0e0e0; /* Color de fondo si no hay imagen */
         height: 160px;
-        border-radius: 8px;
-        margin-bottom: 1rem;
+        width: 100%;
+        object-fit: cover; /* Asegura que la imagen cubra el espacio */
     }
 
-    .carousel .card-name {
-        background-color: white;
+    .carousel .quiz-card-content {
         padding: 1rem;
-        text-align: left;
+        text-align: center;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .carousel .quiz-card-title {
         font-size: 1.1rem;
-        border: 1px solid #dcdcdc;
-        border-radius: 8px;
+        font-weight: bold;
         margin: 0;
+    }
+
+    .carousel .quiz-card-meta {
+        font-size: 0.8rem;
+        color: #888;
+        margin-top: 0.5rem;
     }
 
     /* Botones de navegación */
@@ -142,11 +162,18 @@
         <button class="nav prev" aria-label="Anterior">‹</button>
         <div class="viewport">
             <ul class="track">
-                {% for i in range(6) %}
-                <li class="card">
-                    <div class="card-image-placeholder"></div>
-                    <div class="card-name">Nombre {{ i + 1 }}</div>
+                {% for quiz in quizzes %}
+                <li>
+                    <a href="{{ url_for('quiz_details', cuestionario_id=quiz.id) }}" class="quiz-card">
+                        <img src="{{ url_for('static', filename='uploads/' + quiz.imagen_portada) if quiz.imagen_portada else url_for('static', filename='img/rock.png') }}" alt="Portada de {{ quiz.titulo }}" class="quiz-card-image">
+                        <div class="quiz-card-content">
+                            <h3 class="quiz-card-title">{{ quiz.titulo }}</h3>
+                            <p class="quiz-card-meta">PIN: {{ quiz.pin }} | {{ quiz.question_count }} pregunta{{ 's' if quiz.question_count != 1 else '' }}</p>
+                        </div>
+                    </a>
                 </li>
+                {% else %}
+                <p>No hay cuestionarios públicos disponibles en este momento.</p>
                 {% endfor %}
             </ul>
         </div>

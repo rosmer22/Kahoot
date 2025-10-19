@@ -57,7 +57,27 @@ def inject_globals():
 # =====================
 @app.route('/')
 def home():
-    return render_template('home.html', title='RoBot')
+    """Página de inicio que muestra los cuestionarios públicos más recientes."""
+    db = bd.obtener_conexion()
+    cursor = db.cursor()
+    cursor.execute(
+        """
+        SELECT 
+            c.id, 
+            COALESCE(c.titulo, 'Sin título') as titulo, 
+            c.pin, 
+            c.imagen_portada,
+            (SELECT COUNT(*) FROM preguntas p WHERE p.cuestionario_id = c.id) as question_count
+        FROM cuestionarios c
+        WHERE c.estado = 'publico'
+        ORDER BY c.created_at DESC
+        LIMIT 6
+        """
+    )
+    quizzes = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return render_template('home.html', title='RoBot', quizzes=quizzes)
 
 
 
