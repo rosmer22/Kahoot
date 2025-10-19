@@ -65,7 +65,7 @@
     });
   });
 
-  // Opcional: Hacer que toda la card sea clickeable para editar
+  // Hacer que toda la card sea clickeable para ver detalles
   document.querySelectorAll('.card').forEach(card => {
     card.addEventListener('click', (e) => {
       // No redirigir si se hizo clic en un botón
@@ -78,8 +78,11 @@
       
       const quizId = card.getAttribute('data-quiz-id');
       if (quizId) {
-        window.location.href = `/editor/${quizId}`;
+        window.location.href = `/quiz/${quizId}`;
       }
     });
+    
+    // Añadir cursor pointer
+    card.style.cursor = 'pointer';
   });
 })();

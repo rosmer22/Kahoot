@@ -16,7 +16,7 @@ CREATE TABLE cuestionarios (
     descripcion TEXT,
     imagen_portada VARCHAR(500),
     pin VARCHAR(10) UNIQUE,
-    estado ENUM('borrador', 'publicado', 'archivado') DEFAULT 'borrador',
+    estado ENUM('publico', 'privado') DEFAULT 'publico',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

@@ -13,11 +13,11 @@
 <section class="container grid-results" id="resultsGrid">
   {% if items %}
     {% for item in items %}
-    <article class="result" data-name="{{ item.titulo }}" data-pin="{{ item.pin }}">
+    <article class="result" data-quiz-id="{{ item.id }}" data-name="{{ item.titulo or 'Sin título' }}" data-pin="{{ item.pin or '' }}">
       <div class="thumb"></div>
       <div class="info">
-        <div class="name">{{ item.titulo }}</div>
-        <div class="pin-badge">PIN: {{ item.pin }}</div>
+        <div class="name">{{ item.titulo or 'Sin título' }}</div>
+        <div class="pin-badge">PIN: {{ item.pin or 'N/A' }}</div>
       </div>
     </article>
     {% endfor %}

@@ -342,7 +342,11 @@ def explore():
     cursor = db.cursor()
     cursor.execute(
         """
-        SELECT id, titulo, pin, descripcion, imagen_portada
+        SELECT id, 
+               COALESCE(titulo, 'Sin título') as titulo, 
+               pin, 
+               COALESCE(descripcion, '') as descripcion, 
+               imagen_portada
         FROM cuestionarios
         WHERE estado = 'publico'
         ORDER BY created_at DESC
@@ -363,6 +367,83 @@ def join_quiz():
 @app.route('/editor')
 def editor():
     return render_template('editor.html', title='Editor', creating_quiz=True)
+
+
+@app.route('/quiz/<int:cuestionario_id>')
+def quiz_details(cuestionario_id):
+    """Ver detalles de un cuestionario público o del usuario actual"""
+    db = bd.obtener_conexion()
+    cursor = db.cursor()
+    
+    # Obtener cuestionario
+    cursor.execute("""
+        SELECT c.id, c.user_id, c.titulo, c.descripcion, c.imagen_portada, c.pin, c.estado, c.created_at,
+               u.username as creator_username
+        FROM cuestionarios c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.id = %s
+    """, (cuestionario_id,))
+    
+    cuestionario = cursor.fetchone()
+    
+    if not cuestionario:
+        cursor.close()
+        db.close()
+        flash('Cuestionario no encontrado', 'error')
+        return redirect(url_for('explore'))
+    
+    # Verificar permisos: 
+    # - Si es público, todos pueden verlo
+    # - Si es privado, solo el creador puede verlo en esta vista
+    if cuestionario['estado'] == 'privado':
+        if not g.user or g.user['id'] != cuestionario['user_id']:
+            cursor.close()
+            db.close()
+            flash('Este cuestionario es privado. Usa el PIN para acceder.', 'warning')
+            return redirect(url_for('join_quiz'))
+    
+    # Obtener preguntas
+    cursor.execute("""
+        SELECT id, tipo_pregunta, texto_pregunta, orden, tiempo_limite, puntos
+        FROM preguntas 
+        WHERE cuestionario_id = %s 
+        ORDER BY orden ASC
+    """, (cuestionario_id,))
+    
+    preguntas = cursor.fetchall()
+    
+    # Obtener opciones para cada pregunta
+    preguntas_con_opciones = []
+    for pregunta in preguntas:
+        cursor.execute("""
+            SELECT id, texto_opcion, es_correcta, orden
+            FROM opciones_respuesta 
+            WHERE pregunta_id = %s 
+            ORDER BY orden ASC
+        """, (pregunta['id'],))
+        
+        opciones = cursor.fetchall()
+        
+        preguntas_con_opciones.append({
+            'id': pregunta['id'],
+            'texto': pregunta['texto_pregunta'],
+            'answers': [{'texto': op['texto_opcion'], 'is_correct': bool(op['es_correcta'])} for op in opciones]
+        })
+    
+    cursor.close()
+    db.close()
+    
+    quiz_data = {
+        'id': cuestionario['id'],
+        'titulo': cuestionario['titulo'],
+        'descripcion': cuestionario['descripcion'],
+        'image_url': cuestionario['imagen_portada'],
+        'pin': cuestionario['pin'],
+        'creator_username': cuestionario['creator_username'],
+        'questions': preguntas_con_opciones
+    }
+    
+    return render_template('quiz_details.html', title=quiz_data['titulo'], quiz=quiz_data)
 
 
 @app.route('/editor/<int:cuestionario_id>')

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz_details.css') }}">{% endblock %}
+
+{% block content %}
+<section class="quiz-details-hero">
+  <div class="curve">
+    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+    </svg>
+  </div>
+</section>
+
+<section class="quiz-details-container">
+  <div class="quiz-header-card">
+    <div class="user-info">
+      <div class="avatar-circle">
+        <img src="{{ quiz.creator_avatar or '/static/img/default-avatar.png' }}" alt="Avatar">
+      </div>
+      <span class="username">{{ quiz.creator_username or 'Usuario' }}</span>
+    </div>
+    
+    <div class="quiz-actions">
+      <button class="btn-action btn-edit">
+        <i class="fas fa-pen"></i> Editar
+      </button>
+      <button class="btn-action btn-favorite">
+        <i class="far fa-star"></i> Favorito
+      </button>
+    </div>
+  </div>
+
+  <div class="quiz-main-info">
+    <div class="quiz-thumbnail">
+      <img src="{{ quiz.image_url or '/static/img/default-quiz.png' }}" alt="Quiz thumbnail">
+    </div>
+    
+    <div class="quiz-info-text">
+      <h1 class="quiz-title">{{ quiz.titulo or 'Cuestionario 1' }}</h1>
+      <p class="quiz-description">{{ quiz.descripcion or 'Descripción simple' }}</p>
+    </div>
+    
+    <div class="quiz-start-action">
+      <button class="btn-start-quiz">
+        <i class="fas fa-play"></i> Iniciar ahora
+      </button>
+    </div>
+  </div>
+
+  <div class="questions-section">
+    <h2 class="section-title">Preguntas ({{ quiz.questions|length if quiz.questions else 10 }})</h2>
+    
+    <div class="questions-grid">
+      {% if quiz.questions %}
+        {% for question in quiz.questions %}
+        <article class="question-card">
+          <div class="question-preview">
+            <div class="question-number">{{ loop.index }}</div>
+            <div class="question-text-preview">{{ question.texto[:50] }}...</div>
+          </div>
+          <div class="answers-preview">
+            {% for answer in question.answers[:4] %}
+            <div class="answer-box {{ 'correct' if answer.is_correct else '' }}">
+              {{ answer.texto[:20] }}...
+            </div>
+            {% endfor %}
+          </div>
+        </article>
+        {% endfor %}
+      {% else %}
+        <!-- Placeholders cuando no hay preguntas -->
+        {% for i in range(10) %}
+        <article class="question-card placeholder">
+          <div class="question-preview">
+            <div class="question-number">{{ i + 1 }}</div>
+            <div class="question-text-preview"></div>
+          </div>
+          <div class="answers-preview">
+            <div class="answer-box"></div>
+            <div class="answer-box"></div>
+            <div class="answer-box"></div>
+            <div class="answer-box"></div>
+          </div>
+        </article>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block page_js %}<script src="{{ url_for('static', filename='js/quiz_details.js') }}"></script>{% endblock %}
