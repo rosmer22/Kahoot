@@ -9,6 +9,17 @@ def generate_pin():
     """Genera un PIN único de 6 caracteres"""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
+def _normaliza_estado(raw):
+    """Devuelve 'publico' o 'privado'. Nunca '', nunca None."""
+    if not raw:
+        return 'publico'
+    s = str(raw).strip().lower()
+    if s in ('publico', 'public', 'público'):
+        return 'publico'
+    if s in ('privado', 'private'):
+        return 'privado'
+    return 'publico'
+
 def save_cover_image(file, upload_folder):
     """Guarda la imagen de portada y retorna el nombre del archivo"""
     if not file:
@@ -38,7 +49,7 @@ def crear_cuestionario(db, data, files, upload_folder):
         descripcion = data.get('descripcion', '').strip()
         preguntas_data = data.get('preguntas', [])
         pin = data.get('pin', '').strip()  # Obtener PIN del frontend
-        estado = data.get('estado', 'publico').strip()  # Obtener estado de privacidad (publico/privado)
+        estado = _normaliza_estado(data.get('estado'))  # Normalizar estado de privacidad (publico/privado)
         
         # Validaciones
         if not titulo:
@@ -69,8 +80,8 @@ def crear_cuestionario(db, data, files, upload_folder):
         # Insertar cuestionario
         query_cuestionario = """
             INSERT INTO cuestionarios 
-            (user_id, titulo, descripcion, imagen_portada, pin, estado)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            (user_id, titulo, descripcion, imagen_portada, pin, estado, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
         """
         cursor.execute(query_cuestionario, (
             user_id,
@@ -78,7 +89,7 @@ def crear_cuestionario(db, data, files, upload_folder):
             descripcion if descripcion else None,
             imagen_portada,
             pin,
-            estado  # Guardar el estado de privacidad
+            estado  # Guardar el estado de privacidad normalizado
         ))
         cuestionario_id = cursor.lastrowid
         
@@ -176,7 +187,8 @@ def actualizar_cuestionario(db, cuestionario_id, data, files, upload_folder):
         titulo = data.get('titulo', '').strip()
         descripcion = data.get('descripcion', '').strip()
         preguntas_data = data.get('preguntas', [])
-        estado = data.get('estado', 'publico').strip()  # Obtener estado de privacidad
+        pin = data.get('pin', '').strip()  # Obtener PIN del frontend
+        estado = _normaliza_estado(data.get('estado'))  # Normalizar estado de privacidad
         
         # Validaciones
         if not titulo:
@@ -197,18 +209,27 @@ def actualizar_cuestionario(db, cuestionario_id, data, files, upload_folder):
                         os.remove(old_path)
                 imagen_portada = nueva_imagen
         
+        # Si no se proporciona PIN, conservar el actual
+        if not pin:
+            cursor.execute("SELECT pin FROM cuestionarios WHERE id = %s", (cuestionario_id,))
+            pin_result = cursor.fetchone()
+            if pin_result:
+                pin = pin_result['pin']
+        
         # Actualizar cuestionario
         query_update = """
             UPDATE cuestionarios 
-            SET titulo = %s, descripcion = %s, imagen_portada = %s, estado = %s
-            WHERE id = %s
+            SET titulo = %s, descripcion = %s, imagen_portada = %s, pin = %s, estado = %s, updated_at = NOW()
+            WHERE id = %s AND user_id = %s
         """
         cursor.execute(query_update, (
             titulo,
             descripcion if descripcion else None,
             imagen_portada,
-            estado,  # Actualizar el estado de privacidad
-            cuestionario_id
+            pin,
+            estado,  # Actualizar el estado de privacidad normalizado
+            cuestionario_id,
+            user_id
         ))
         
         # Eliminar preguntas y opciones antiguas
