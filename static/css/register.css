@@ -109,3 +109,48 @@
     .register-section .curve .shape-fill { 
         fill: var(--color-fondo-claro); 
     }
+
+    /* Estilos para el botón de mostrar/ocultar contraseña */
+    .password-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .password-wrapper .input {
+        width: 100%;
+        padding-right: 3rem;
+        /* Espacio para el botón */
+    }
+
+    .toggle-password {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #666;
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Estilos para el campo de términos y condiciones */
+    .terms-field {
+        display: flex;
+        align-items: flex-start; /* Alinear con el texto si es largo */
+        gap: 0.75rem;
+        font-size: 0.875rem;
+        color: #555;
+        margin-top: 1.25rem;
+        line-height: 1.4;
+    }
+
+    .terms-field a {
+        color: var(--accent, #007bff); /* Usar variable de color si existe */
+        text-decoration: none;
+    }
+
+    .terms-field a:hover { text-decoration: underline; }
