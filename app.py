@@ -9,12 +9,18 @@ import bd
 import logging
 import os
 import re
+from pathlib import Path
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = 'dev-secret-change-me'
 
-# === Config generales ===
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
+# === Config generales (MODIFICADO: usar rutas absolutas) ===
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+UPLOAD_DIR = STATIC_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+app.config['UPLOAD_FOLDER'] = str(UPLOAD_DIR)
 
 # === Config de correo (Gmail SMTP) ===
 # Sugerencia: usar variables de entorno para no exponer credenciales en código
@@ -634,6 +640,4 @@ def delete_account():
         return jsonify({'success': False, 'message': 'Error interno al eliminar cuenta'}), 500
 
 if __name__ == '__main__':
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
     app.run(debug=True)

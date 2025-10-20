@@ -165,7 +165,7 @@
                 {% for quiz in quizzes %}
                 <li>
                     <a href="{{ url_for('quiz_details', cuestionario_id=quiz.id) }}" class="quiz-card">
-                        <img src="{{ url_for('static', filename='uploads/' + quiz.imagen_portada) if quiz.imagen_portada else url_for('static', filename='img/rock.png') }}" alt="Portada de {{ quiz.titulo }}" class="quiz-card-image">
+                        <img src="{{ url_for('static', filename='uploads/' + quiz.imagen_portada) if quiz.imagen_portada else url_for('static', filename='img/sinimagenes.jpeg') }}" alt="Portada de {{ quiz.titulo }}" class="quiz-card-image">
                         <div class="quiz-card-content">
                             <h3 class="quiz-card-title">{{ quiz.titulo }}</h3>
                             <p class="quiz-card-meta">PIN: {{ quiz.pin }} | {{ quiz.question_count }} pregunta{{ 's' if quiz.question_count != 1 else '' }}</p>
