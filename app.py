@@ -638,6 +638,69 @@ def delete_account():
     except Exception as e:
         print("Error al eliminar cuenta:", e)
         return jsonify({'success': False, 'message': 'Error interno al eliminar cuenta'}), 500
+    
+# =====================
+#  Login Cuestionarios
+# =====================
+@app.route('/join', methods=['POST'])
+def join_quiz_post():
+    """
+    Permite a un jugador logueado unirse a una sesión de juego usando un PIN.
+    """
+    usuario = session.get('user_id')
+    if not usuario:
+        flash('Debes iniciar sesión para unirte a una partida.', 'error')
+        return redirect(url_for('login'))
+
+    pin_sesion = request.form.get('pin')
+    if not pin_sesion:
+        flash('Debes ingresar el PIN para unirte.', 'error')
+        return redirect(url_for('join'))
+
+    try:
+        db = bd.obtener_conexion()
+
+        # Buscar la sesión de juego por pin_sesion
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM sesiones_juego WHERE pin_sesion = %s AND estado != 'finalizado'", (pin_sesion,))
+        sesion = cursor.fetchone()
+
+        if not sesion:
+            flash('El PIN ingresado no es válido o la sesión ya finalizó.', 'error')
+            cursor.close()
+            db.close()
+            return redirect(url_for('join_quiz'))
+
+        # Registrar participante
+        nombre_participante = usuario.get('user_name')  # O el campo que tengas
+        cursor.execute(
+            "INSERT INTO participantes (sesion_id, nombre_participante) VALUES (%s, %s)",
+            (sesion['id'], nombre_participante)
+        )
+        db.commit()
+        participante_id = cursor.lastrowid
+
+        cursor.close()
+        db.close()
+
+        # Guardar info en sesión
+        session['jugador'] = {
+            'nombre': nombre_participante,
+            'email': usuario.get('email'),
+            'sesion_id': sesion['id'],
+            'pin': pin_sesion,
+            'participante_id': participante_id
+        }
+
+        flash(f'¡Bienvenido {nombre_participante}! Te uniste a la sesión correctamente.', 'success')
+        return redirect(url_for('quiz_details', cuestionario_id=sesion['cuestionario_id']))
+
+    except Exception as e:
+        app.logger.error(f"Error al unirse a la sesión: {e}", exc_info=True)
+        flash('Ocurrió un error al intentar unirse a la partida.', 'error')
+        return redirect(url_for('join_quiz'))
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
