@@ -14,7 +14,7 @@
   <div class="quiz-header-card">
     <div class="user-info">
       <div class="avatar-circle">
-        <img src="{{ quiz.creator_avatar or '/static/img/default-avatar.png' }}" alt="Avatar">
+        <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
       </div>
       <span class="username">{{ quiz.creator_username or 'Usuario' }}</span>
     </div>
@@ -31,7 +31,7 @@
 
   <div class="quiz-main-info">
     <div class="quiz-thumbnail">
-      <img src="{{ quiz.image_url or '/static/img/default-quiz.png' }}" alt="Quiz thumbnail">
+      <img src="{{ quiz.image_url }}" alt="Quiz thumbnail">
     </div>
     
     <div class="quiz-info-text">

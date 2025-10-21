@@ -2,6 +2,15 @@
 {% extends "base.html" %}
 {% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/explore.css') }}">{% endblock %}
 {% block content %}
+<script>
+    // Establecer el valor de búsqueda en el input del header
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.querySelector('.search-container input[name="q"]');
+        if (searchInput && '{{ search_query }}') {
+            searchInput.value = '{{ search_query }}';
+        }
+    });
+</script>
 <section class="explore-hero">
   <div class="curve">
     <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
@@ -24,8 +33,19 @@
   {% endif %}
 </section>
 
+{% if search_query %}
+    <div class="container search-results-header">
+        <h2>Resultados para "{{ search_query }}"</h2>
+        <p>{{ items|length }} cuestionario{{ 's' if items|length != 1 else '' }} encontrado{{ 's' if items|length != 1 else '' }}</p>
+    </div>
+{% endif %}
+
 {% if not items %}
-<p class="container no-results" id="noResultsInitial">Sin Cuestionarios Disponibles</p>
+    {% if search_query %}
+        <p class="container no-results" id="noResultsInitial">No se encontraron cuestionarios para "{{ search_query }}"</p>
+    {% else %}
+        <p class="container no-results" id="noResultsInitial">Sin Cuestionarios Disponibles</p>
+    {% endif %}
 {% endif %}
 <p class="container no-results hidden" id="noResults">No se encontraron cuestionarios</p>
 <p class="container more"><a href="#" class="link-underline">Ver más resultados</a></p>

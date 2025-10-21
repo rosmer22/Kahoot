@@ -9,18 +9,18 @@ import bd
 import logging
 import os
 import re
-from pathlib import Path
+from pathlib import Path  # ✅ agregado para rutas absolutas seguras
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = 'dev-secret-change-me'
 
-# === Config generales (MODIFICADO: usar rutas absolutas) ===
-BASE_DIR = Path(__file__).resolve().parent
+# === Config generales (MODIFICADO: usar rutas absolutas y crear carpeta en carga) ===
+BASE_DIR = Path(__file__).resolve().parent               # /home/usuario/mysite
 STATIC_DIR = BASE_DIR / "static"
 UPLOAD_DIR = STATIC_DIR / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)            # crea si no existe (funciona en WSGI)
 
-app.config['UPLOAD_FOLDER'] = str(UPLOAD_DIR)
+app.config['UPLOAD_FOLDER'] = str(UPLOAD_DIR)            # ruta ABSOLUTA para guardar archivos
 
 # === Config de correo (Gmail SMTP) ===
 # Sugerencia: usar variables de entorno para no exponer credenciales en código
@@ -37,6 +37,8 @@ logging.basicConfig(level=logging.ERROR)
 # Almacén temporal de usuarios pendientes de verificación
 # {email: {"username": str, "password": str, "codigo": int, "expira": datetime}}
 usuarios_pendientes = {}
+codigos = {}
+
 
 
 # =====================
@@ -68,10 +70,10 @@ def home():
     cursor = db.cursor()
     cursor.execute(
         """
-        SELECT 
-            c.id, 
-            COALESCE(c.titulo, 'Sin título') as titulo, 
-            c.pin, 
+        SELECT
+            c.id,
+            COALESCE(c.titulo, 'Sin título') as titulo,
+            c.pin,
             c.imagen_portada,
             (SELECT COUNT(*) FROM preguntas p WHERE p.cuestionario_id = c.id) as question_count
         FROM cuestionarios c
@@ -205,6 +207,39 @@ def register():
 
     return render_template('register.html', title='Registrarme')
 
+@app.route('/codigo_recuperacion', methods=['GET', 'POST'])
+def codigo_recuperacion():
+    if request.method == 'POST':
+        email = request.form.get('email').strip()
+
+        if user_controller.obtener_usuario_por_email(email):
+            # Generar código de verificación
+            codigo = random.randint(100000, 999999)
+
+            codigos[email] = {
+                'codigo': codigo,
+                'expira': datetime.datetime.now() + datetime.timedelta(minutes=10)
+            }
+
+            try:
+                msg = Message(
+                    'Código de confirmación - RoBot',
+                    sender=app.config['MAIL_USERNAME'],
+                    recipients=[email]
+                )
+                msg.body = f"Tu código de confirmación es: {codigo}\nVálido por 10 minutos."
+                mail.send(msg)
+                session['email_verificacion'] = email
+                flash('Se ha enviado un código de verificación a tu correo. Revisa tu bandeja.', 'info')
+                return redirect(url_for('verificar_recuperar_cuenta'))
+            except Exception as e:
+                # Si el correo falla, se puede permitir registro directo o mostrar error.
+                # Aquí optamos por mostrar error para no crear cuentas sin verificación.
+                flash(f'No se pudo enviar el correo de verificación: {e}', 'error')
+                return redirect(url_for('verificar_codigo'))
+        else:
+            flash('El correo electrónico no existe', 'error')
+            return redirect(url_for('recuperar_cuenta'))
 
 @app.route('/verify_email', methods=['GET', 'POST'])
 def verify_email():
@@ -254,7 +289,28 @@ def verify_email():
 
     return render_template('emailverificacion.html', title='Verificar correo')
 
+@app.route('/verificar_codigo_recuperacion', methods=['GET', 'POST'])
+def verificar_codigo_recuperacion():
+    email = session.get('email_verificacion')
+    if not email:
+        return redirect(url_for('recuperar_cuenta'))
 
+    if request.method == 'POST':
+        codigo_ingresado = request.form.get('codigo')
+        datos = codigos.get(email)
+
+        if datos and str(datos['codigo']) == codigo_ingresado and datetime.datetime.now() < datos['expira']:
+            # Código válido → redirige al formulario de cambio de contraseña
+            codigos.pop(email, None)
+            return redirect(url_for('cambiar_contra'))  # 👈 ajusta este nombre si tu función de cambio de contraseña tiene otro nombre
+        else:
+            flash('Código inválido o expirado', 'error')
+
+    return render_template('verificar_codigo.html', title='Verificar código')
+
+@app.route('/cambiar_contra', methods=['GET'])
+def cambiar_contra():
+     return render_template('cambiar_contra.html', title='Empezar')
 
 @app.route('/resend_code', methods=['POST'])
 def resend_verification_code():
@@ -364,24 +420,46 @@ def my_quizzes():
 @app.route('/explore')
 def explore():
     """Explorar cuestionarios públicos (versión que consulta BD)."""
+    search_query = request.args.get('q', '').strip()
+    
     db = bd.obtener_conexion()
     cursor = db.cursor()
-    cursor.execute(
-        """
-        SELECT id, 
-               COALESCE(titulo, 'Sin título') as titulo, 
-               pin, 
-               COALESCE(descripcion, '') as descripcion, 
-               imagen_portada
-        FROM cuestionarios
-        WHERE estado = 'publico'
-        ORDER BY created_at DESC
-        """
-    )
+    
+    if search_query:
+        # Búsqueda por título o PIN
+        cursor.execute(
+            """
+            SELECT id,
+                   COALESCE(titulo, 'Sin título') as titulo,
+                   pin,
+                   COALESCE(descripcion, '') as descripcion,
+                   imagen_portada
+            FROM cuestionarios
+            WHERE estado = 'publico' 
+            AND (LOWER(titulo) LIKE LOWER(%s) OR CAST(pin AS CHAR) LIKE %s)
+            ORDER BY created_at DESC
+            """,
+            (f'%{search_query}%', f'%{search_query}%')
+        )
+    else:
+        # Sin búsqueda, mostrar todos
+        cursor.execute(
+            """
+            SELECT id,
+                   COALESCE(titulo, 'Sin título') as titulo,
+                   pin,
+                   COALESCE(descripcion, '') as descripcion,
+                   imagen_portada
+            FROM cuestionarios
+            WHERE estado = 'publico'
+            ORDER BY created_at DESC
+            """
+        )
+    
     items = cursor.fetchall()
     cursor.close()
     db.close()
-    return render_template('explore.html', title='Explorar', items=items)
+    return render_template('explore.html', title='Explorar', items=items, search_query=search_query)
 
 
 @app.route('/join')
@@ -400,7 +478,7 @@ def quiz_details(cuestionario_id):
     """Ver detalles de un cuestionario público o del usuario actual"""
     db = bd.obtener_conexion()
     cursor = db.cursor()
-    
+
     # Obtener cuestionario
     cursor.execute("""
         SELECT c.id, c.user_id, c.titulo, c.descripcion, c.imagen_portada, c.pin, c.estado, c.created_at,
@@ -409,16 +487,16 @@ def quiz_details(cuestionario_id):
         LEFT JOIN users u ON c.user_id = u.id
         WHERE c.id = %s
     """, (cuestionario_id,))
-    
+
     cuestionario = cursor.fetchone()
-    
+
     if not cuestionario:
         cursor.close()
         db.close()
         flash('Cuestionario no encontrado', 'error')
         return redirect(url_for('explore'))
-    
-    # Verificar permisos: 
+
+    # Verificar permisos:
     # - Si es público, todos pueden verlo
     # - Si es privado, solo el creador puede verlo en esta vista
     if cuestionario['estado'] == 'privado':
@@ -427,48 +505,54 @@ def quiz_details(cuestionario_id):
             db.close()
             flash('Este cuestionario es privado. Usa el PIN para acceder.', 'warning')
             return redirect(url_for('join_quiz'))
-    
+
     # Obtener preguntas
     cursor.execute("""
         SELECT id, tipo_pregunta, texto_pregunta, orden, tiempo_limite, puntos
-        FROM preguntas 
-        WHERE cuestionario_id = %s 
+        FROM preguntas
+        WHERE cuestionario_id = %s
         ORDER BY orden ASC
     """, (cuestionario_id,))
-    
+
     preguntas = cursor.fetchall()
-    
+
     # Obtener opciones para cada pregunta
     preguntas_con_opciones = []
     for pregunta in preguntas:
         cursor.execute("""
             SELECT id, texto_opcion, es_correcta, orden
-            FROM opciones_respuesta 
-            WHERE pregunta_id = %s 
+            FROM opciones_respuesta
+            WHERE pregunta_id = %s
             ORDER BY orden ASC
         """, (pregunta['id'],))
-        
+
         opciones = cursor.fetchall()
-        
+
         preguntas_con_opciones.append({
             'id': pregunta['id'],
             'texto': pregunta['texto_pregunta'],
             'answers': [{'texto': op['texto_opcion'], 'is_correct': bool(op['es_correcta'])} for op in opciones]
         })
-    
+
     cursor.close()
     db.close()
-    
+
+    # Construir URL completa de la imagen
+    if cuestionario['imagen_portada'] and cuestionario['imagen_portada'].strip():
+        image_url = url_for('static', filename='uploads/' + cuestionario['imagen_portada'])
+    else:
+        image_url = url_for('static', filename='img/sinimagenes.jpeg')
+
     quiz_data = {
         'id': cuestionario['id'],
         'titulo': cuestionario['titulo'],
         'descripcion': cuestionario['descripcion'],
-        'image_url': cuestionario['imagen_portada'],
+        'image_url': image_url,
         'pin': cuestionario['pin'],
         'creator_username': cuestionario['creator_username'],
         'questions': preguntas_con_opciones
     }
-    
+
     return render_template('quiz_details.html', title=quiz_data['titulo'], quiz=quiz_data)
 
 
@@ -639,5 +723,523 @@ def delete_account():
         print("Error al eliminar cuenta:", e)
         return jsonify({'success': False, 'message': 'Error interno al eliminar cuenta'}), 500
 
+@app.route('/recuperar_cuenta')
+def recuperar_cuenta():
+    return render_template('recuperar_cuenta.html')
+
+@app.route('/verificar_recuperar_cuenta')
+def verificar_recuperar_cuenta():
+    return render_template('verificar_recuperar_cuenta.html')
+
+@app.route('/cambiar_contrasena', methods=['GET', 'POST'])
+def cambiar_contrasena():
+    if request.method == 'POST':
+        nueva = request.form['new-password']
+        confirmar = request.form['confirm-password']
+        email = session.get('email_verificacion')  # el correo que guardaste tras verificar el código
+
+        if nueva != confirmar:
+            return render_template('cambiar_contra.html', mensaje="Las contraseñas no coinciden")
+
+        if email:
+            user_controller.actualizar_password_por_email(email, nueva)
+            session.pop('email_verificacion', None)  # limpia la sesión
+            return redirect(url_for('login'))  # redirige al inicio o login
+
+        return render_template('cambiar_contra.html', mensaje="Sesión inválida o expirada")
+
+    return render_template('cambiar_contra.html')
+
+# === RUTAS PARA GRUPOS ===
+
+@app.route('/grupos')
+def grupos():
+    """Página principal de gestión de grupos"""
+    if not g.user:
+        flash('Debes iniciar sesión para acceder a los grupos', 'warning')
+        return redirect(url_for('login'))
+    
+    # Obtener grupos del usuario
+    db = bd.obtener_conexion()
+    cursor = db.cursor()
+    
+    # Grupos donde el usuario es miembro
+    cursor.execute("""
+        SELECT g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at,
+               CASE WHEN g.admin_id = %s THEN true ELSE false END as es_admin,
+               COUNT(gm.user_id) as miembros_count
+        FROM grupos g
+        LEFT JOIN grupo_miembros gm ON g.id = gm.grupo_id
+        WHERE g.id IN (
+            SELECT grupo_id FROM grupo_miembros WHERE user_id = %s
+        )
+        GROUP BY g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at, g.admin_id
+        ORDER BY g.created_at DESC
+    """, (g.user['id'], g.user['id']))
+    
+    mis_grupos = cursor.fetchall()
+    
+    # Grupos públicos disponibles (donde el usuario NO es miembro)
+    cursor.execute("""
+        SELECT g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at,
+               false as es_admin,
+               COUNT(gm.user_id) as miembros_count
+        FROM grupos g
+        LEFT JOIN grupo_miembros gm ON g.id = gm.grupo_id
+        WHERE g.es_publico = true 
+        AND g.id NOT IN (
+            SELECT grupo_id FROM grupo_miembros WHERE user_id = %s
+        )
+        GROUP BY g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at
+        ORDER BY g.created_at DESC
+    """, (g.user['id'],))
+    
+    grupos_publicos = cursor.fetchall()
+    cursor.close()
+    db.close()
+    
+    return render_template('grupos.html', 
+                         title='Grupos', 
+                         grupos=mis_grupos, 
+                         grupos_publicos=grupos_publicos)
+
+@app.route('/api/grupos/crear', methods=['POST'])
+def api_crear_grupo():
+    """API para crear un nuevo grupo"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    nombre = data.get('nombre', '').strip()
+    descripcion = data.get('descripcion', '').strip()
+    es_publico = data.get('es_publico', False)
+    
+    if not nombre:
+        return jsonify({'success': False, 'message': 'El nombre del grupo es requerido'})
+    
+    # Generar código único de 8 caracteres
+    import string
+    import random
+    codigo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Crear grupo
+        cursor.execute("""
+            INSERT INTO grupos (nombre, descripcion, codigo, es_publico, admin_id, created_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+        """, (nombre, descripcion, codigo, es_publico, g.user['id']))
+        
+        grupo_id = cursor.lastrowid
+        
+        # Agregar admin como miembro
+        cursor.execute("""
+            INSERT INTO grupo_miembros (grupo_id, user_id, joined_at)
+            VALUES (%s, %s, NOW())
+        """, (grupo_id, g.user['id']))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Grupo creado exitosamente',
+            'grupo_id': grupo_id,
+            'codigo': codigo
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al crear grupo: {str(e)}'})
+
+@app.route('/api/grupos/unirse', methods=['POST'])
+def api_unirse_grupo():
+    """API para unirse a un grupo por código"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    codigo = data.get('codigo', '').strip().upper()
+    
+    if len(codigo) != 8:
+        return jsonify({'success': False, 'message': 'El código debe tener 8 caracteres'})
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Buscar grupo por código
+        cursor.execute("SELECT id, nombre FROM grupos WHERE codigo = %s", (codigo,))
+        grupo = cursor.fetchone()
+        
+        if not grupo:
+            return jsonify({'success': False, 'message': 'Grupo no encontrado'})
+        
+        # Verificar si ya es miembro
+        cursor.execute("""
+            SELECT id FROM grupo_miembros 
+            WHERE grupo_id = %s AND user_id = %s
+        """, (grupo['id'], g.user['id']))
+        
+        if cursor.fetchone():
+            return jsonify({'success': False, 'message': 'Ya eres miembro de este grupo'})
+        
+        # Agregar como miembro
+        cursor.execute("""
+            INSERT INTO grupo_miembros (grupo_id, user_id, joined_at)
+            VALUES (%s, %s, NOW())
+        """, (grupo['id'], g.user['id']))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Te has unido al grupo "{grupo["nombre"]}"'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al unirse al grupo: {str(e)}'})
+
+@app.route('/api/grupos/salir', methods=['POST'])
+def api_salir_grupo():
+    """API para salir de un grupo"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    grupo_id = data.get('grupo_id')
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Verificar si es miembro
+        cursor.execute("""
+            SELECT id FROM grupo_miembros 
+            WHERE grupo_id = %s AND user_id = %s
+        """, (grupo_id, g.user['id']))
+        
+        if not cursor.fetchone():
+            return jsonify({'success': False, 'message': 'No eres miembro de este grupo'})
+        
+        # Remover del grupo
+        cursor.execute("""
+            DELETE FROM grupo_miembros 
+            WHERE grupo_id = %s AND user_id = %s
+        """, (grupo_id, g.user['id']))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({'success': True, 'message': 'Has salido del grupo'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al salir del grupo: {str(e)}'})
+
+@app.route('/api/grupos/cuestionarios')
+def api_grupos_cuestionarios():
+    """API para obtener cuestionarios disponibles para grupos"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener cuestionarios públicos y del usuario
+        cursor.execute("""
+            SELECT c.id, c.titulo, c.descripcion, c.pin, c.imagen_portada,
+                   COUNT(p.id) as preguntas_count
+            FROM cuestionarios c
+            LEFT JOIN preguntas p ON c.id = p.cuestionario_id
+            WHERE c.estado = 'publico' OR c.user_id = %s
+            GROUP BY c.id, c.titulo, c.descripcion, c.pin, c.imagen_portada
+            ORDER BY c.created_at DESC
+        """, (g.user['id'],))
+        
+        cuestionarios = cursor.fetchall()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'quizzes': cuestionarios
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al cargar cuestionarios: {str(e)}'})
+
+@app.route('/api/grupos/iniciar-cuestionario', methods=['POST'])
+def api_iniciar_cuestionario_grupo():
+    """API para iniciar un cuestionario en grupo"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    grupo_id = data.get('grupo_id')
+    cuestionario_id = data.get('cuestionario_id')
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Verificar que el usuario es miembro del grupo
+        cursor.execute("""
+            SELECT id FROM grupo_miembros 
+            WHERE grupo_id = %s AND user_id = %s
+        """, (grupo_id, g.user['id']))
+        
+        if not cursor.fetchone():
+            return jsonify({'success': False, 'message': 'No eres miembro de este grupo'})
+        
+        # Crear sesión de cuestionario en grupo
+        cursor.execute("""
+            INSERT INTO sesiones_grupo (grupo_id, cuestionario_id, iniciado_por, created_at)
+            VALUES (%s, %s, %s, NOW())
+        """, (grupo_id, cuestionario_id, g.user['id']))
+        
+        sesion_id = cursor.lastrowid
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'sesion_id': sesion_id,
+            'message': 'Cuestionario iniciado en el grupo'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al iniciar cuestionario: {str(e)}'})
+
+@app.route('/grupo/quiz/<int:sesion_id>')
+def grupo_quiz(sesion_id):
+    """Página para rendir cuestionario en grupo"""
+    if not g.user:
+        flash('Debes iniciar sesión para participar', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado,
+                   g.nombre as grupo_nombre, c.titulo, c.pin, c.descripcion
+            FROM sesiones_grupo sg
+            JOIN grupos g ON sg.grupo_id = g.id
+            JOIN cuestionarios c ON sg.cuestionario_id = c.id
+            WHERE sg.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('grupos'))
+        
+        # Verificar que el usuario es miembro del grupo
+        cursor.execute("""
+            SELECT id FROM grupo_miembros 
+            WHERE grupo_id = %s AND user_id = %s
+        """, (sesion['grupo_id'], g.user['id']))
+        
+        if not cursor.fetchone():
+            flash('No eres miembro de este grupo', 'error')
+            return redirect(url_for('grupos'))
+        
+        # Obtener miembros del grupo
+        cursor.execute("""
+            SELECT u.id, u.username, ues.esta_listo
+            FROM grupo_miembros gm
+            JOIN users u ON gm.user_id = u.id
+            LEFT JOIN usuario_estado_grupo ues ON ues.user_id = u.id AND ues.sesion_id = %s
+            WHERE gm.grupo_id = %s
+        """, (sesion_id, sesion['grupo_id']))
+        
+        miembros = cursor.fetchall()
+        
+        # Obtener preguntas del cuestionario
+        cursor.execute("""
+            SELECT p.id, p.texto_pregunta, p.tiempo_limite, p.puntos
+            FROM preguntas p
+            WHERE p.cuestionario_id = %s
+            ORDER BY p.orden ASC
+        """, (sesion['cuestionario_id'],))
+        
+        preguntas = cursor.fetchall()
+        
+        cursor.close()
+        db.close()
+        
+        return render_template('grupo_quiz.html', 
+                             sesion_id=sesion_id,
+                             grupo={'nombre': sesion['grupo_nombre']},
+                             cuestionario={
+                                 'titulo': sesion['titulo'],
+                                 'pin': sesion['pin'],
+                                 'preguntas_count': len(preguntas)
+                             },
+                             miembros=miembros)
+        
+    except Exception as e:
+        flash(f'Error al cargar el cuestionario: {str(e)}', 'error')
+        return redirect(url_for('grupos'))
+
+@app.route('/api/grupo/ready', methods=['POST'])
+def api_grupo_ready():
+    """API para marcar usuario como listo"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+    ready = data.get('ready', False)
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Actualizar o crear estado del usuario
+        cursor.execute("""
+            INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE esta_listo = %s
+        """, (sesion_id, g.user['id'], ready, ready))
+        
+        # Obtener estado de todos los miembros
+        cursor.execute("""
+            SELECT u.id, u.username, COALESCE(ues.esta_listo, FALSE) as ready
+            FROM grupo_miembros gm
+            JOIN users u ON gm.user_id = u.id
+            JOIN sesiones_grupo sg ON gm.grupo_id = sg.grupo_id
+            LEFT JOIN usuario_estado_grupo ues ON ues.user_id = u.id AND ues.sesion_id = %s
+            WHERE sg.id = %s
+        """, (sesion_id, sesion_id))
+        
+        miembros = cursor.fetchall()
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'members': miembros
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/api/grupo/status/<int:sesion_id>')
+def api_grupo_status(sesion_id):
+    """API para obtener el estado de la sesión"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT estado FROM sesiones_grupo WHERE id = %s", (sesion_id,))
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            return jsonify({'success': False, 'message': 'Sesión no encontrada'})
+        
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'status': sesion['estado']
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/api/grupo/answer', methods=['POST'])
+def api_grupo_answer():
+    """API para enviar respuesta del usuario"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+    question_id = data.get('question_id')
+    answer_id = data.get('answer_id')
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la opción
+        cursor.execute("""
+            SELECT es_correcta FROM opciones_respuesta 
+            WHERE id = %s AND pregunta_id = %s
+        """, (answer_id, question_id))
+        
+        opcion = cursor.fetchone()
+        if not opcion:
+            return jsonify({'success': False, 'message': 'Opción no encontrada'})
+        
+        # Guardar respuesta
+        cursor.execute("""
+            INSERT INTO respuestas_grupo (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE opcion_id = %s, es_correcta = %s, puntos = %s
+        """, (sesion_id, g.user['id'], question_id, answer_id, 
+              opcion['es_correcta'], 10 if opcion['es_correcta'] else 0,
+              answer_id, opcion['es_correcta'], 10 if opcion['es_correcta'] else 0))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/api/grupo/results/<int:sesion_id>')
+def api_grupo_results(sesion_id):
+    """API para obtener resultados del grupo"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener puntuaciones de todos los usuarios
+        cursor.execute("""
+            SELECT u.username, SUM(rg.puntos) as score
+            FROM respuestas_grupo rg
+            JOIN users u ON rg.user_id = u.id
+            WHERE rg.sesion_id = %s
+            GROUP BY u.id, u.username
+            ORDER BY score DESC
+        """, (sesion_id,))
+        
+        resultados = cursor.fetchall()
+        
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'results': resultados
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
 if __name__ == '__main__':
+    # Ya no es necesario crear la carpeta aquí; se crea arriba en tiempo de carga.
     app.run(debug=True)

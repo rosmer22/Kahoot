@@ -4,6 +4,24 @@
   --color-fondo-claro: #f0f0f0;
 }
 
+/* --- Header de Resultados de Búsqueda --- */
+.search-results-header {
+  text-align: center;
+  padding: 2rem 0;
+  margin-bottom: 2rem;
+}
+
+.search-results-header h2 {
+  color: #333;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.search-results-header p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
 /* --- Hero Section --- */
 .explore-hero {
   background-color: var(--color-naranja);

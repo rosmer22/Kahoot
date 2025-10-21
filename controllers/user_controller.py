@@ -46,10 +46,10 @@ def actualizar_username(user_id, new_username):
     existing_user = obtener_usuario_por_username(new_username)
     if existing_user and existing_user['id'] != user_id:
         return False, "El nombre de usuario ya está en uso"
-    
+
     conexion = obtener_conexion()
     with conexion.cursor() as cursor:
-        cursor.execute("UPDATE users SET username = %s WHERE id = %s", 
+        cursor.execute("UPDATE users SET username = %s WHERE id = %s",
                       (new_username, user_id))
     conexion.commit()
     conexion.close()
@@ -60,10 +60,10 @@ def actualizar_email(user_id, new_email):
     existing_user = obtener_usuario_por_email(new_email)
     if existing_user and existing_user['id'] != user_id:
         return False, "El correo electrónico ya está en uso"
-    
+
     conexion = obtener_conexion()
     with conexion.cursor() as cursor:
-        cursor.execute("UPDATE users SET email = %s WHERE id = %s", 
+        cursor.execute("UPDATE users SET email = %s WHERE id = %s",
                       (new_email, user_id))
     conexion.commit()
     conexion.close()
@@ -74,15 +74,15 @@ def actualizar_password(user_id, old_password, new_password):
     usuario = obtener_usuario_por_id(user_id)
     if not usuario:
         return False, "Usuario no encontrado"
-    
+
     # Verificar contraseña anterior
     if not check_password_hash(usuario['password'], old_password):
         return False, "La contraseña anterior es incorrecta"
-    
+
     # Actualizar contraseña
     conexion = obtener_conexion()
     with conexion.cursor() as cursor:
-        cursor.execute("UPDATE users SET password = %s WHERE id = %s", 
+        cursor.execute("UPDATE users SET password = %s WHERE id = %s",
                       (generate_password_hash(new_password), user_id))
     conexion.commit()
     conexion.close()
@@ -98,3 +98,13 @@ def eliminar_usuario(db, user_id):
         db.rollback()
         return False, f"Error al eliminar la cuenta: {e.pgerror}"
 
+def actualizar_password_por_email(email, new_password):
+    conexion = obtener_conexion()
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            "UPDATE users SET password = %s WHERE email = %s",
+            (generate_password_hash(new_password), email)
+        )
+    conexion.commit()
+    conexion.close()
+    return True, "Contraseña actualizada correctamente"

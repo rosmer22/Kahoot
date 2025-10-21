@@ -1,0 +1,515 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_quiz.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="grupo-quiz-container">
+    <!-- Header del Grupo -->
+    <div class="quiz-header">
+        <div class="group-info">
+            <h1>{{ grupo.nombre }}</h1>
+            <p class="quiz-title">{{ cuestionario.titulo }}</p>
+            <div class="quiz-meta">
+                <span class="pin">PIN: {{ cuestionario.pin }}</span>
+                <span class="questions-count">{{ cuestionario.preguntas_count }} preguntas</span>
+            </div>
+        </div>
+        <div class="group-members">
+            <h3>Miembros del Grupo</h3>
+            <div class="members-list" id="membersList">
+                {% for miembro in miembros %}
+                <div class="member-item" data-user-id="{{ miembro.id }}">
+                    <div class="member-avatar">
+                        <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
+                    </div>
+                    <span class="member-name">{{ miembro.username }}</span>
+                    <div class="member-status">
+                        <span class="status-indicator {% if miembro.activo %}online{% else %}offline{% endif %}"></span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado del Cuestionario -->
+    <div class="quiz-status" id="quizStatus">
+        <div class="status-waiting" id="statusWaiting">
+            <div class="waiting-content">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <h2>Esperando a que todos estén listos</h2>
+                <p>El cuestionario comenzará cuando todos los miembros estén preparados</p>
+                <div class="ready-button">
+                    <button class="btn-ready" id="readyBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Estoy Listo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-starting" id="statusStarting" style="display: none;">
+            <div class="starting-content">
+                <div class="countdown" id="countdown">3</div>
+                <h2>¡El cuestionario está a punto de comenzar!</h2>
+                <p>Prepárate para responder las preguntas</p>
+            </div>
+        </div>
+
+        <div class="status-active" id="statusActive" style="display: none;">
+            <div class="quiz-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-text" id="progressText">Pregunta 1 de {{ cuestionario.preguntas_count }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pregunta Actual -->
+    <div class="question-container" id="questionContainer" style="display: none;">
+        <div class="question-card">
+            <div class="question-header">
+                <h3 id="questionText">¿Cuál es la capital de Francia?</h3>
+                <div class="question-timer" id="questionTimer">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span id="timerValue">30</span>s
+                </div>
+            </div>
+            
+            <div class="answers-container" id="answersContainer">
+                <!-- Las opciones se cargarán dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Resultados del Grupo -->
+    <div class="results-container" id="resultsContainer" style="display: none;">
+        <div class="results-header">
+            <h2>Resultados del Grupo</h2>
+            <p>Puntuación total: <span id="groupScore">0</span> puntos</p>
+        </div>
+        
+        <div class="leaderboard" id="leaderboard">
+            <!-- Los resultados se cargarán dinámicamente -->
+        </div>
+        
+        <div class="results-actions">
+            <button class="btn-primary" onclick="window.location.href='/grupos'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                Volver a Grupos
+            </button>
+            <button class="btn-secondary" onclick="restartQuiz()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L20.49 9"></path>
+                    <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3.51 15"></path>
+                </svg>
+                Repetir Cuestionario
+            </button>
+        </div>
+    </div>
+</main>
+
+<!-- Modal de Confirmación -->
+<div class="modal" id="confirmModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Respuesta</h3>
+        </div>
+        <div class="modal-body">
+            <p>¿Estás seguro de tu respuesta?</p>
+            <div class="selected-answer" id="selectedAnswerText"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeConfirmModal()">Cambiar</button>
+            <button class="btn-primary" onclick="confirmAnswer()">Confirmar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+    // Variables globales
+    const sesionId = {{ sesion_id }};
+    const userId = {{ g.user.id if g.user else 0 }};
+    let currentQuestion = 0;
+    let questions = [];
+    let userAnswers = [];
+    let isReady = false;
+    let selectedAnswer = null;
+    let questionTimer = null;
+
+    // Elementos del DOM
+    const statusWaiting = document.getElementById('statusWaiting');
+    const statusStarting = document.getElementById('statusStarting');
+    const statusActive = document.getElementById('statusActive');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const questionContainer = document.getElementById('questionContainer');
+    const readyBtn = document.getElementById('readyBtn');
+    const membersList = document.getElementById('membersList');
+    const confirmModal = document.getElementById('confirmModal');
+
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeQuiz();
+        setupEventListeners();
+        startPolling();
+    });
+
+    function initializeQuiz() {
+        console.log('Inicializando cuestionario en grupo...');
+        // Aquí se cargarían las preguntas del cuestionario
+        loadQuestions();
+    }
+
+    function setupEventListeners() {
+        readyBtn.addEventListener('click', toggleReady);
+        
+        // Event listeners para respuestas
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('answer-option')) {
+                selectAnswer(e.target);
+            }
+        });
+    }
+
+    function loadQuestions() {
+        // Simular carga de preguntas (en implementación real, se haría una petición al servidor)
+        questions = [
+            {
+                id: 1,
+                text: "¿Cuál es la capital de Francia?",
+                options: [
+                    { id: 1, text: "Londres", is_correct: false },
+                    { id: 2, text: "París", is_correct: true },
+                    { id: 3, text: "Madrid", is_correct: false },
+                    { id: 4, text: "Roma", is_correct: false }
+                ],
+                time_limit: 30
+            },
+            {
+                id: 2,
+                text: "¿Cuál es el río más largo del mundo?",
+                options: [
+                    { id: 1, text: "Amazonas", is_correct: true },
+                    { id: 2, text: "Nilo", is_correct: false },
+                    { id: 3, text: "Misisipi", is_correct: false },
+                    { id: 4, text: "Yangtsé", is_correct: false }
+                ],
+                time_limit: 30
+            }
+        ];
+    }
+
+    function toggleReady() {
+        isReady = !isReady;
+        
+        if (isReady) {
+            readyBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Listo ✓
+            `;
+            readyBtn.classList.add('ready');
+        } else {
+            readyBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Estoy Listo
+            `;
+            readyBtn.classList.remove('ready');
+        }
+
+        // Enviar estado al servidor
+        sendReadyStatus(isReady);
+    }
+
+    function sendReadyStatus(ready) {
+        fetch('/api/grupo/ready', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                sesion_id: sesionId,
+                user_id: userId,
+                ready: ready
+            })
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateMembersStatus(data.members);
+            }
+        });
+    }
+
+    function updateMembersStatus(members) {
+        membersList.innerHTML = '';
+        members.forEach(member => {
+            const memberElement = document.createElement('div');
+            memberElement.className = 'member-item';
+            memberElement.innerHTML = `
+                <div class="member-avatar">
+                    <img src="/static/img/robot_ico.png" alt="Avatar">
+                </div>
+                <span class="member-name">${member.username}</span>
+                <div class="member-status">
+                    <span class="status-indicator ${member.ready ? 'ready' : 'waiting'}"></span>
+                </div>
+            `;
+            membersList.appendChild(memberElement);
+        });
+    }
+
+    function startQuiz() {
+        statusWaiting.style.display = 'none';
+        statusStarting.style.display = 'block';
+        
+        let countdown = 3;
+        const countdownElement = document.getElementById('countdown');
+        
+        const countdownInterval = setInterval(() => {
+            countdownElement.textContent = countdown;
+            countdown--;
+            
+            if (countdown < 0) {
+                clearInterval(countdownInterval);
+                startQuestions();
+            }
+        }, 1000);
+    }
+
+    function startQuestions() {
+        statusStarting.style.display = 'none';
+        statusActive.style.display = 'block';
+        questionContainer.style.display = 'block';
+        
+        showQuestion(0);
+    }
+
+    function showQuestion(questionIndex) {
+        if (questionIndex >= questions.length) {
+            endQuiz();
+            return;
+        }
+
+        currentQuestion = questionIndex;
+        const question = questions[questionIndex];
+        
+        // Mostrar pregunta
+        document.getElementById('questionText').textContent = question.text;
+        
+        // Mostrar opciones
+        const answersContainer = document.getElementById('answersContainer');
+        answersContainer.innerHTML = '';
+        
+        question.options.forEach(option => {
+            const optionElement = document.createElement('div');
+            optionElement.className = 'answer-option';
+            optionElement.dataset.optionId = option.id;
+            optionElement.innerHTML = `
+                <div class="option-content">
+                    <span class="option-text">${option.text}</span>
+                </div>
+            `;
+            answersContainer.appendChild(optionElement);
+        });
+
+        // Actualizar progreso
+        updateProgress(questionIndex + 1, questions.length);
+        
+        // Iniciar temporizador
+        startQuestionTimer(question.time_limit);
+    }
+
+    function selectAnswer(optionElement) {
+        // Remover selección anterior
+        document.querySelectorAll('.answer-option').forEach(opt => {
+            opt.classList.remove('selected');
+        });
+        
+        // Seleccionar nueva opción
+        optionElement.classList.add('selected');
+        selectedAnswer = parseInt(optionElement.dataset.optionId);
+        
+        // Mostrar modal de confirmación
+        const question = questions[currentQuestion];
+        const selectedOption = question.options.find(opt => opt.id === selectedAnswer);
+        document.getElementById('selectedAnswerText').textContent = selectedOption.text;
+        confirmModal.style.display = 'flex';
+    }
+
+    function confirmAnswer() {
+        if (selectedAnswer) {
+            // Guardar respuesta
+            userAnswers.push({
+                question_id: questions[currentQuestion].id,
+                answer_id: selectedAnswer,
+                time_taken: questions[currentQuestion].time_limit - getRemainingTime()
+            });
+            
+            // Enviar respuesta al servidor
+            sendAnswer(questions[currentQuestion].id, selectedAnswer);
+            
+            // Limpiar selección
+            selectedAnswer = null;
+            closeConfirmModal();
+            
+            // Pasar a siguiente pregunta
+            setTimeout(() => {
+                showQuestion(currentQuestion + 1);
+            }, 1000);
+        }
+    }
+
+    function closeConfirmModal() {
+        confirmModal.style.display = 'none';
+    }
+
+    function sendAnswer(questionId, answerId) {
+        fetch('/api/grupo/answer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                sesion_id: sesionId,
+                user_id: userId,
+                question_id: questionId,
+                answer_id: answerId
+            })
+        });
+    }
+
+    function startQuestionTimer(seconds) {
+        const timerElement = document.getElementById('timerValue');
+        let timeLeft = seconds;
+        
+        questionTimer = setInterval(() => {
+            timerElement.textContent = timeLeft;
+            timeLeft--;
+            
+            if (timeLeft < 0) {
+                clearInterval(questionTimer);
+                // Tiempo agotado, pasar a siguiente pregunta
+                showQuestion(currentQuestion + 1);
+            }
+        }, 1000);
+    }
+
+    function getRemainingTime() {
+        return parseInt(document.getElementById('timerValue').textContent);
+    }
+
+    function updateProgress(current, total) {
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        
+        const percentage = (current / total) * 100;
+        progressFill.style.width = percentage + '%';
+        progressText.textContent = `Pregunta ${current} de ${total}`;
+    }
+
+    function endQuiz() {
+        statusActive.style.display = 'none';
+        questionContainer.style.display = 'none';
+        resultsContainer.style.display = 'block';
+        
+        // Cargar resultados
+        loadResults();
+    }
+
+    function loadResults() {
+        fetch(`/api/grupo/results/${sesionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayResults(data.results);
+            }
+        });
+    }
+
+    function displayResults(results) {
+        const leaderboard = document.getElementById('leaderboard');
+        const groupScore = document.getElementById('groupScore');
+        
+        let totalScore = 0;
+        leaderboard.innerHTML = '';
+        
+        results.forEach((result, index) => {
+            totalScore += result.score;
+            
+            const resultElement = document.createElement('div');
+            resultElement.className = 'result-item';
+            resultElement.innerHTML = `
+                <div class="result-rank">${index + 1}</div>
+                <div class="result-user">
+                    <div class="user-avatar">
+                        <img src="/static/img/robot_ico.png" alt="Avatar">
+                    </div>
+                    <span class="user-name">${result.username}</span>
+                </div>
+                <div class="result-score">${result.score} pts</div>
+            `;
+            leaderboard.appendChild(resultElement);
+        });
+        
+        groupScore.textContent = totalScore;
+    }
+
+    function restartQuiz() {
+        if (confirm('¿Estás seguro de que quieres reiniciar el cuestionario?')) {
+            window.location.reload();
+        }
+    }
+
+    function startPolling() {
+        // Polling para actualizar estado del cuestionario
+        setInterval(() => {
+            fetch(`/api/grupo/status/${sesionId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateQuizStatus(data.status);
+                }
+            });
+        }, 2000);
+    }
+
+    function updateQuizStatus(status) {
+        switch(status) {
+            case 'waiting':
+                // Todos esperando
+                break;
+            case 'starting':
+                startQuiz();
+                break;
+            case 'active':
+                // Cuestionario activo
+                break;
+            case 'finished':
+                endQuiz();
+                break;
+        }
+    }
+
+    console.log('✅ Cuestionario en grupo inicializado');
+</script>
+{% endblock %}

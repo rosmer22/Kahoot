@@ -1,0 +1,147 @@
+
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+<style>
+    /* Estilos para el botón de mostrar/ocultar contraseña */
+    .password-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .password-wrapper .input {
+        width: 100%;
+        /* Asegura que el input ocupe todo el espacio del wrapper */
+        padding-right: 3rem;
+        /* Espacio para el botón */
+    }
+
+    .toggle-password {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #666;
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Estilos mejorados para el botón Buscar */
+    .search-btn {
+        width: 100%;
+        padding: 1.2rem 2rem;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-size: 1.2rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        position: relative;
+        overflow: hidden;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .search-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    }
+
+    .search-btn:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .search-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .search-btn:hover::before {
+        left: 100%;
+    }
+
+    /* Estilos para el formulario */
+    .auth-card form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .auth-card label {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-weight: 500;
+        color: #555;
+        font-size: 1.1rem;
+    }
+
+    .auth-card input[type="email"] {
+        width: 100%;
+        padding: 1rem;
+        border: 2px solid #e1e5e9;
+        background-color: #fff;
+        border-radius: 12px;
+        font-size: 1rem;
+        box-sizing: border-box;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .auth-card input[type="email"]:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+</style>
+{% endblock %}
+{% block content %}
+<main class="login-section">
+    <div class="auth-card">
+        <h2>Recuperar cuenta</h2>
+        <form method="POST" action="{{ url_for('codigo_recuperacion') }}">
+          <label>Correo institucional:</label>
+          <input type="email" name="email" required>
+          <button type="submit" class="search-btn">🔍 Buscar</button>
+        </form>
+    </div>
+    <div class="curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</main>
+{% endblock %}
+{% block page_js %}
+<script>
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const button = input.parentElement.querySelector('.toggle-password');
+        const svg = button.querySelector('svg');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            // Cambiar a icono de ojo abierto
+            svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+        } else {
+            input.type = 'password';
+            // Cambiar a icono de ojo cerrado (original)
+            svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+        }
+    }
+</script>
+{% endblock %}

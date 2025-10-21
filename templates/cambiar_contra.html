@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+<style>
+    :root {
+        --color-secundario-amarillo: #fdd867;
+        --color-fondo-claro: #f0f0f0;
+        --color-texto: #333333;
+        --color-gris-claro-tarjeta: #e9e9e9;
+        --color-gris-boton: #b0b0b0;
+        --color-borde-input: #b8b8b8;
+    }
+
+    .change-password-section {
+        background-color: var(--color-secundario-amarillo);
+        flex-grow: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 4rem 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .auth-card {
+        background-color: var(--color-gris-claro-tarjeta);
+        padding: 2.5rem 3rem;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 480px;
+        z-index: 1;
+        border: 1px solid #ddd;
+    }
+
+    .auth-card h2 {
+        text-align: center;
+        font-size: 2.2rem;
+        font-weight: 600;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        color: var(--color-texto);
+    }
+
+    .auth-card .subtitle {
+        color: #666;
+        margin-bottom: 2.5rem;
+        font-size: 1.1rem;
+        text-align: center;
+    }
+
+    .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .auth-form .field {
+        margin-bottom: 1.5rem;
+    }
+
+    .auth-form .label {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-weight: 500;
+        color: #555;
+        font-size: 1.1rem;
+    }
+
+    .password-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .password-wrapper .input {
+        width: 100%;
+        padding: 1rem;
+        padding-right: 3rem;
+        border: 2px solid #e1e5e9;
+        background-color: #fff;
+        border-radius: 12px;
+        font-size: 1rem;
+        box-sizing: border-box;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .password-wrapper .input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    /* Validación visual para contraseñas */
+    .password-wrapper .input:valid {
+        border-color: #28a745;
+    }
+
+    .password-wrapper .input:invalid:not(:placeholder-shown) {
+        border-color: #dc3545;
+    }
+
+    /* Animación sutil para los inputs */
+    .password-wrapper .input {
+        animation: subtle-pulse 3s infinite;
+    }
+
+    @keyframes subtle-pulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+        }
+        50% {
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+    }
+
+    .toggle-password {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #666;
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .toggle-password:hover {
+        color: #333;
+    }
+
+    .hint {
+        display: block;
+        margin-top: 0.5rem;
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    /* Estilos mejorados para el botón Confirmar */
+    .submit-btn {
+        width: 100%;
+        padding: 1.2rem 2rem;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-size: 1.2rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        position: relative;
+        overflow: hidden;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 1rem;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    }
+
+    .submit-btn:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .submit-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .submit-btn:hover::before {
+        left: 100%;
+    }
+
+    .helper-text {
+        text-align: center;
+        margin-top: 2rem;
+        color: #666;
+    }
+
+    .helper-text a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .helper-text a:hover {
+        text-decoration: underline;
+    }
+
+    /* Estilos para mensajes de error */
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+    }
+
+    .error-icon {
+        font-size: 1.2rem;
+    }
+
+    /* Curva decorativa */
+    .change-password-section .curve {
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        width: 100%;
+        overflow: hidden;
+        line-height: 0;
+        z-index: 0;
+    }
+
+    .change-password-section .curve svg {
+        position: relative;
+        display: block;
+        width: calc(100% + 1.3px);
+        height: 180px;
+    }
+
+    .change-password-section .curve .shape-fill {
+        fill: var(--color-fondo-claro);
+    }
+</style>
+{% endblock %}
+{% block header %}
+  {% include "_header_guest.html" %}
+{% endblock %}
+
+{% block content %}
+<main class="change-password-section">
+    <div class="auth-card">
+        <h2>Cambiar Contraseña</h2>
+        <p class="subtitle">Ingresa tu nueva contraseña para continuar</p>
+        
+        <!-- Mensajes de error -->
+        {% if mensaje %}
+        <div class="error-message">
+            <span class="error-icon">⚠️</span>
+            {{ mensaje }}
+        </div>
+        {% endif %}
+
+        <form class="auth-form" method="post" action="{{ url_for('cambiar_contrasena') }}" id="changePasswordForm">
+            <div class="field">
+                <label class="label" for="new-password">Nueva Contraseña*</label>
+                <div class="password-wrapper">
+                    <input class="input" id="new-password" name="new-password" type="password" required minlength="8">
+                    <span class="toggle-password" onclick="togglePassword('new-password')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24">
+                            </path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                    </span>
+                </div>
+                <small class="hint">Mínimo 8 caracteres</small>
+            </div>
+
+            <div class="field">
+                <label class="label" for="confirm-password">Confirmar Contraseña*</label>
+                <div class="password-wrapper">
+                    <input class="input" id="confirm-password" name="confirm-password" type="password" required minlength="8">
+                    <span class="toggle-password" onclick="togglePassword('confirm-password')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24">
+                            </path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <button class="submit-btn" type="submit">🔒 Confirmar Cambio</button>
+        </form>
+
+        <p class="helper-text">¿Recordaste tu contraseña? <a href="{{ url_for('login') }}">Iniciar sesión</a></p>
+    </div>
+    
+    <div class="curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</main>
+{% endblock %}
+{% block page_js %}
+<script>
+    // Función para mostrar/ocultar contraseña
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const button = input.parentElement.querySelector('.toggle-password');
+        const svg = button.querySelector('svg');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            // Cambiar a icono de ojo abierto
+            svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+        } else {
+            input.type = 'password';
+            // Cambiar a icono de ojo cerrado (original)
+            svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+        }
+    }
+
+    // Validación en tiempo real
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('changePasswordForm');
+        const newPassword = document.getElementById('new-password');
+        const confirmPassword = document.getElementById('confirm-password');
+        const submitBtn = document.querySelector('.submit-btn');
+
+        // Función para validar contraseñas
+        function validatePasswords() {
+            const newPass = newPassword.value;
+            const confirmPass = confirmPassword.value;
+            
+            // Verificar longitud mínima
+            if (newPass.length < 8) {
+                newPassword.style.borderColor = '#dc3545';
+                return false;
+            } else {
+                newPassword.style.borderColor = '#28a745';
+            }
+
+            // Verificar que las contraseñas coincidan
+            if (confirmPass && newPass !== confirmPass) {
+                confirmPassword.style.borderColor = '#dc3545';
+                return false;
+            } else if (confirmPass) {
+                confirmPassword.style.borderColor = '#28a745';
+            }
+
+            return newPass.length >= 8 && newPass === confirmPass;
+        }
+
+        // Event listeners para validación en tiempo real
+        newPassword.addEventListener('input', validatePasswords);
+        confirmPassword.addEventListener('input', validatePasswords);
+
+        // Validación al enviar el formulario
+        form.addEventListener('submit', function(e) {
+            if (!validatePasswords()) {
+                e.preventDefault();
+                alert('Por favor, verifica que las contraseñas coincidan y tengan al menos 8 caracteres.');
+                return false;
+            }
+
+            // Mostrar estado de carga
+            submitBtn.innerHTML = '⏳ Procesando...';
+            submitBtn.disabled = true;
+        });
+
+        // Efecto de carga en el botón
+        submitBtn.addEventListener('click', function() {
+            if (validatePasswords()) {
+                this.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    this.style.transform = 'scale(1)';
+                }, 150);
+            }
+        });
+    });
+</script>
+{% endblock %}

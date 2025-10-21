@@ -81,31 +81,90 @@
         .auth-form .input {
             width: 100%;
             padding: 1rem;
-            border: 1px solid var(--color-borde-input);
+            border: 2px solid #e1e5e9;
             background-color: #fff;
             border-radius: 12px;
-            font-size: 1rem;
+            font-size: 1.2rem;
+            font-weight: 600;
             box-sizing: border-box;
             text-align: center; /* Centrar el texto del código */
             letter-spacing: 0.5rem; /* Espaciar los dígitos */
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
 
+        .auth-form .input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Animación para el input del código */
+        .auth-form .input {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+            }
+        }
+
+        /* Estilos para el placeholder */
+        .auth-form .input::placeholder {
+            color: #bbb;
+            font-weight: 400;
+        }
+
+        /* Estilos mejorados para el botón Verificar */
         .auth-form .submit-btn {
             width: 100%;
-            padding: 1rem;
+            padding: 1.2rem 2rem;
             border: none;
             border-radius: 12px;
-            background-color: var(--color-gris-boton);
-            color: #444;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             font-size: 1.2rem;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             margin-top: 1rem;
         }
 
         .auth-form .submit-btn:hover {
-            background-color: #a0a0a0;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+
+        .auth-form .submit-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .auth-form .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .auth-form .submit-btn:hover::before {
+            left: 100%;
         }
 
         /* Contenedor para los mensajes flash */
@@ -141,22 +200,22 @@
         }
 
         /* Curva decorativa */
-        .verification-section .curve { 
-            position: absolute; 
-            bottom: -1px; 
-            left: 0; 
-            width: 100%; 
-            overflow: hidden; 
-            line-height: 0; 
-            z-index: 0; 
+        .verification-section .curve {
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            overflow: hidden;
+            line-height: 0;
+            z-index: 0;
         }
-        .verification-section .curve svg { 
-            position: relative; 
-            display: block; 
-            width: calc(100% + 1.3px); 
-            height: 180px; 
+        .verification-section .curve svg {
+            position: relative;
+            display: block;
+            width: calc(100% + 1.3px);
+            height: 180px;
         }
-        .verification-section .curve .shape-fill { 
+        .verification-section .curve .shape-fill {
             fill: var(--color-fondo-claro); /* Relleno que coincide con el fondo de la sección de abajo */
         }
     </style>
@@ -164,48 +223,28 @@
 {% block content %}
 <main class="verification-section">
     <div class="auth-card">
-        <h2>Verificación de Correo</h2>
-        <p class="subtitle">Ingresa el código que enviamos a tu bandeja de entrada.</p>
+        <h2>Verificación de código</h2>
+        <p class="subtitle">Ingresa el código de 6 dígitos que te enviamos por correo</p>
         
-        <form class="auth-form" method="POST">
+        <form method="POST" action="{{ url_for('verificar_codigo_recuperacion') }}" class="auth-form">
             <div class="field">
-                <label class="label" for="codigo">Código de 6 dígitos</label>
-                <input class="input" type="text" id="codigo" name="codigo" placeholder="123456" required maxlength="6" pattern="\d{6}" title="El código debe tener 6 dígitos.">
+                <label for="codigo" class="label">Código de verificación:</label>
+                <input type="text" id="codigo" name="codigo" class="input" required maxlength="6" pattern="\d{6}" title="Debe tener 6 dígitos" placeholder="000000">
             </div>
-            <button class="submit-btn" type="submit">Verificar</button>
+            <button type="submit" class="submit-btn">✅ Verificar</button>
         </form>
 
-        <div class="resend-container">
-            <p>¿No recibiste el código?</p>
-            <button id="resend-code-btn" class="resend-btn">Reenviar código</button>
-        </div>
-
-        <style>
-            .resend-container {
-                margin-top: 2rem;
-                font-size: 0.95rem;
-            }
-            .resend-btn {
-                background: none; border: none; color: #007bff; text-decoration: underline; cursor: pointer; font-size: inherit; padding: 0;
-            }
-            .resend-btn:disabled { color: #6c757d; cursor: not-allowed; text-decoration: none; }
-        </style>
-
-        <!-- Contenedor para los mensajes flash -->
         <div class="flash-messages-container">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">
-                            {{ message }}
-                        </div>
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
         </div>
     </div>
-
-    <!-- Curva decorativa -->
+    
     <div class="curve" aria-hidden="true">
         <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
             <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>

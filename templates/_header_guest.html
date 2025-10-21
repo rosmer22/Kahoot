@@ -3,7 +3,7 @@
             <!-- Izquierda: Logo y Nombre -->
             <div class="left cluster">
                 <a class="avatar" href="{{ url_for('home') }}" aria-label="Inicio">
-                     <img src="static/img/robot_ico.png" alt="Logo de la página" >
+                     <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Logo de la página" >
                 </a>
                 <a class="brand-title" href="{{ url_for('home') }}">RoBot</a>
             </div>
