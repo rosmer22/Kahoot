@@ -394,3 +394,34 @@
 .curve{position:absolute;bottom:-1px;left:0;width:100%;overflow:hidden;line-height:0;z-index:0}
 .curve svg{position:relative;display:block;width:calc(100% + 1.3px);height:180px}
 .curve .shape-fill{fill:#f3f3f3}
+
+/* --- Estilos para la nueva tarjeta de pregunta --- */
+.editor-wrap .panel .question-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem;
+  /* Separación del borde del panel gris */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.editor-wrap .panel .question-card:focus-within {
+  box-shadow: 0 4px 16px rgba(0, 123, 255, 0.2);
+  border-color: #a9cffc;
+}
+
+.editor-wrap .panel .question-card .question-text {
+  border: none; /* Quitar el borde del textarea */
+}
+
+/* --- Ajuste para reducir el ancho del editor --- */
+.editor-wrap {
+  max-width: 1500px;   /* Ancho máximo en pantallas grandes */
+  padding-left: 1rem;  /* Espaciado lateral para responsividad */
+  padding-right: 1rem; /* Espaciado lateral para responsividad */
+  margin-left: auto;   /* Centrar el contenedor */
+  margin-right: auto;  /* Centrar el contenedor */
+  margin-top: 3rem;    /* Añadir espacio superior para bajarlo */
+}

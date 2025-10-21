@@ -1,38 +1,6 @@
 {% extends "base.html" %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
-<style>
-  /* --- Estilos para la nueva tarjeta de pregunta --- */
-  .editor-wrap .panel .question-card {
-    background-color: #ffffff;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin: 1.5rem;
-    /* Separación del borde del panel gris */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e5e7eb;
-    transition: box-shadow 0.2s ease-in-out;
-  }
-
-  .editor-wrap .panel .question-card:focus-within {
-    box-shadow: 0 4px 16px rgba(0, 123, 255, 0.2);
-    border-color: #a9cffc;
-  }
-
-  .editor-wrap .panel .question-card .question-text {
-    border: none; /* Quitar el borde del textarea */
-  }
-
-  /* --- Ajuste para reducir el ancho del editor --- */
-  .editor-wrap {
-    max-width: 1500px;   /* Ancho máximo en pantallas grandes */
-    padding-left: 1rem;  /* Espaciado lateral para responsividad */
-    padding-right: 1rem; /* Espaciado lateral para responsividad */
-    margin-left: auto;   /* Centrar el contenedor */
-    margin-right: auto;  /* Centrar el contenedor */
-    margin-top: 3rem;    /* Añadir espacio superior para bajarlo */
-  }
-</style>
 {% endblock %}
 {% block header %}
   {% include "_header_editor.html" %}

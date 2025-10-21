@@ -8,10 +8,10 @@ let originalEmail = '';
 document.addEventListener('DOMContentLoaded', function() {
   const usernameDisplay = document.getElementById('username-display');
   const emailDisplay = document.getElementById('email-display');
-  
+
   if (usernameDisplay) originalUsername = usernameDisplay.textContent;
   if (emailDisplay) originalEmail = emailDisplay.textContent;
-  
+
   // Event listener para el botón de logout
   const logoutBtn = document.querySelector('.btn-logout');
   if (logoutBtn) {
@@ -22,6 +22,25 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
+   // Event listener para el botón de delete
+   const deleteBtn = document.querySelector('.btn-delete');
+   if (deleteBtn) {
+     deleteBtn.addEventListener('click', function() {
+       const deleteUrl = this.getAttribute('data-delete-url');
+       if (deleteUrl && confirm('¿Seguro que deseas eliminar tu cuenta? Esta acción no se puede deshacer.')) {
+         fetch(deleteUrl, { method: 'POST' })
+           .then(response => response.json())
+           .then(data => {
+             alert(data.message);
+             if (data.success) {
+               window.location.href = '/';
+             }
+           })
+           .catch(error => console.error('Error al eliminar cuenta:', error));
+       }
+     });
+ }
+
 });
 
 // Editar nombre de usuario
@@ -29,7 +48,7 @@ function editUsername() {
   const display = document.getElementById('username-display');
   const input = document.getElementById('username');
   const saveBtn = document.getElementById('saveProfileBtn');
-  
+
   if (!isEditingUsername) {
     // Activar modo edición
     display.style.display = 'none';
@@ -46,7 +65,7 @@ function editEmail() {
   const display = document.getElementById('email-display');
   const input = document.getElementById('email');
   const saveBtn = document.getElementById('saveProfileBtn');
-  
+
   if (!isEditingEmail) {
     // Activar modo edición
     display.style.display = 'none';
@@ -102,10 +121,10 @@ async function saveProfile() {
   const usernameDisplay = document.getElementById('username-display');
   const emailDisplay = document.getElementById('email-display');
   const saveBtn = document.getElementById('saveProfileBtn');
-  
+
   const newUsername = usernameInput.value.trim();
   const newEmail = emailInput.value.trim();
-  
+
   // Validar username si está siendo editado
   if (isEditingUsername) {
     const usernameValidation = validateUsername(newUsername);
@@ -114,7 +133,7 @@ async function saveProfile() {
       return;
     }
   }
-  
+
   // Validar email si está siendo editado
   if (isEditingEmail) {
     const emailValidation = validateEmail(newEmail);
@@ -123,7 +142,7 @@ async function saveProfile() {
       return;
     }
   }
-  
+
   // Preparar datos para enviar
   const data = {};
   if (isEditingUsername && newUsername !== originalUsername) {
@@ -132,17 +151,17 @@ async function saveProfile() {
   if (isEditingEmail && newEmail !== originalEmail) {
     data.email = newEmail;
   }
-  
+
   // Si no hay cambios
   if (Object.keys(data).length === 0) {
     showAlert('No hay cambios para guardar', 'info');
     return;
   }
-  
+
   // Deshabilitar botón mientras se procesa
   saveBtn.disabled = true;
   saveBtn.textContent = 'Guardando...';
-  
+
   try {
     const response = await fetch('/update_profile', {
       method: 'POST',
@@ -151,12 +170,12 @@ async function saveProfile() {
       },
       body: JSON.stringify(data)
     });
-    
+
     const result = await response.json();
-    
+
     if (result.success) {
       showAlert(result.message, 'success');
-      
+
       // Actualizar valores originales y displays
       if (data.username) {
         originalUsername = newUsername;
@@ -166,7 +185,7 @@ async function saveProfile() {
         originalEmail = newEmail;
         emailDisplay.textContent = newEmail;
       }
-      
+
       // Volver a modo vista
       if (isEditingUsername) {
         usernameInput.style.display = 'none';
@@ -178,7 +197,7 @@ async function saveProfile() {
         emailDisplay.style.display = 'block';
         isEditingEmail = false;
       }
-      
+
       saveBtn.style.display = 'none';
     } else {
       showAlert(result.message, 'error');
@@ -195,36 +214,36 @@ async function saveProfile() {
 // Cambiar contraseña
 async function changePassword(event) {
   event.preventDefault();
-  
+
   const oldPassword = document.getElementById('oldPassword').value;
   const newPassword = document.getElementById('newPassword').value;
   const confirmPassword = document.getElementById('confirmPassword').value;
-  
+
   // Validaciones
   if (!oldPassword || !newPassword || !confirmPassword) {
     showAlert('Por favor completa todos los campos', 'error');
     return false;
   }
-  
+
   if (newPassword.length < 6) {
     showAlert('La nueva contraseña debe tener al menos 6 caracteres', 'error');
     return false;
   }
-  
+
   if (newPassword !== confirmPassword) {
     showAlert('Las contraseñas no coinciden', 'error');
     return false;
   }
-  
+
   if (oldPassword === newPassword) {
     showAlert('La nueva contraseña debe ser diferente a la anterior', 'error');
     return false;
   }
-  
+
   const submitBtn = event.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   submitBtn.textContent = 'Guardando...';
-  
+
   try {
     const response = await fetch('/change_password', {
       method: 'POST',
@@ -236,9 +255,9 @@ async function changePassword(event) {
         new_password: newPassword
       })
     });
-    
+
     const result = await response.json();
-    
+
     if (result.success) {
       showAlert(result.message, 'success');
       document.getElementById('passwordForm').reset();
@@ -251,7 +270,7 @@ async function changePassword(event) {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Guardar Contraseña';
   }
-  
+
   return false;
 }
 
@@ -260,7 +279,7 @@ function togglePassword(inputId) {
   const input = document.getElementById(inputId);
   const button = input.parentElement.querySelector('.toggle-password');
   const svg = button.querySelector('svg');
-  
+
   if (input.type === 'password') {
     input.type = 'text';
     // Cambiar a icono de ojo abierto
@@ -281,15 +300,15 @@ function showAlert(message, type) {
     flashContainer.className = 'flash-messages';
     document.body.appendChild(flashContainer);
   }
-  
+
   // Crear alerta con el estilo del sistema global
   const alert = document.createElement('div');
   alert.className = `flash-message flash-${type}`;
   alert.innerHTML = `${message}<button class="flash-close" onclick="this.parentElement.remove()">&times;</button>`;
-  
+
   // Agregar al contenedor
   flashContainer.appendChild(alert);
-  
+
   // Auto-cerrar después de 5 segundos
   setTimeout(() => {
     alert.style.opacity = '0';

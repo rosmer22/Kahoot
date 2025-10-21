@@ -1,3 +1,4 @@
 Flask
 PyMySQL
 flask_mail
+psycopg2

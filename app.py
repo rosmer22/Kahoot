@@ -640,6 +640,7 @@ def delete_account():
         print("Error al eliminar cuenta:", e)
         return jsonify({'success': False, 'message': 'Error interno al eliminar cuenta'}), 500
     
+
 # app.py
 @app.route('/grupos', methods=['GET', 'POST'])
 def grupos():
@@ -888,6 +889,115 @@ def esperar_cuestionario(pin):
 
     return render_template('espera.html', quiz=quiz, pin=pin)
 
+
+
+# =====================
+#  Login Cuestionarios
+# =====================
+#@app.route('/join', methods=['POST'])
+def join_quiz_post():
+    """
+    Permite a un jugador logueado unirse a una sesión de juego usando un PIN.
+    """
+    usuario = session.get('user_id')
+    if not usuario:
+        flash('Debes iniciar sesión para unirte a una partida.', 'error')
+        return redirect(url_for('login'))
+
+    pin_sesion = request.form.get('pin')
+    if not pin_sesion:
+        flash('Debes ingresar el PIN para unirte.', 'error')
+        return redirect(url_for('join'))
+
+    try:
+        db = bd.obtener_conexion()
+
+        # Buscar la sesión de juego por pin_sesion
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM sesiones_juego WHERE pin_sesion = %s AND estado != 'finalizado'", (pin_sesion,))
+        sesion = cursor.fetchone()
+
+        if not sesion:
+            flash('El PIN ingresado no es válido o la sesión ya finalizó.', 'error')
+            cursor.close()
+            db.close()
+            return redirect(url_for('join_quiz'))
+
+        # Registrar participante
+        nombre_participante = usuario.get('user_name')  # O el campo que tengas
+        cursor.execute(
+            "INSERT INTO participantes (sesion_id, nombre_participante) VALUES (%s, %s)",
+            (sesion['id'], nombre_participante)
+        )
+        db.commit()
+        participante_id = cursor.lastrowid
+
+        cursor.close()
+        db.close()
+
+        # Guardar info en sesión
+        session['jugador'] = {
+            'nombre': nombre_participante,
+            'email': usuario.get('email'),
+            'sesion_id': sesion['id'],
+            'pin': pin_sesion,
+            'participante_id': participante_id
+        }
+
+        flash(f'¡Bienvenido {nombre_participante}! Te uniste a la sesión correctamente.', 'success')
+        return redirect(url_for('quiz_details', cuestionario_id=sesion['cuestionario_id']))
+
+    except Exception as e:
+        app.logger.error(f"Error al unirse a la sesión: {e}", exc_info=True)
+        flash('Ocurrió un error al intentar unirse a la partida.', 'error')
+        return redirect(url_for('join_quiz'))
+
+#@app.route('/iniciar_cuestionario/<int:cuestionario_id>', methods=['POST'])
+def iniciar_cuestionario(cuestionario_id):
+    usuario = session.get('usuario')
+    if not usuario:
+        flash('Debes iniciar sesión para iniciar un cuestionario.', 'error')
+        return redirect(url_for('login'))
+
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor(dictionary=True)
+
+        # Validar que el cuestionario existe y es del usuario
+        cursor.execute("SELECT * FROM cuestionarios WHERE id = %s AND user_id = %s", (cuestionario_id, usuario['id']))
+        cuestionario = cursor.fetchone()
+        if not cuestionario:
+            flash('No tienes permiso para iniciar este cuestionario.', 'error')
+            cursor.close()
+            db.close()
+            return redirect(url_for('dashboard'))
+
+        # Verificar que no exista una sesión activa con ese PIN
+        cursor.execute("SELECT * FROM sesiones_juego WHERE pin_sesion = %s AND estado != 'finalizado'", (cuestionario['pin'],))
+        sesion_existente = cursor.fetchone()
+        if sesion_existente:
+            flash(f'Ya existe una sesión activa con el PIN {cuestionario["pin"]}.', 'warning')
+            cursor.close()
+            db.close()
+            return redirect(url_for('dashboard'))
+
+        # Insertar nueva sesión en sesiones_juego usando el PIN del cuestionario
+        cursor.execute("""
+            INSERT INTO sesiones_juego (cuestionario_id, pin_sesion, estado, created_by)
+            VALUES (%s, %s, 'esperando', %s)
+        """, (cuestionario_id, cuestionario['pin'], usuario['id']))
+
+        db.commit()
+        cursor.close()
+        db.close()
+
+        flash(f'Sesión iniciada con éxito. El PIN para unirse es: {cuestionario["pin"]}', 'success')
+        return redirect(url_for('dashboard'))
+
+    except Exception as e:
+        app.logger.error(f"Error al iniciar cuestionario: {e}", exc_info=True)
+        flash('Error al iniciar la sesión del cuestionario.', 'error')
+        return redirect(url_for('dashboard'))
 
 
 

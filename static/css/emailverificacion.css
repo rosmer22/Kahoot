@@ -9,7 +9,7 @@
 }
 
 .verification-section {
-    background-color: var(--color-fondo-claro); /* Fondo neutro y claro */
+    background-color: var(--color-secundario-amarillo); /* Fondo amarillo como en login */
     flex-grow: 1;
     display: flex;
     justify-content: center;
@@ -144,4 +144,23 @@
 }
 .verification-section .curve .shape-fill { 
     fill: var(--color-fondo-claro); 
+}
+
+.resend-container {
+    margin-top: 2rem;
+    font-size: 0.95rem;
+}
+.resend-btn {
+    background: none; 
+    border: none; 
+    color: #007bff; 
+    text-decoration: underline; 
+    cursor: pointer; 
+    font-size: inherit; 
+    padding: 0;
+}
+.resend-btn:disabled { 
+    color: #6c757d; 
+    cursor: not-allowed; 
+    text-decoration: none; 
 }
