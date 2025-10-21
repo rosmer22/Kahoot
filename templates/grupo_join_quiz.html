@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+
+{% block page_css %}
+<style>
+/* ===== Contenedor ===== */
+.group-join-wrapper{
+  max-width: 1100px;
+  margin: 2rem auto;
+  background: #f3f3f3;
+  border: 2px solid #ccc;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.12);
+  overflow: hidden;
+}
+
+/* ===== Header ===== */
+.group-header{
+  background: linear-gradient(135deg,#ffd89b,#ff9f2a);
+  color:#fff;
+  padding: 1.2rem 1.4rem;
+  display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap;
+}
+.group-title{
+  display:flex; align-items:center; gap:.6rem; font-weight:800; font-size:1.2rem;
+}
+.group-id-pill{
+  background:#fff4e0; color:#723f00; border:1px dashed #ffc266;
+  padding:.2rem .5rem; border-radius:8px; font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.header-actions{ display:flex; gap:.5rem; flex-wrap:wrap; }
+.btn{
+  display:inline-flex; align-items:center; gap:.4rem;
+  background:#fff; color:#333; border:1px solid rgba(0,0,0,.12);
+  padding:.45rem .8rem; border-radius:10px; cursor:pointer; text-decoration:none; font-weight:700;
+}
+.btn:hover{ background:#fffaf2; }
+
+/* ===== Layout ===== */
+.group-content{ display:grid; grid-template-columns: 1.2fr .8fr; gap:1rem; padding:1.2rem; }
+@media (max-width: 920px){ .group-content{ grid-template-columns: 1fr; } }
+
+/* ===== Miembros ===== */
+.card{
+  background:#fff; border:1px solid #dedede; border-radius:12px; padding:1rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,.08);
+}
+.card h3{ margin:0 0 .8rem 0; font-size:1.05rem; }
+.members-grid{
+  display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap:.8rem;
+}
+.member-item{
+  border:1px solid #eee; border-radius:10px; padding:.7rem .8rem; background:#fafafa;
+  display:flex; align-items:center; gap:.6rem;
+}
+.member-avatar{
+  width:34px; height:34px; border-radius:50%; background:#ffe0b2; display:grid; place-items:center; font-weight:800; color:#7a4d00;
+}
+.member-name{ font-weight:700; color:#333; }
+
+/* ===== Panel “Unirse a un cuestionario” ===== */
+.join-panel .hint{ color:#555; margin:.25rem 0 1rem; }
+.input-row{ display:flex; gap:.6rem; flex-wrap:wrap; }
+.input-row input{
+  flex:1; min-width: 210px;
+  padding:.7rem .8rem; border:2px solid #d1d5db; border-radius:10px; background:#fff; font-size:1rem;
+}
+.input-row input:focus{
+  outline:none; border-color:#ff9f2a; box-shadow:0 0 0 3px rgba(255,159,42,.18);
+}
+.btn-primary{
+  background:linear-gradient(135deg,#ffb300,#ff9800);
+  color:#fff; border:1px solid #ffa726;
+}
+.btn-primary:hover{ filter:brightness(1.02); transform: translateY(-1px); }
+.btn-ghost{
+  background:#fff; border:1px dashed #ffb74d; color:#7b4d00;
+}
+.btn-ghost:hover{ background:#fff9f0; }
+
+.error-msg{ color:#d32f2f; margin-top:.6rem; font-weight:700; display:none; }
+.success-msg{ color:#2e7d32; margin-top:.6rem; font-weight:700; display:none; }
+
+.small-help{ margin-top: .8rem; font-size:.92rem; color:#555; }
+.small-help a{ color:#ff9800; font-weight:700; text-decoration:none; }
+.small-help a:hover{ text-decoration:underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="group-join-wrapper">
+  <!-- Header -->
+  <div class="group-header">
+    <div class="group-title">
+      👥 Grupo: <span>{{ grupo_nombre or 'Sin nombre' }}</span>
+      <span class="group-id-pill" id="groupIdPill">ID: {{ grupo_id }}</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn" onclick="copyGroupId('{{ grupo_id }}', this)">📋 Copiar ID</button>
+      <button class="btn" onclick="shareGroup('{{ grupo_nombre|default('Grupo')|e }}','{{ grupo_id }}')">📤 Compartir</button>
+    </div>
+  </div>
+
+  <!-- Contenido -->
+  <div class="group-content">
+    <!-- Columna izquierda: miembros -->
+    <div class="card">
+      <h3>Integrantes del grupo ({{ miembros|length if miembros else 0 }})</h3>
+      {% if miembros and miembros|length > 0 %}
+        <div class="members-grid">
+          {% for m in miembros %}
+          <div class="member-item">
+            <div class="member-avatar">{{ (m.username or m.email or 'U')[0]|upper }}</div>
+            <div class="member-name">{{ m.username or m.email or 'Usuario' }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p style="margin:.4rem 0">Aún no hay integrantes. Comparte el ID del grupo para invitar a tus compañeros.</p>
+      {% endif %}
+    </div>
+
+    <!-- Columna derecha: unirse a cuestionario -->
+    <div class="card join-panel">
+      <h3>Resolver un cuestionario en grupo</h3>
+      <p class="hint">Ingresa el <strong>ID del cuestionario</strong> que quieren resolver juntos.</p>
+
+      <form onsubmit="return goToGroupQuiz(event)">
+        <div class="input-row">
+          <input type="number" id="quizIdInput" placeholder="Ej: 12" min="1" required>
+          <button type="submit" class="btn btn-primary">🚀 Continuar</button>
+          <a href="{{ url_for('my_quizzes') }}" class="btn btn-ghost">Mis cuestionarios</a>
+        </div>
+        <div id="errorBox" class="error-msg">Ingresa un ID válido (número mayor a 0).</div>
+        <div id="okBox" class="success-msg">Redirigiendo…</div>
+      </form>
+
+      <p class="small-help">
+        ¿No sabes el ID del cuestionario? Pídelo al profesor o crea uno en el
+        <a href="{{ url_for('editor') }}">editor</a>.
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_js %}
+<script>
+// Copiar ID del grupo
+async function copyGroupId(id, btn){
+  try{
+    await navigator.clipboard.writeText(String(id));
+    const old = btn.textContent;
+    btn.textContent = '✅ Copiado';
+    setTimeout(()=>btn.textContent = '📋 Copiar ID', 1200);
+  }catch(_){
+    const tmp = document.createElement('input');
+    tmp.value = String(id);
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    alert('ID copiado: ' + id);
+  }
+}
+
+// Compartir (si el navegador lo permite)
+function shareGroup(nombre, id){
+  const text = `Únete a mi grupo "${nombre}" en RoBot. ID: ${id}`;
+  if(navigator.share){
+    navigator.share({title:'Grupo RoBot', text}).catch(()=>{});
+  }else{
+    alert(text);
+  }
+}
+
+// Enviar a /grupo/<grupo_id>/cuestionario/<cuestionario_id>
+function goToGroupQuiz(e){
+  e.preventDefault();
+  const quizId = Number(document.getElementById('quizIdInput').value);
+  const errorBox = document.getElementById('errorBox');
+  const okBox = document.getElementById('okBox');
+  const grupoId = {{ grupo_id|int }};
+
+  if(!quizId || quizId < 1){
+    okBox.style.display = 'none';
+    errorBox.style.display = 'block';
+    return false;
+  }
+  errorBox.style.display = 'none';
+  okBox.style.display = 'block';
+
+  // Redirige a tu endpoint existente
+  window.location.href = `/grupo/${grupoId}/cuestionario/${quizId}`;
+  return false;
+}
+</script>
+{% endblock %}

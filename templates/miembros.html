@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block page_css %}
+<style>
+/* ===============================
+   ESTILO: MIEMBROS DEL GRUPO
+   =============================== */
+.container-miembros {
+  max-width: 900px;
+  margin: 2.5rem auto;
+  background: #f3f3f3;
+  border: 2px solid #ccc;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  padding: 2rem;
+}
+h1 {
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+.miembros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.miembro-card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  padding: 1rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+.miembro-card:hover { transform: translateY(-3px); border-color: #ffcf77; }
+.miembro-avatar {
+  font-size: 2.2rem;
+  background: #ffe9c4;
+  color: #ff9f2a;
+  border-radius: 50%;
+  width: 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 0.6rem auto;
+}
+.miembro-nombre { font-weight: 600; color: #333; font-size: 1rem; margin-bottom: 0.25rem; }
+.miembro-email { font-size: 0.9rem; color: #666; }
+
+/* ---- Zona iniciar cuestionario grupal ---- */
+.iniciar-grupal {
+  margin-top: 2rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 1.2rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+.iniciar-grupal h3 {
+  margin: 0 0 .8rem 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+.form-row {
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+.form-row input[type="text"] {
+  flex: 1 1 220px;
+  padding: .7rem .8rem;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}
+.btn-go {
+  background: #ff9f2a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: .7rem 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.btn-go:hover { background: #ffb84d; }
+
+/* ---- Botones pie ---- */
+.botones-grupo {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: .7rem 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: 1rem;
+}
+.btn-volver { background: #d3d3d3; color: #333; }
+.btn-volver:hover { background: #e4e4e4; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container-miembros">
+  <h1>👥 Miembros del Grupo {{ grupo_id }}</h1>
+
+  {% if miembros %}
+    <div class="miembros-grid">
+      {% for m in miembros %}
+      <div class="miembro-card">
+        <div class="miembro-avatar">👤</div>
+        <div class="miembro-nombre">{{ m.username }}</div>
+        <div class="miembro-email">{{ m.email }}</div>
+        <div style="font-size: 0.85rem; color: #777; margin-top: .3rem;">
+          Unido el {{ m.fecha_union.strftime('%d/%m/%Y') if m.fecha_union else '—' }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-center mt-3">⚠ No hay miembros registrados en este grupo.</p>
+  {% endif %}
+
+  <!-- 🔹 Ingresar PIN del cuestionario para jugar en grupo -->
+  <div class="iniciar-grupal">
+    <h3>🚀 Iniciar cuestionario en grupo</h3>
+    <form onsubmit="return goGroupQuiz(event, {{ grupo_id }})">
+      <div class="form-row">
+        <input type="text" id="quizPinInput" placeholder="PIN del cuestionario (por ejemplo: 7KHA)" maxlength="10" required>
+        <button type="submit" class="btn-go">Iniciar</button>
+      </div>
+      <p style="margin:.6rem 0 0; font-size:.9rem; color:#666;">
+        Ingresa el <strong>PIN del cuestionario</strong>. Se usará la ruta 
+        <code>/grupo/{{ grupo_id }}/cuestionario/&lt;pin&gt;</code>.
+      </p>
+    </form>
+  </div>
+
+  <div class="botones-grupo">
+    <a href="{{ url_for('grupos') }}" class="btn btn-volver">⬅ Volver a Grupos</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_js %}
+<script>
+function goGroupQuiz(e, grupoId) {
+  e.preventDefault();
+  const input = document.getElementById('quizPinInput');
+  const pin = (input.value || '').trim().toUpperCase();
+
+  if (!pin.match(/^[A-Z0-9]+$/)) {
+    alert("El PIN solo puede contener letras y números (sin espacios).");
+    input.focus();
+    return false;
+  }
+
+  // Redirige a tu ruta existente: /grupo/<grupo_id>/cuestionario/<pin>
+  window.location.href = `/grupo/${grupoId}/cuestionario/${pin}`;
+  return false;
+}
+</script>
+{% endblock %}

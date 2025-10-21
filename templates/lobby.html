@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
+<style>
+/* ===============================
+   ESTILOS LOBBY DE CUESTIONARIO
+   =============================== */
+.lobby-wrap {
+  max-width: 900px;
+  margin: 3rem auto;
+  background: #e9e9e9;
+  border: 2px solid #bfbfbf;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.15);
+  padding: 2rem;
+  text-align: center;
+}
+
+.lobby-header {
+  background: #ffe8b6;
+  border: 1px solid #f5d385;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+
+.lobby-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: #333;
+}
+
+.pin-display {
+  background: #fff;
+  border: 2px solid #f1e2b9;
+  border-radius: 12px;
+  padding: 1rem 2rem;
+  display: inline-block;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: .3rem;
+  color: #ff9f2a;
+  margin: 1rem 0;
+}
+
+.player-list {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  padding: 1rem;
+  max-height: 320px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed #ddd;
+  padding: .6rem 0;
+  font-size: 1.05rem;
+  color: #333;
+}
+
+.player-item:last-child {
+  border-bottom: none;
+}
+
+.player-name {
+  font-weight: 500;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: .75rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all .2s ease;
+  font-weight: 600;
+}
+
+.btn-start {
+  background: #ff9f2a;
+  color: #fff;
+}
+.btn-start:hover { background: #ffb84d; }
+
+.btn-refresh {
+  background: #fff;
+  border: 2px solid #bfbfbf;
+  color: #333;
+}
+.btn-refresh:hover { background: #f9f9f9; }
+
+.btn-exit {
+  background: #d3d3d3;
+  color: #333;
+}
+.btn-exit:hover { background: #e4e4e4; }
+
+.status {
+  margin-top: 1rem;
+  font-size: .95rem;
+  color: #555;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container lobby-wrap">
+  <div class="lobby-header">
+    <h1>{{ quiz.titulo }}</h1>
+    <div>Modo: <strong>{{ modo|capitalize }}</strong></div>
+  </div>
+
+  <div class="pin-display">PIN: {{ pin }}</div>
+  <p>Comparte este PIN con tus alumnos para que se unan al cuestionario.</p>
+
+  <div class="player-list" id="playerList">
+    <div class="player-item"><span>Cargando jugadores...</span></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-refresh" id="refreshBtn">🔄 Actualizar lista</button>
+    <button class="btn btn-start" id="startBtn">🚀 Iniciar cuestionario</button>
+    <button class="btn btn-exit" onclick="window.location.href='/inicio'">🏠 Volver al inicio</button>
+  </div>
+
+  <div class="status" id="statusMsg"></div>
+</section>
+{% endblock %}
+
+{% block page_js %}
+<script>
+// ============================
+// LOBBY LOGIC (Front-End)
+// ============================
+const PIN = "{{ pin }}";
+const listEl = document.getElementById('playerList');
+const msgEl = document.getElementById('statusMsg');
+
+// Cargar jugadores
+async function cargarJugadores() {
+  msgEl.textContent = "Actualizando...";
+  try {
+    const res = await fetch(`/api/participantes?pin=${PIN}`);
+    const data = await res.json();
+    renderJugadores(data.participantes || []);
+    msgEl.textContent = "";
+  } catch (err) {
+    msgEl.textContent = "Error al obtener la lista.";
+  }
+}
+
+function renderJugadores(participantes) {
+  listEl.innerHTML = "";
+  if (participantes.length === 0) {
+    listEl.innerHTML = "<div class='player-item'><em>No hay jugadores conectados</em></div>";
+    return;
+  }
+  participantes.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = "player-item";
+    div.innerHTML = `<span class="player-name">👤 ${p.nombre}</span> <span>${p.puntaje ?? 0} pts</span>`;
+    listEl.appendChild(div);
+  });
+}
+
+// Iniciar sesión / juego
+async function iniciarCuestionario() {
+  msgEl.textContent = "Iniciando cuestionario...";
+  try {
+    const res = await fetch(`/api/iniciar_sesion/${PIN}`, {method: "POST"});
+    const data = await res.json();
+    if (data.success) {
+      msgEl.textContent = "Cuestionario iniciado ✔";
+      setTimeout(() => {
+        window.location.href = `/sesion/${PIN}/pregunta/1`;
+      }, 1000);
+    } else {
+      msgEl.textContent = "Error al iniciar.";
+    }
+  } catch (err) {
+    msgEl.textContent = "Error de conexión.";
+  }
+}
+
+document.getElementById('refreshBtn').addEventListener('click', cargarJugadores);
+document.getElementById('startBtn').addEventListener('click', iniciarCuestionario);
+
+// Cargar jugadores cada 5 segundos
+setInterval(cargarJugadores, 5000);
+cargarJugadores();
+</script>
+{% endblock %}
