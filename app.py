@@ -701,8 +701,26 @@ def obtener_miembros(grupo_id):
         flash("Hubo un error al obtener los miembros del grupo", "danger")
         return redirect(url_for('grupos.grupos'))  # Volvemos a la lista de grupos
 
-@app.route('/grupo/<int:grupo_id>/cuestionario/<int:cuestionario_id>', methods=['GET', 'POST'])
-def rendir_cuestionario_grupo(grupo_id, cuestionario_id):
+@app.route('/grupo/<int:grupo_id>/cuestionario/<pin>', methods=['GET', 'POST'])
+def rendir_cuestionario_grupo(grupo_id, pin):
+    """
+    Vista para rendir un cuestionario en grupo usando el PIN del cuestionario (no el ID).
+    """
+    db = obtener_conexion()
+    cursor = db.cursor()
+
+    # 🔹 Buscar el cuestionario por su PIN
+    cursor.execute("SELECT id, titulo FROM cuestionarios WHERE pin = %s", (pin,))
+    cuestionario = cursor.fetchone()
+
+    if not cuestionario:
+        cursor.close()
+        db.close()
+        flash('❌ Código de cuestionario no válido.', 'error')
+        return redirect(url_for('grupos'))
+
+    cuestionario_id = cuestionario['id']
+
     if request.method == 'POST':
         sesion_id = request.form.get('sesion_id')
         sesion_grupo_id = quiz_grupo_controller.crear_sesion_grupal(grupo_id, sesion_id)
@@ -715,16 +733,62 @@ def rendir_cuestionario_grupo(grupo_id, cuestionario_id):
                     sesion_grupo_id, pregunta_id, opcion_id, True, 1
                 )
 
+        cursor.close()
+        db.close()
         flash('✅ Cuestionario rendido en grupo con éxito', 'success')
         return redirect(url_for('resultado_grupo', grupo_id=grupo_id))
 
+    # 🔹 Obtener preguntas asociadas al cuestionario encontrado
     preguntas = quiz_grupo_controller.obtener_preguntas_por_cuestionario(cuestionario_id)
-    return render_template('rendir_cuestionario_grupo.html', grupo_id=grupo_id, cuestionario_id=cuestionario_id, preguntas=preguntas)
+    cursor.close()
+    db.close()
+
+    return render_template(
+        'rendir_cuestionario_grupo.html',
+        grupo_id=grupo_id,
+        cuestionario_pin=pin,
+        cuestionario_titulo=cuestionario['titulo'],
+        preguntas=preguntas
+    )
 
 
 @app.route('/grupo/<int:grupo_id>/resultado')
 def resultado_grupo(grupo_id):
-    return render_template('resultado_grupo.html', grupo_id=grupo_id)
+    db = obtener_conexion()
+    cursor = db.cursor()
+    cursor.execute("""
+        SELECT g.nombre AS nombre_grupo, c.titulo, c.pin
+        FROM grupos g
+        LEFT JOIN sesiones_grupo sg ON sg.grupo_id = g.id
+        LEFT JOIN sesiones_juego sj ON sj.id = sg.sesion_id
+        LEFT JOIN cuestionarios c ON c.id = sj.cuestionario_id
+        WHERE g.id = %s
+        LIMIT 1
+    """, (grupo_id,))
+    quiz_info = cursor.fetchone()
+
+    # 🔹 Simulación de resultados (puedes reemplazar por query real)
+    ranking = [
+        {"nombre": "Usuario1", "puntaje_obtenido": 80, "respuestas_correctas": 8, "total_preguntas": 10, "tiempo_total": 90},
+        {"nombre": "Usuario2", "puntaje_obtenido": 70, "respuestas_correctas": 7, "total_preguntas": 10, "tiempo_total": 110},
+    ]
+
+    data = {
+        "grupo_id": grupo_id,
+        "nombre_grupo": quiz_info["nombre_grupo"] if quiz_info else "Grupo Desconocido",
+        "quiz": quiz_info or {},
+        "puntaje_total": sum(r["puntaje_obtenido"] for r in ranking),
+        "respuestas_correctas": sum(r["respuestas_correctas"] for r in ranking),
+        "total_preguntas": ranking[0]["total_preguntas"] if ranking else 0,
+        "tiempo_total": sum(r["tiempo_total"] for r in ranking),
+        "ranking": ranking,
+    }
+
+    cursor.close()
+    db.close()
+
+    return render_template('resultado_grupo.html', **data)
+
 
 @app.route('/cuestionario/<int:cuestionario_id>/lobby')
 def lobby(cuestionario_id):
@@ -891,113 +955,8 @@ def esperar_cuestionario(pin):
 
 
 
-# =====================
-#  Login Cuestionarios
-# =====================
-#@app.route('/join', methods=['POST'])
-def join_quiz_post():
-    """
-    Permite a un jugador logueado unirse a una sesión de juego usando un PIN.
-    """
-    usuario = session.get('user_id')
-    if not usuario:
-        flash('Debes iniciar sesión para unirte a una partida.', 'error')
-        return redirect(url_for('login'))
 
-    pin_sesion = request.form.get('pin')
-    if not pin_sesion:
-        flash('Debes ingresar el PIN para unirte.', 'error')
-        return redirect(url_for('join'))
 
-    try:
-        db = bd.obtener_conexion()
-
-        # Buscar la sesión de juego por pin_sesion
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM sesiones_juego WHERE pin_sesion = %s AND estado != 'finalizado'", (pin_sesion,))
-        sesion = cursor.fetchone()
-
-        if not sesion:
-            flash('El PIN ingresado no es válido o la sesión ya finalizó.', 'error')
-            cursor.close()
-            db.close()
-            return redirect(url_for('join_quiz'))
-
-        # Registrar participante
-        nombre_participante = usuario.get('user_name')  # O el campo que tengas
-        cursor.execute(
-            "INSERT INTO participantes (sesion_id, nombre_participante) VALUES (%s, %s)",
-            (sesion['id'], nombre_participante)
-        )
-        db.commit()
-        participante_id = cursor.lastrowid
-
-        cursor.close()
-        db.close()
-
-        # Guardar info en sesión
-        session['jugador'] = {
-            'nombre': nombre_participante,
-            'email': usuario.get('email'),
-            'sesion_id': sesion['id'],
-            'pin': pin_sesion,
-            'participante_id': participante_id
-        }
-
-        flash(f'¡Bienvenido {nombre_participante}! Te uniste a la sesión correctamente.', 'success')
-        return redirect(url_for('quiz_details', cuestionario_id=sesion['cuestionario_id']))
-
-    except Exception as e:
-        app.logger.error(f"Error al unirse a la sesión: {e}", exc_info=True)
-        flash('Ocurrió un error al intentar unirse a la partida.', 'error')
-        return redirect(url_for('join_quiz'))
-
-#@app.route('/iniciar_cuestionario/<int:cuestionario_id>', methods=['POST'])
-def iniciar_cuestionario(cuestionario_id):
-    usuario = session.get('usuario')
-    if not usuario:
-        flash('Debes iniciar sesión para iniciar un cuestionario.', 'error')
-        return redirect(url_for('login'))
-
-    try:
-        db = bd.obtener_conexion()
-        cursor = db.cursor(dictionary=True)
-
-        # Validar que el cuestionario existe y es del usuario
-        cursor.execute("SELECT * FROM cuestionarios WHERE id = %s AND user_id = %s", (cuestionario_id, usuario['id']))
-        cuestionario = cursor.fetchone()
-        if not cuestionario:
-            flash('No tienes permiso para iniciar este cuestionario.', 'error')
-            cursor.close()
-            db.close()
-            return redirect(url_for('dashboard'))
-
-        # Verificar que no exista una sesión activa con ese PIN
-        cursor.execute("SELECT * FROM sesiones_juego WHERE pin_sesion = %s AND estado != 'finalizado'", (cuestionario['pin'],))
-        sesion_existente = cursor.fetchone()
-        if sesion_existente:
-            flash(f'Ya existe una sesión activa con el PIN {cuestionario["pin"]}.', 'warning')
-            cursor.close()
-            db.close()
-            return redirect(url_for('dashboard'))
-
-        # Insertar nueva sesión en sesiones_juego usando el PIN del cuestionario
-        cursor.execute("""
-            INSERT INTO sesiones_juego (cuestionario_id, pin_sesion, estado, created_by)
-            VALUES (%s, %s, 'esperando', %s)
-        """, (cuestionario_id, cuestionario['pin'], usuario['id']))
-
-        db.commit()
-        cursor.close()
-        db.close()
-
-        flash(f'Sesión iniciada con éxito. El PIN para unirse es: {cuestionario["pin"]}', 'success')
-        return redirect(url_for('dashboard'))
-
-    except Exception as e:
-        app.logger.error(f"Error al iniciar cuestionario: {e}", exc_info=True)
-        flash('Error al iniciar la sesión del cuestionario.', 'error')
-        return redirect(url_for('dashboard'))
 
 
 

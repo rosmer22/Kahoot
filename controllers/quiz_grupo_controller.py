@@ -13,26 +13,43 @@ def crear_sesion_grupal(grupo_id, sesion_id):
     finally:
         conn.close()
 
-
 def obtener_preguntas_por_cuestionario(cuestionario_id):
     conn = obtener_conexion()
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT p.id, p.texto_pregunta, o.id AS opcion_id, o.texto_opcion
+                SELECT 
+                    p.id AS pregunta_id,
+                    p.texto_pregunta,
+                    o.id AS opcion_id,
+                    o.texto_opcion,
+                    o.es_correcta
                 FROM preguntas p
                 JOIN opciones_respuesta o ON o.pregunta_id = p.id
                 WHERE p.cuestionario_id = %s
                 ORDER BY p.orden, o.orden
             """, (cuestionario_id,))
             rows = cursor.fetchall()
-            preguntas = {}
+
+            preguntas_dict = {}
             for r in rows:
-                pid = r['id']
-                if pid not in preguntas:
-                    preguntas[pid] = {'texto': r['texto_pregunta'], 'opciones': []}
-                preguntas[pid]['opciones'].append({'id': r['opcion_id'], 'texto': r['texto_opcion']})
-            return preguntas
+                pid = r['pregunta_id']
+                if pid not in preguntas_dict:
+                    preguntas_dict[pid] = {
+                        "id": pid,
+                        "texto_pregunta": r['texto_pregunta'],
+                        "opciones": []
+                    }
+                preguntas_dict[pid]["opciones"].append({
+                    "id": r['opcion_id'],
+                    "texto_opcion": r['texto_opcion'],
+                    "es_correcta": bool(r.get('es_correcta', 0))
+                })
+
+            # ✅ Convertir a lista antes de retornar
+            preguntas_lista = list(preguntas_dict.values())
+            return preguntas_lista
+
     finally:
         conn.close()
 

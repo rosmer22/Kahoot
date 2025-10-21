@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
+<style>
+/* ===============================
+   ESTILO RESULTADOS GRUPALES
+   =============================== */
+.result-wrap {
+  max-width: 850px;
+  margin: 3rem auto;
+  background: #e9e9e9;
+  border: 2px solid #bfbfbf;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.15);
+  text-align: center;
+  padding: 2rem;
+}
+
+.result-header {
+  background: #ffe8b6;
+  border-bottom: 1px solid #f5d385;
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.result-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #333;
+}
+
+.score-circle {
+  margin: 2rem auto;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  border: 10px solid #6aa84f;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #333;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+
+.score-circle span {
+  display: block;
+  font-size: 1rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.summary {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  padding: 1.5rem;
+  text-align: left;
+  margin-top: 1rem;
+}
+
+.summary p {
+  margin: .4rem 0;
+  font-size: 1.05rem;
+  color: #444;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: .75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem .5rem 0;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.btn-restart {
+  background: #ff9f2a;
+  color: #fff;
+}
+.btn-restart:hover { background: #ffb84d; }
+
+.btn-home {
+  background: #d3d3d3;
+  color: #333;
+}
+.btn-home:hover { background: #e4e4e4; }
+
+.ranking-table {
+  margin-top: 2rem;
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ranking-table th {
+  background: #ffd89b;
+  padding: .75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+}
+
+.ranking-table td {
+  padding: .75rem;
+  border-top: 1px solid #ddd;
+  color: #444;
+}
+
+.ranking-table tr:nth-child(even) {
+  background: #f9f9f9;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container result-wrap">
+  <div class="result-header">
+    <h1>🏆 Resultados del Grupo</h1>
+  </div>
+
+  <div class="score-circle">
+    {{ puntaje_total or 0 }}
+    <span>Puntaje total</span>
+  </div>
+
+  <div class="summary">
+    <p><strong>Grupo:</strong> {{ nombre_grupo or 'Sin nombre' }}</p>
+    <p><strong>Cuestionario:</strong> {{ quiz.titulo if quiz else 'Desconocido' }}</p>
+    <p><strong>Preguntas Correctas:</strong> {{ respuestas_correctas or 0 }} / {{ total_preguntas or 0 }}</p>
+    <p><strong>Tiempo Total:</strong> {{ tiempo_total or 0 }} seg</p>
+  </div>
+
+  {% if ranking and ranking|length > 0 %}
+  <h3 style="margin-top:2rem;">📊 Rendimiento de los miembros</h3>
+  <table class="ranking-table">
+    <thead>
+      <tr><th>Miembro</th><th>Puntaje</th><th>Correctas</th><th>Tiempo (s)</th></tr>
+    </thead>
+    <tbody>
+      {% for fila in ranking %}
+      <tr>
+        <td>{{ fila.nombre }}</td>
+        <td>{{ fila.puntaje_obtenido }}</td>
+        <td>{{ fila.respuestas_correctas }}/{{ fila.total_preguntas }}</td>
+        <td>{{ fila.tiempo_total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div>
+    <button class="btn btn-restart" onclick="window.location.href='/grupo/{{ grupo_id }}/cuestionario/{{ quiz.pin if quiz else '' }}'">🔄 Jugar de nuevo</button>
+    <button class="btn btn-home" onclick="window.location.href='/'">🏠 Volver al inicio</button>
+  </div>
+</section>
+{% endblock %}
