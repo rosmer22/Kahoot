@@ -136,12 +136,6 @@
 }
 .btn-ver:hover { background: #51963c; }
 
-.btn-jugar {
-  background: #ff9f2a;
-  color: white;
-}
-.btn-jugar:hover { background: #ffb84d; }
-
 /* ---- Formularios ---- */
 form {
   background: #fff;
@@ -205,9 +199,7 @@ form button:hover { background: #ffb84d; }
 
                   <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
                       <a href="{{ url_for('obtener_miembros', grupo_id=g.id) }}" class="btn btn-ver">👁 Ver miembros</a>
-                      <!-- OJO: este 'Jugar' actualmente envía g.id a 'lobby' que espera un cuestionario_id.
-                           Déjalo si así lo estás manejando; si no, cambia a la ruta correcta. -->
-                      <a href="{{ url_for('lobby', cuestionario_id=g.id) }}" class="btn btn-jugar">🚀 Jugar</a>
+                      <!-- 🔸 Se quitó el botón 'Jugar' como pediste -->
                   </div>
               </div>
               {% endfor %}
@@ -263,7 +255,6 @@ async function copyId(id, btn) {
     btn.textContent = '¡Copiado!';
     setTimeout(()=>btn.textContent = old, 1200);
   } catch (_) {
-    // Fallback
     const tmp = document.createElement('input');
     tmp.value = String(id);
     document.body.appendChild(tmp);
@@ -279,9 +270,8 @@ function shareGroup(nombre, id) {
   const text = `Únete a mi grupo "${nombre}" en RoBot. ID: ${id}`;
   if (navigator.share) {
     navigator.share({ title: 'Grupo RoBot', text })
-      .catch(() => {/* usuario canceló */});
+      .catch(() => {});
   } else {
-    // Fallback: copiar mensaje
     copyId(id, {textContent:''});
     alert(text + '\n\nEl ID ya fue copiado al portapapeles.');
   }

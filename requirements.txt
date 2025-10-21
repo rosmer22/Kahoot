@@ -2,3 +2,4 @@ Flask
 PyMySQL
 flask_mail
 psycopg2
+werkzeug
