@@ -10,6 +10,7 @@ import logging
 import os
 import re
 from pathlib import Path  # ✅ agregado para rutas absolutas seguras
+import json
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = 'dev-secret-change-me'
@@ -997,11 +998,20 @@ def api_iniciar_cuestionario_grupo():
         if not cursor.fetchone():
             return jsonify({'success': False, 'message': 'No eres miembro de este grupo'})
         
+        # Generar un session_code único
+        import string
+        import random
+        while True:
+            session_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            cursor.execute("SELECT id FROM sesiones_grupo WHERE session_code = %s", (session_code,))
+            if not cursor.fetchone():
+                break
+
         # Crear sesión de cuestionario en grupo
         cursor.execute("""
-            INSERT INTO sesiones_grupo (grupo_id, cuestionario_id, iniciado_por, created_at)
-            VALUES (%s, %s, %s, NOW())
-        """, (grupo_id, cuestionario_id, g.user['id']))
+            INSERT INTO sesiones_grupo (grupo_id, cuestionario_id, iniciado_por, created_at, session_code)
+            VALUES (%s, %s, %s, NOW(), %s)
+        """, (grupo_id, cuestionario_id, g.user['id'], session_code))
         
         sesion_id = cursor.lastrowid
         db.commit()
@@ -1074,6 +1084,23 @@ def grupo_quiz(sesion_id):
         """, (sesion['cuestionario_id'],))
         
         preguntas = cursor.fetchall()
+
+        # Obtener opciones para cada pregunta
+        preguntas_con_opciones = []
+        for pregunta in preguntas:
+            cursor.execute("""
+                SELECT id, texto_opcion, es_correcta
+                FROM opciones_respuesta
+                WHERE pregunta_id = %s
+                ORDER BY orden ASC
+            """, (pregunta['id'],))
+            opciones = cursor.fetchall()
+            preguntas_con_opciones.append({
+                'id': pregunta['id'],
+                'text': pregunta['texto_pregunta'],
+                'time_limit': pregunta['tiempo_limite'],
+                'options': [{'id': o['id'], 'text': o['texto_opcion'], 'is_correct': bool(o['es_correcta'])} for o in opciones]
+            })
         
         cursor.close()
         db.close()
@@ -1086,7 +1113,8 @@ def grupo_quiz(sesion_id):
                                  'pin': sesion['pin'],
                                  'preguntas_count': len(preguntas)
                              },
-                             miembros=miembros)
+                             miembros=miembros,
+                             preguntas_json=json.dumps(preguntas_con_opciones))
         
     except Exception as e:
         flash(f'Error al cargar el cuestionario: {str(e)}', 'error')
@@ -1094,48 +1122,59 @@ def grupo_quiz(sesion_id):
 
 @app.route('/api/grupo/ready', methods=['POST'])
 def api_grupo_ready():
-    """API para marcar usuario como listo"""
+    """API para marcar usuario como listo y, si todos están listos, iniciar la sesión."""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
     
     data = request.get_json()
     sesion_id = data.get('sesion_id')
-    ready = data.get('ready', False)
+    ready = bool(data.get('ready', False))
     
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
         
-        # Actualizar o crear estado del usuario
+        # 1) Upsert del estado del usuario en la sesión
         cursor.execute("""
             INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
             VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE esta_listo = %s
-        """, (sesion_id, g.user['id'], ready, ready))
+            ON DUPLICATE KEY UPDATE esta_listo = VALUES(esta_listo)
+        """, (sesion_id, g.user['id'], ready))
         
-        # Obtener estado de todos los miembros
+        # 2) Obtener grupo de la sesión
+        cursor.execute("SELECT grupo_id FROM sesiones_grupo WHERE id = %s", (sesion_id,))
+        row = cursor.fetchone()
+        if not row:
+            cursor.close(); db.close()
+            return jsonify({'success': False, 'message': 'Sesión no encontrada'}), 404
+        grupo_id = row['grupo_id']
+        
+        # 3) Contar miembros del grupo
+        cursor.execute("SELECT COUNT(*) AS total FROM grupo_miembros WHERE grupo_id = %s", (grupo_id,))
+        total_miembros = cursor.fetchone()['total']
+        
+        # 4) Contar cuántos están listos en esta sesión
         cursor.execute("""
-            SELECT u.id, u.username, COALESCE(ues.esta_listo, FALSE) as ready
-            FROM grupo_miembros gm
-            JOIN users u ON gm.user_id = u.id
-            JOIN sesiones_grupo sg ON gm.grupo_id = sg.grupo_id
-            LEFT JOIN usuario_estado_grupo ues ON ues.user_id = u.id AND ues.sesion_id = %s
-            WHERE sg.id = %s
-        """, (sesion_id, sesion_id))
+            SELECT COUNT(*) AS listos
+            FROM usuario_estado_grupo
+            WHERE sesion_id = %s AND esta_listo = 1
+        """, (sesion_id,))
+        listos = cursor.fetchone()['listos']
         
-        miembros = cursor.fetchall()
+        all_ready = (total_miembros > 0 and listos == total_miembros)
+        
+        # 5) Si todos listos, marcar sesión como 'iniciado'
+        if all_ready:
+            cursor.execute("UPDATE sesiones_grupo SET estado = 'iniciado' WHERE id = %s", (sesion_id,))
         
         db.commit()
-        cursor.close()
-        db.close()
+        cursor.close(); db.close()
         
-        return jsonify({
-            'success': True,
-            'members': miembros
-        })
+        return jsonify({'success': True, 'all_ready': all_ready, 'ready_count': listos, 'total': total_miembros})
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
 
 @app.route('/api/grupo/status/<int:sesion_id>')
 def api_grupo_status(sesion_id):

@@ -189,31 +189,8 @@
     }
 
     function loadQuestions() {
-        // Simular carga de preguntas (en implementación real, se haría una petición al servidor)
-        questions = [
-            {
-                id: 1,
-                text: "¿Cuál es la capital de Francia?",
-                options: [
-                    { id: 1, text: "Londres", is_correct: false },
-                    { id: 2, text: "París", is_correct: true },
-                    { id: 3, text: "Madrid", is_correct: false },
-                    { id: 4, text: "Roma", is_correct: false }
-                ],
-                time_limit: 30
-            },
-            {
-                id: 2,
-                text: "¿Cuál es el río más largo del mundo?",
-                options: [
-                    { id: 1, text: "Amazonas", is_correct: true },
-                    { id: 2, text: "Nilo", is_correct: false },
-                    { id: 3, text: "Misisipi", is_correct: false },
-                    { id: 4, text: "Yangtsé", is_correct: false }
-                ],
-                time_limit: 30
-            }
-        ];
+        const questionsData = JSON.parse('{{ preguntas_json | tojson | safe }}');
+        questions = questionsData;
     }
 
     function toggleReady() {
