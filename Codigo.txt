@@ -1,0 +1,10 @@
+---Visual Studio Code---
+py -3 -m venv .venv
+.venv\Scripts\Activate
+pip install flask pymysql flask_mail psycopg2
+
+---Git Hub---
+git pull origin main  --Bajar camios de tus compañeros
+git add .  --Preparar tus cambios
+git commit -m "mensaje"  --Guardar el commit local
+git push origin main  --Subirlo a GitHub

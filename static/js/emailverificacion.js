@@ -1,7 +1,34 @@
 document.addEventListener('DOMContentLoaded', function() {
     const resendBtn = document.getElementById('resend-code-btn');
     const flashContainer = document.querySelector('.flash-messages-container');
+    const codigoInput = document.getElementById('codigo');
+    const submitBtn = document.querySelector('.submit-btn');
 
+    // === VALIDACIÓN DINÁMICA DEL CÓDIGO ===
+    function validarCodigo() {
+        const value = codigoInput.value.trim();
+        const isValid = /^\d{6}$/.test(value);
+
+        if (isValid) {
+            submitBtn.disabled = false;
+            submitBtn.style.backgroundColor = 'var(--color-secundario-amarillo)';
+            submitBtn.style.cursor = 'pointer';
+        } else {
+            submitBtn.disabled = true;
+            submitBtn.style.backgroundColor = 'var(--color-gris-boton)';
+            submitBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    // Escuchar cambios en el campo
+    codigoInput.addEventListener('input', validarCodigo);
+
+    // Estado inicial
+    submitBtn.disabled = true;
+    submitBtn.style.backgroundColor = 'var(--color-gris-boton)';
+    submitBtn.style.cursor = 'not-allowed';
+
+    // === REENVÍO DE CÓDIGO (tu lógica existente) ===
     resendBtn.addEventListener('click', function() {
         // Deshabilitar el botón y mostrar estado de carga
         resendBtn.disabled = true;
