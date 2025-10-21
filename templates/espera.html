@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block page_css %}
+<style>
+/* ======== ESTILOS DE PANTALLA DE ESPERA ======== */
+.wait-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 90vh;
+  background: linear-gradient(135deg, #b3e5cf, #6aa84f);
+  color: #fff;
+  text-align: center;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.wait-card {
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 2.5rem 3rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  max-width: 500px;
+  width: 100%;
+  animation: fadeInUp 0.8s ease;
+}
+
+@keyframes fadeInUp {
+  from {opacity: 0; transform: translateY(40px);}
+  to {opacity: 1; transform: translateY(0);}
+}
+
+.wait-card h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.wait-card h2 {
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: #e8f5e9;
+}
+
+.pin-box {
+  background: rgba(0,0,0,0.3);
+  border: 2px dashed #fff;
+  border-radius: 12px;
+  padding: 0.8rem 1.2rem;
+  margin: 1.5rem 0;
+  display: inline-block;
+  font-size: 1.6rem;
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+
+.loader {
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #fff;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  animation: spin 1s linear infinite;
+  margin: 1rem auto;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.participants-box {
+  margin-top: 2rem;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.participants-box h3 {
+  color: #fff;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.participant {
+  background: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  margin: 0.4rem 0;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.participant::before {
+  content: "👤";
+}
+
+.wait-footer {
+  margin-top: 2rem;
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="wait-section">
+  <div class="wait-card">
+    <h1>Esperando a que comience el cuestionario...</h1>
+    <h2>{{ quiz.titulo }}</h2>
+
+    <div class="pin-box">PIN: {{ pin }}</div>
+
+    <div class="loader"></div>
+    <p>El profesor iniciará el juego pronto</p>
+
+    <div class="participants-box" id="participantsBox">
+      <h3>Participantes conectados:</h3>
+      <div id="participantsList">Cargando...</div>
+    </div>
+
+    <div class="wait-footer">
+      <p>RoBot Game © 2025 — Mantente atento 👀</p>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block page_js %}
+<script>
+// === ACTUALIZACIÓN DE PARTICIPANTES EN TIEMPO REAL ===
+const pin = "{{ pin }}";
+const list = document.getElementById("participantsList");
+
+async function actualizarParticipantes() {
+  try {
+    const res = await fetch(`/api/participantes?pin=${pin}`);
+    const data = await res.json();
+    if (data.participantes && data.participantes.length > 0) {
+      list.innerHTML = data.participantes
+        .map(p => `<div class="participant">${p.nombre}</div>`)
+        .join("");
+    } else {
+      list.innerHTML = "<em>Aún no hay jugadores conectados...</em>";
+    }
+  } catch (e) {
+    console.error("Error al cargar participantes:", e);
+  }
+}
+
+// Actualiza cada 3 segundos
+setInterval(actualizarParticipantes, 3000);
+actualizarParticipantes();
+</script>
+{% endblock %}

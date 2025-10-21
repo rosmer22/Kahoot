@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
+<style>
+/* ===============================
+   ESTILOS DE LA PANTALLA DE JUEGO
+   =============================== */
+.game-wrap {
+  max-width: 1100px;
+  margin: 3rem auto;
+  background: #e9e9e9;
+  border: 2px solid #bfbfbf;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .15);
+  overflow: hidden;
+  text-align: center;
+}
+
+.game-header {
+  background: #ffe8b6;
+  border-bottom: 1px solid #f5d385;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.game-header h2 {
+  font-size: 1.6rem;
+  color: #333;
+  margin: 0;
+}
+
+.timer {
+  background: #fff;
+  border: 2px solid #f1e2b9;
+  border-radius: 10px;
+  padding: .5rem 1rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #ff9f2a;
+}
+
+.question-panel {
+  padding: 2rem;
+}
+
+.question-text {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 1.5rem;
+  color: #333;
+}
+
+.answers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.answer-btn {
+  background: #fff;
+  border: 2px solid #bfbfbf;
+  border-radius: 10px;
+  padding: 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.answer-btn:hover {
+  background: #fff9f0;
+  border-color: #ff9f2a;
+}
+
+.answer-btn.selected {
+  background: #b3e5cf;
+  border-color: #6aa84f;
+}
+
+.feedback {
+  margin-top: 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.btn-next {
+  background: #ff9f2a;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: .75rem 1.5rem;
+  font-size: 1.1rem;
+  margin-top: 2rem;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+
+.btn-next:hover { background: #ffb84d; }
+
+.score-box {
+  background: #fff5d6;
+  border: 1px solid #f1e2b9;
+  border-radius: 8px;
+  padding: .4rem 1rem;
+  font-weight: 600;
+  color: #444;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container game-wrap">
+  <div class="game-header">
+    <h2>{{ quiz.titulo if quiz else "Pregunta" }}</h2>
+    <div class="score-box">Puntaje: <span id="score">{{ puntaje_inicial or 0 }}</span></div>
+    <div class="timer">⏱ <span id="time">{{ tiempo_limite or 30 }}</span>s</div>
+  </div>
+
+  <div class="question-panel">
+    <div class="question-text" id="questionText">Cargando pregunta...</div>
+
+    <div class="answers-grid" id="answersGrid">
+      <!-- Opciones generadas dinámicamente -->
+    </div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <button id="nextBtn" class="btn-next hidden">Siguiente ➡</button>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_js %}
+<script>
+// ===============================
+// LOGICA DE JUEGO DEL CUESTIONARIO
+// ===============================
+let preguntas = {{ preguntas|tojson|safe }};
+let indice = 0;
+let puntaje = 0;
+let tiempo = {{ preguntas[0].tiempo_limite if preguntas and preguntas[0].tiempo_limite else 30 }};
+let intervalo;
+
+function mostrarPregunta() {
+  const q = preguntas[indice];
+  document.getElementById("questionText").textContent = q.texto_pregunta;
+  const grid = document.getElementById("answersGrid");
+  grid.innerHTML = "";
+  q.opciones.forEach(op => {
+    const btn = document.createElement("button");
+    btn.className = "answer-btn";
+    btn.textContent = op.texto_opcion;
+    btn.onclick = () => responder(btn, op.es_correcta);
+    grid.appendChild(btn);
+  });
+  document.getElementById("feedback").textContent = "";
+  document.getElementById("nextBtn").classList.add("hidden");
+  resetTimer(q.tiempo_limite || 30);
+}
+
+function responder(btn, correcto) {
+  clearInterval(intervalo);
+  document.querySelectorAll(".answer-btn").forEach(b => b.disabled = true);
+  if (correcto) {
+    btn.classList.add("selected");
+    document.getElementById("feedback").textContent = "✅ ¡Correcto!";
+    puntaje += 10;
+  } else {
+    btn.style.background = "#fee";
+    document.getElementById("feedback").textContent = "❌ Incorrecto";
+  }
+  document.getElementById("score").textContent = puntaje;
+  document.getElementById("nextBtn").classList.remove("hidden");
+}
+
+function siguiente() {
+  indice++;
+  if (indice < preguntas.length) {
+    mostrarPregunta();
+  } else {
+    window.location.href = `/resultado/{{ pin }}`;
+  }
+}
+
+function resetTimer(t) {
+  tiempo = t;
+  document.getElementById("time").textContent = tiempo;
+  clearInterval(intervalo);
+  intervalo = setInterval(() => {
+    tiempo--;
+    document.getElementById("time").textContent = tiempo;
+    if (tiempo <= 0) {
+      clearInterval(intervalo);
+      document.getElementById("feedback").textContent = "⏰ Tiempo agotado";
+      document.querySelectorAll(".answer-btn").forEach(b => b.disabled = true);
+      document.getElementById("nextBtn").classList.remove("hidden");
+    }
+  }, 1000);
+}
+
+document.getElementById("nextBtn").addEventListener("click", siguiente);
+mostrarPregunta();
+</script>
+{% endblock %}

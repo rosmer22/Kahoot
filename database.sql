@@ -114,3 +114,79 @@ CREATE TABLE resultados (
     INDEX idx_cuestionario_id (cuestionario_id),
     INDEX idx_fecha (fecha_completado)
 );
+
+-- Script para actualizar la tabla cuestionarios
+-- Cambiar el ENUM de estado para usar 'publico' y 'privado'
+
+-- PASO 1: Modificar la columna para incluir temporalmente todos los valores
+ALTER TABLE cuestionarios 
+MODIFY COLUMN estado ENUM('borrador', 'publicado', 'archivado', 'publico', 'privado') DEFAULT 'publico';
+
+-- PASO 2: Migrar datos existentes
+UPDATE cuestionarios SET estado = 'publico' WHERE estado IN ('publicado', 'borrador');
+UPDATE cuestionarios SET estado = 'privado' WHERE estado = 'archivado';
+
+-- PASO 3: Modificar la columna para tener solo los valores finales
+ALTER TABLE cuestionarios 
+MODIFY COLUMN estado ENUM('publico', 'privado') DEFAULT 'publico';
+
+-- Verificar el resultado
+SELECT id, titulo, estado, pin FROM cuestionarios;
+
+
+CREATE TABLE IF NOT EXISTS grupos (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    creador_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS grupo_miembros (
+    id SERIAL PRIMARY KEY,
+    grupo_id INT NOT NULL REFERENCES grupos(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    fecha_union TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE IF NOT EXISTS sesiones_grupo (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    grupo_id INT NOT NULL,
+    sesion_id INT NOT NULL,  -- se vincula a sesiones_juego existente
+    fecha_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_fin TIMESTAMP NULL,
+    estado ENUM('esperando','en_progreso', 'finalizado') DEFAULT 'esperando',
+    FOREIGN KEY (grupo_id) REFERENCES grupos(id) ON DELETE CASCADE,
+    FOREIGN KEY (sesion_id) REFERENCES sesiones_juego(id) ON DELETE CASCADE
+);
+
+-- Respuestas del grupo (en lugar de participante individual)
+CREATE TABLE IF NOT EXISTS respuestas_grupo (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sesion_grupo_id INT NOT NULL,
+    pregunta_id INT NOT NULL,
+    opcion_seleccionada_id INT,
+    es_correcta BOOLEAN DEFAULT FALSE,
+    puntos_obtenidos INT DEFAULT 0,
+    fecha_respuesta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sesion_grupo_id) REFERENCES sesiones_grupo(id) ON DELETE CASCADE,
+    FOREIGN KEY (pregunta_id) REFERENCES preguntas(id) ON DELETE CASCADE,
+    FOREIGN KEY (opcion_seleccionada_id) REFERENCES opciones_respuesta(id) ON DELETE SET NULL
+);
+
+-- Resultados finales por grupo
+CREATE TABLE IF NOT EXISTS resultados_grupo (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    grupo_id INT NOT NULL,
+    sesion_grupo_id INT NOT NULL,
+    cuestionario_id INT NOT NULL,
+    puntaje_obtenido INT DEFAULT 0,
+    puntaje_maximo INT NOT NULL,
+    respuestas_correctas INT DEFAULT 0,
+    total_preguntas INT NOT NULL,
+    tiempo_total INT, -- en segundos
+    fecha_finalizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (grupo_id) REFERENCES grupos(id) ON DELETE CASCADE,
+    FOREIGN KEY (cuestionario_id) REFERENCES cuestionarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (sesion_grupo_id) REFERENCES sesiones_grupo(id) ON DELETE CASCADE
+);

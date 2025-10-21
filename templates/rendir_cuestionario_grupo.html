@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% block page_css %}
+<style>
+/* ===============================
+   ESTILO: RENDIR CUESTIONARIO EN GRUPO
+   =============================== */
+.cuestionario-wrap {
+  max-width: 900px;
+  margin: 2.5rem auto;
+  background: #f3f3f3;
+  border: 2px solid #ccc;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  padding: 2rem;
+}
+
+h2.text-center {
+  font-size: 1.8rem;
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+.pregunta {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  padding: 1.2rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.pregunta h4 {
+  color: #ff9f2a;
+  margin-bottom: .4rem;
+}
+
+.pregunta strong {
+  font-size: 1.05rem;
+  color: #333;
+}
+
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  margin: .4rem 0;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.opcion:hover {
+  background: #fff7e6;
+  border-color: #ffcf77;
+}
+
+input[type="radio"] {
+  accent-color: #ff9f2a;
+  transform: scale(1.2);
+  cursor: pointer;
+}
+
+.botones-final {
+  text-align: center;
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: .75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.btn-enviar {
+  background: #ff9f2a;
+  color: white;
+}
+.btn-enviar:hover {
+  background: #ffb84d;
+}
+
+.btn-volver {
+  background: #d3d3d3;
+  color: #333;
+}
+.btn-volver:hover {
+  background: #e4e4e4;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container cuestionario-wrap">
+  <h2 class="text-center">🧩 Rendir Cuestionario en Grupo</h2>
+
+  <form method="POST" action="{{ url_for('rendir_cuestionario_grupo', grupo_id=grupo_id, cuestionario_id=cuestionario_id) }}">
+    <input type="hidden" name="sesion_id" value="{{ grupo_id }}">
+
+    {% if preguntas %}
+      {% for p in preguntas %}
+        <div class="pregunta">
+          <h4>Pregunta {{ loop.index }}:</h4>
+          <p><strong>{{ p['texto_pregunta'] }}</strong></p>
+
+          {% for opcion in p['opciones'] %}
+            <label class="opcion">
+              <input type="radio" name="pregunta_{{ p['id'] }}" value="{{ opcion['id'] }}" required>
+              {{ opcion['texto'] }}
+            </label>
+          {% endfor %}
+        </div>
+      {% endfor %}
+
+      <div class="botones-final">
+        <button type="submit" class="btn btn-enviar">🚀 Enviar respuestas</button>
+        <a href="{{ url_for('obtener_miembros', grupo_id=grupo_id) }}" class="btn btn-volver">⬅ Volver al grupo</a>
+      </div>
+    {% else %}
+      <p class="text-center">⚠ No hay preguntas disponibles para este cuestionario.</p>
+    {% endif %}
+  </form>
+</section>
+{% endblock %}

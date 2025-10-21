@@ -1,5 +1,38 @@
 {% extends "base.html" %}
-{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz_details.css') }}">{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz_details.css') }}">
+<style>
+/* --- Estilo del botón de inicio --- */
+.btn-start-quiz {
+  background: linear-gradient(135deg, #b3e5cf, #6aa84f);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.8rem 1.6rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transition: background 0.3s ease, transform 0.2s ease;
+  text-decoration: none;
+}
+.btn-start-quiz:hover {
+  background: linear-gradient(135deg, #9cd9bb, #5c9645);
+  transform: translateY(-2px);
+}
+.btn-start-quiz:active {
+  transform: translateY(0);
+  background: linear-gradient(135deg, #8acfae, #4f8c3b);
+}
+.btn-start-quiz.loading {
+  opacity: 0.8;
+  pointer-events: none;
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <section class="quiz-details-hero">
@@ -11,6 +44,7 @@
 </section>
 
 <section class="quiz-details-container">
+  <!-- ======== Cabecera del quiz ======== -->
   <div class="quiz-header-card">
     <div class="user-info">
       <div class="avatar-circle">
@@ -29,6 +63,7 @@
     </div>
   </div>
 
+  <!-- ======== Información principal ======== -->
   <div class="quiz-main-info">
     <div class="quiz-thumbnail">
       <img src="{{ quiz.image_url or '/static/img/default-quiz.png' }}" alt="Quiz thumbnail">
@@ -40,12 +75,15 @@
     </div>
     
     <div class="quiz-start-action">
-      <button class="btn-start-quiz">
+      <!-- 🔹 Botón redirige a tu ruta existente -->
+      <a href="{{ url_for('lobby', cuestionario_id=quiz.id, modo='grupal') }}" 
+         class="btn-start-quiz" id="startQuizBtn">
         <i class="fas fa-play"></i> Iniciar ahora
-      </button>
+      </a>
     </div>
   </div>
 
+  <!-- ======== Sección de preguntas ======== -->
   <div class="questions-section">
     <h2 class="section-title">Preguntas ({{ quiz.questions|length if quiz.questions else 10 }})</h2>
     
@@ -67,7 +105,7 @@
         </article>
         {% endfor %}
       {% else %}
-        <!-- Placeholders cuando no hay preguntas -->
+        <!-- Placeholders si no hay preguntas -->
         {% for i in range(10) %}
         <article class="question-card placeholder">
           <div class="question-preview">
@@ -87,6 +125,14 @@
   </div>
 </section>
 
+<script>
+document.getElementById('startQuizBtn').addEventListener('click', function(){
+  this.classList.add('loading');
+  this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+});
+</script>
 {% endblock %}
 
-{% block page_js %}<script src="{{ url_for('static', filename='js/quiz_details.js') }}"></script>{% endblock %}
+{% block page_js %}
+<script src="{{ url_for('static', filename='js/quiz_details.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% block page_css %}
+<style>
+/* ===============================
+   ESTILOS GESTIÓN DE GRUPOS
+   =============================== */
+.container-grupos {
+  max-width: 900px;
+  margin: 2rem auto;
+  background: #f3f3f3;
+  border: 2px solid #ccc;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  padding: 2rem;
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  display: flex;
+  gap: .5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.tab-button {
+  background: #ffd89b;
+  color: #333;
+  border: 1px solid #f5d385;
+  padding: .6rem 1.2rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.tab-button:hover { background: #ffe9c4; }
+.tab-button.active {
+  background: #ff9f2a;
+  color: white;
+}
+
+/* ---- Content ---- */
+.tab-content { display: none; }
+.tab-content.active {
+  display: block;
+  animation: fadeIn .25s ease;
+}
+@keyframes fadeIn {
+  from {opacity: 0; transform: translateY(10px);}
+  to {opacity: 1; transform: translateY(0);}
+}
+
+/* ---- Tarjetas de grupos ---- */
+.grupo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.grupo-card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform .2s ease;
+}
+.grupo-card:hover { transform: translateY(-3px); }
+
+.grupo-nombre {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #333;
+  margin-bottom: .25rem;
+}
+.grupo-creador {
+  font-size: .9rem;
+  color: #555;
+}
+
+/* ---- Línea ID + acciones compartir/copiar ---- */
+.grupo-id-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .6rem;
+  flex-wrap: wrap;
+}
+.grupo-id-pill {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background: #fff4e0;
+  border: 1px dashed #ffc266;
+  color: #7a4d00;
+  padding: .25rem .5rem;
+  border-radius: 8px;
+}
+
+/* ---- Botones ---- */
+.btn {
+  display: inline-block;
+  border: none;
+  border-radius: 8px;
+  padding: .55rem 1rem;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all .2s ease;
+}
+
+.btn-mini {
+  padding: .35rem .6rem;
+  font-size: .85rem;
+}
+
+.btn-copy {
+  background: #ffcc80;
+  border: 1px solid #ffb74d;
+  color: #7b4d00;
+}
+.btn-copy:hover { background: #ffc266; }
+
+.btn-share {
+  background: #b3e5cf;
+  border: 1px solid #6aa84f;
+  color: #2e7d32;
+}
+.btn-share:hover { background: #a0dbbf; }
+
+.btn-ver {
+  background: #6aa84f;
+  color: white;
+}
+.btn-ver:hover { background: #51963c; }
+
+.btn-jugar {
+  background: #ff9f2a;
+  color: white;
+}
+.btn-jugar:hover { background: #ffb84d; }
+
+/* ---- Formularios ---- */
+form {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  padding: 1.5rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  max-width: 500px;
+  margin: 1rem auto;
+}
+form input {
+  width: 100%;
+  padding: .6rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  margin-bottom: 1rem;
+}
+form button {
+  background: #ff9f2a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: .6rem 1.2rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+form button:hover { background: #ffb84d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container-grupos">
+  <h2 class="text-center mb-3">👥 Gestión de Grupos</h2>
+
+  <!-- Tabs -->
+  <div class="tabs">
+      <button class="tab-button active" data-tab="misGrupos">📋 Mis grupos</button>
+      <button class="tab-button" data-tab="crearGrupo">➕ Crear grupo</button>
+      <button class="tab-button" data-tab="unirseGrupo">🔗 Unirse a grupo</button>
+  </div>
+
+  <!-- ======================== -->
+  <!-- SECCIÓN 1: Mis Grupos -->
+  <!-- ======================== -->
+  <div id="misGrupos" class="tab-content active">
+      {% if grupos %}
+          <div class="grupo-grid">
+              {% for g in grupos %}
+              <div class="grupo-card">
+                  <div>
+                      <div class="grupo-nombre">{{ g.nombre }}</div>
+                      <div class="grupo-creador">Creado por {{ g.creador_nombre }}</div>
+
+                      <!-- ID del grupo + acciones -->
+                      <div class="grupo-id-row">
+                        <span class="grupo-id-pill" id="gid-{{ g.id }}">ID: {{ g.id }}</span>
+                        <button class="btn btn-mini btn-copy" onclick="copyId('{{ g.id }}', this)">Copiar ID</button>
+                        <button class="btn btn-mini btn-share" onclick="shareGroup('{{ g.nombre|e }}', '{{ g.id }}')">Compartir</button>
+                      </div>
+                  </div>
+
+                  <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+                      <a href="{{ url_for('obtener_miembros', grupo_id=g.id) }}" class="btn btn-ver">👁 Ver miembros</a>
+                      <!-- OJO: este 'Jugar' actualmente envía g.id a 'lobby' que espera un cuestionario_id.
+                           Déjalo si así lo estás manejando; si no, cambia a la ruta correcta. -->
+                      <a href="{{ url_for('lobby', cuestionario_id=g.id) }}" class="btn btn-jugar">🚀 Jugar</a>
+                  </div>
+              </div>
+              {% endfor %}
+          </div>
+      {% else %}
+          <p class="text-center mt-3">No perteneces a ningún grupo todavía.</p>
+      {% endif %}
+  </div>
+
+  <!-- ======================== -->
+  <!-- SECCIÓN 2: Crear Grupo -->
+  <!-- ======================== -->
+  <div id="crearGrupo" class="tab-content">
+      <form method="POST">
+          <h3>🆕 Crear nuevo grupo</h3>
+          <input type="hidden" name="action" value="crear">
+          <input type="text" name="nombre" placeholder="Nombre del grupo" required>
+          <button type="submit">Crear grupo</button>
+      </form>
+  </div>
+
+  <!-- ======================== -->
+  <!-- SECCIÓN 3: Unirse a Grupo -->
+  <!-- ======================== -->
+  <div id="unirseGrupo" class="tab-content">
+      <form method="POST">
+          <h3>🤝 Unirse a grupo existente</h3>
+          <input type="hidden" name="action" value="unirse">
+          <input type="number" name="grupo_id" placeholder="ID del grupo" required>
+          <button type="submit">Unirse</button>
+      </form>
+  </div>
+</section>
+
+<script>
+const tabButtons = document.querySelectorAll('.tab-button');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabButtons.forEach(b => b.classList.remove('active'));
+    tabContents.forEach(tc => tc.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Copiar ID al portapapeles
+async function copyId(id, btn) {
+  try {
+    await navigator.clipboard.writeText(String(id));
+    const old = btn.textContent;
+    btn.textContent = '¡Copiado!';
+    setTimeout(()=>btn.textContent = old, 1200);
+  } catch (_) {
+    // Fallback
+    const tmp = document.createElement('input');
+    tmp.value = String(id);
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    alert('ID copiado: ' + id);
+  }
+}
+
+// Compartir (si el navegador lo soporta)
+function shareGroup(nombre, id) {
+  const text = `Únete a mi grupo "${nombre}" en RoBot. ID: ${id}`;
+  if (navigator.share) {
+    navigator.share({ title: 'Grupo RoBot', text })
+      .catch(() => {/* usuario canceló */});
+  } else {
+    // Fallback: copiar mensaje
+    copyId(id, {textContent:''});
+    alert(text + '\n\nEl ID ya fue copiado al portapapeles.');
+  }
+}
+</script>
+{% endblock %}
