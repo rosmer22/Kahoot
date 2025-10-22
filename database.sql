@@ -465,3 +465,35 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2025-10-21 22:35:27
+
+
+-----------------
+-- 1. Añadir la columna user_id a sesiones_juego para registrar quién está jugando.
+ALTER TABLE `sesiones_juego`
+ADD COLUMN `user_id` INT NULL AFTER `cuestionario_id`,
+ADD KEY `idx_user_id` (`user_id`),
+ADD CONSTRAINT `fk_sesiones_juego_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+-- 2. Modificar la tabla de respuestas para que se relacione con la sesión y el usuario.
+ALTER TABLE `respuestas_participantes`
+DROP FOREIGN KEY `respuestas_participantes_ibfk_1`,
+DROP FOREIGN KEY `respuestas_participantes_ibfk_3`,
+DROP COLUMN `participante_id`,
+ADD COLUMN `sesion_juego_id` INT NOT NULL AFTER `id`,
+ADD COLUMN `user_id` INT NOT NULL AFTER `sesion_juego_id`,
+ADD COLUMN `opcion_id` INT NULL AFTER `pregunta_id`,
+DROP COLUMN `opcion_seleccionada_id`,
+ADD KEY `idx_sesion_juego_id` (`sesion_juego_id`),
+ADD KEY `idx_user_id` (`user_id`),
+ADD CONSTRAINT `fk_respuestas_sesion` FOREIGN KEY (`sesion_juego_id`) REFERENCES `sesiones_juego` (`id`) ON DELETE CASCADE,
+ADD CONSTRAINT `fk_respuestas_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+ADD CONSTRAINT `fk_respuestas_opcion` FOREIGN KEY (`opcion_id`) REFERENCES `opciones_respuesta` (`id`) ON DELETE SET NULL;
+
+-- 3. Eliminar la tabla 'participantes' que ya no se usará en este flujo.
+DROP TABLE IF EXISTS `participantes`;
+
+
+
+-- Eliminar la columna conflictiva 'pin_sesion' de la tabla de sesiones de juego
+ALTER TABLE `sesiones_juego` DROP KEY `pin_sesion`, DROP COLUMN `pin_sesion`;
+
