@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/resultados_quiz.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="results-container">
+    <header class="results-header">
+        <h1>Resultados RoBot</h1>
+        <div class="summary-chips">
+            <div class="chip" id="total-questions-chip">-- preguntas</div>
+            <div class="chip" id="total-participants-chip">-- participantes</div>
+            <div class="chip" id="total-time-chip">--s tiempo total</div>
+        </div>
+        <div class="global-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="global-progress-fill"></div>
+            </div>
+            <span class="progress-text" id="global-progress-text">--% Aciertos Globales</span>
+        </div>
+    </header>
+
+    <section class="leaderboard-section">
+        <h2>🏆 Ranking General</h2>
+        <div class="table-container">
+            <table id="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Usuario</th>
+                        <th>Puntos</th>
+                        <th>Aciertos</th>
+                        <th>Tiempo Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Filas generadas por JS -->
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="heatmap-section">
+        <h2>📊 Tablero por Pregunta</h2>
+        <div class="table-container" id="heatmap-container">
+            <!-- Heatmap generado por JS -->
+        </div>
+    </section>
+
+    <section class="details-section" id="user-details-section">
+        <h2>🔍 Detalles por Usuario</h2>
+        <div id="details-accordion">
+            <!-- Acordeones generados por JS -->
+        </div>
+    </section>
+
+</main>
+
+<!-- Tooltip para el Heatmap -->
+<div id="heatmap-tooltip" class="tooltip" style="display: none;"></div>
+
+{% endblock %}
+
+{% block page_js %}
+<script>
+    // Pasar datos reales de Flask a JavaScript
+    const gameData = JSON.parse({{ game_data_json | tojson }});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/resultados_quiz.js') }}"></script>
+{% endblock %}

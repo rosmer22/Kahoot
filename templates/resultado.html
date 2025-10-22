@@ -1,163 +1,46 @@
-{% extends "base.html" %}
-{% block page_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
-<style>
-/* ===============================
-   ESTILO RESULTADOS FINAL
-   =============================== */
-.result-wrap {
-  max-width: 800px;
-  margin: 3rem auto;
-  background: #e9e9e9;
-  border: 2px solid #bfbfbf;
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.15);
-  text-align: center;
-  padding: 2rem;
-}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados RoBot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/resultado.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Resultados RoBot</h1>
+            <div class="summary-chips">
+                <span class="chip">Total Preguntas: <strong id="total-preguntas"></strong></span>
+                <span class="chip">Participantes: <strong id="total-participantes"></strong></span>
+                <span class="chip">Tiempo Total: <strong id="tiempo-total"></strong></span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="global-progress"></div>
+                <span id="global-progress-text"></span>
+            </div>
+        </header>
 
-.result-header {
-  background: #ffe8b6;
-  border-bottom: 1px solid #f5d385;
-  padding: 1rem;
-  border-radius: 10px;
-}
+        <main>
+            <section class="leaderboard-section">
+                <h2>🏆 Ranking General</h2>
+                <div id="leaderboard"></div>
+            </section>
 
-.result-header h1 {
-  margin: 0;
-  font-size: 1.8rem;
-  color: #333;
-}
+            <section class="heatmap-section">
+                <h2>📊 Tablero por Pregunta</h2>
+                <div class="heatmap-container">
+                    <div id="heatmap"></div>
+                </div>
+            </section>
 
-.score-circle {
-  margin: 2rem auto;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  border: 8px solid #ff9f2a;
-  display: grid;
-  place-items: center;
-  background: #fff;
-  font-size: 2.2rem;
-  font-weight: 700;
-  color: #333;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-}
+            <section class="details-section">
+                <h2>🔍 Detalles por Usuario</h2>
+                <div id="user-details-accordion"></div>
+            </section>
+        </main>
+    </div>
 
-.score-circle span {
-  display: block;
-  font-size: 1rem;
-  color: #666;
-  font-weight: 500;
-}
-
-.summary {
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #ccc;
-  padding: 1.5rem;
-  text-align: left;
-  margin-top: 1rem;
-}
-
-.summary p {
-  margin: .4rem 0;
-  font-size: 1.05rem;
-  color: #444;
-}
-
-.btn-restart,
-.btn-home {
-  border: none;
-  border-radius: 10px;
-  padding: .75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 1rem .5rem 0;
-  cursor: pointer;
-  transition: all .2s ease;
-}
-
-.btn-restart {
-  background: #ff9f2a;
-  color: #fff;
-}
-.btn-restart:hover { background: #ffb84d; }
-
-.btn-home {
-  background: #d3d3d3;
-  color: #333;
-}
-.btn-home:hover { background: #e4e4e4; }
-
-.ranking-table {
-  margin-top: 2rem;
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.ranking-table th {
-  background: #ffd89b;
-  padding: .75rem;
-  text-align: left;
-  font-weight: 600;
-  color: #333;
-}
-
-.ranking-table td {
-  padding: .75rem;
-  border-top: 1px solid #ddd;
-  color: #444;
-}
-
-.ranking-table tr:nth-child(even) {
-  background: #f9f9f9;
-}
-</style>
-{% endblock %}
-
-{% block content %}
-<section class="container result-wrap">
-  <div class="result-header">
-    <h1>Resultados Finales</h1>
-  </div>
-
-  <div class="score-circle">
-    {{ puntaje_obtenido }}
-    <span>de {{ puntaje_maximo }}</span>
-  </div>
-
-  <div class="summary">
-    <p><strong>Cuestionario:</strong> {{ quiz.titulo }}</p>
-    <p><strong>Modo:</strong> {{ modo|capitalize }}</p>
-    <p><strong>Preguntas Correctas:</strong> {{ respuestas_correctas }} / {{ total_preguntas }}</p>
-    <p><strong>Tiempo Total:</strong> {{ tiempo_total }} seg</p>
-  </div>
-
-  {% if modo == 'grupal' and ranking %}
-  <table class="ranking-table">
-    <thead>
-      <tr><th>Grupo</th><th>Puntaje</th><th>Correctas</th><th>Tiempo (s)</th></tr>
-    </thead>
-    <tbody>
-      {% for fila in ranking %}
-      <tr>
-        <td>{{ fila.nombre_grupo }}</td>
-        <td>{{ fila.puntaje_obtenido }}</td>
-        <td>{{ fila.respuestas_correctas }}/{{ fila.total_preguntas }}</td>
-        <td>{{ fila.tiempo_total }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-
-  <div>
-    <button class="btn-restart" onclick="window.location.href='/cuestionario/{{ quiz.id }}/lobby'">🔄 Jugar de nuevo</button>
-    <button class="btn-home" onclick="window.location.href='/'">🏠 Volver al inicio</button>
-  </div>
-</section>
-{% endblock %}
+    <script src="{{ url_for('static', filename='js/resultado.js') }}"></script>
+</body>
+</html>

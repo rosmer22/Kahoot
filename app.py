@@ -417,6 +417,238 @@ def my_quizzes():
 
     return render_template('my_quizzes.html', title='Mis cuestionarios', created=created, completed=completed)
 
+@app.route('/lobby/<int:cuestionario_id>')
+def lobby(cuestionario_id):
+    """Muestra el lobby de espera para un cuestionario."""
+    if not g.user:
+        flash('Debes iniciar sesión para acceder a esta página.', 'warning')
+        return redirect(url_for('login'))
+
+    modo = request.args.get('modo', 'individual')
+
+    db = bd.obtener_conexion()
+    cursor = db.cursor()
+
+    # Obtener detalles del cuestionario
+    cursor.execute("SELECT id, titulo, pin FROM cuestionarios WHERE id = %s", (cuestionario_id,))
+    quiz = cursor.fetchone()
+
+    if not quiz:
+        flash('Cuestionario no encontrado.', 'error')
+        return redirect(url_for('my_quizzes'))
+
+    # Si el modo es grupal, redirigir a la página de grupos por ahora
+    if modo == 'grupal':
+        # This is a temporary solution, as the group flow from here is not clear.
+        flash('La función de iniciar un quiz grupal desde aquí no está implementada. Por favor, inicia el quiz desde la página del grupo.', 'info')
+        return redirect(url_for('grupos'))
+
+    cursor.close()
+    db.close()
+
+    return render_template('lobby.html', quiz=quiz, pin=quiz['pin'], modo=modo)
+
+@app.route('/cuestionario/<pin>/espera')
+def espera_cuestionario(pin):
+    """Página de espera para un jugador que se une a un cuestionario."""
+    db = bd.obtener_conexion()
+    cursor = db.cursor()
+
+    # Buscar el cuestionario por PIN
+    cursor.execute("SELECT id, titulo FROM cuestionarios WHERE pin = %s", (pin,))
+    quiz = cursor.fetchone()
+
+    cursor.close()
+    db.close()
+
+    if not quiz:
+        flash('El PIN del cuestionario no es válido o ha expirado.', 'error')
+        return redirect(url_for('join_quiz'))
+
+    return render_template('lobby.html', quiz=quiz, pin=pin, modo='individual')
+
+@app.route('/api/participantes')
+def api_participantes():
+    """Devuelve la lista de participantes para un PIN de cuestionario."""
+    pin = request.args.get('pin')
+    if not pin:
+        return jsonify({'error': 'PIN no proporcionado'}), 400
+
+    # TODO: Replace with a real database query
+    participantes = [
+        {'nombre': g.user['username'] if g.user else 'Jugador Anonimo', 'puntaje': 0},
+    ]
+
+    return jsonify({'participantes': participantes})
+
+@app.route('/api/iniciar_sesion/<pin>', methods=['POST'])
+def api_iniciar_sesion(pin):
+    """Marca una sesión de cuestionario como iniciada."""
+    if not g.user:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    # TODO: Update the session status in the database
+
+    return jsonify({'success': True, 'message': 'Cuestionario iniciado'})
+
+@app.route('/sesion/<pin>/pregunta/', defaults={'num_pregunta': 1})
+@app.route('/sesion/<pin>/pregunta/<int:num_pregunta>')
+def sesion_pregunta(pin, num_pregunta):
+    """Muestra una pregunta de un cuestionario en una sesión de juego."""
+    if not g.user:
+        flash('Debes iniciar sesión para jugar.', 'warning')
+        return redirect(url_for('login'))
+
+    db = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+
+        # Obtener el cuestionario a partir del PIN
+        cursor.execute("SELECT id, titulo FROM cuestionarios WHERE pin = %s", (pin,))
+        quiz = cursor.fetchone()
+
+        if not quiz:
+            cursor.close(); db.close()
+            flash('El PIN del cuestionario no es válido o ha expirado.', 'error')
+            return redirect(url_for('join_quiz'))
+
+        cuestionario_id = quiz['id']
+
+        # Obtener todas las preguntas con opciones
+        cursor.execute("""
+            SELECT p.id, p.texto_pregunta, p.tiempo_limite
+            FROM preguntas p
+            WHERE p.cuestionario_id = %s
+            ORDER BY p.orden ASC
+        """, (cuestionario_id,))
+        preguntas_db = cursor.fetchall()
+
+        preguntas_list = []
+        for p in preguntas_db:
+            cursor.execute("""
+                SELECT id, texto_opcion, es_correcta, orden
+                FROM opciones_respuesta
+                WHERE pregunta_id = %s
+                ORDER BY orden ASC
+            """, (p['id'],))
+            opciones = cursor.fetchall()
+            preguntas_list.append({
+                'id': p['id'],
+                'texto_pregunta': p['texto_pregunta'],
+                'tiempo_limite': p.get('tiempo_limite', 30),
+                'opciones': [
+                    {'id': o['id'], 'texto_opcion': o['texto_opcion'], 'es_correcta': bool(o['es_correcta'])}
+                    for o in opciones
+                ]
+            })
+
+        cursor.close()
+
+        if not preguntas_list:
+            db.close()
+            flash('Este cuestionario no tiene preguntas.', 'error')
+            return redirect(url_for('my_quizzes'))
+
+        # Si el número de pregunta solicitado es mayor que el total, el quiz ha terminado.
+        if num_pregunta > len(preguntas_list):
+            db.close()
+            return redirect(url_for('resultados_quiz', pin=pin))
+
+        pregunta_actual = preguntas_list[num_pregunta - 1]
+
+        resp = render_template(
+            'juego_pregunta.html',
+            pin=pin,
+            quiz=quiz,
+            preguntas=preguntas_list,
+            preguntas_json=preguntas_list, # Pasa la lista de Python directamente
+            num_pregunta=num_pregunta,
+            puntaje_inicial=0,
+            tiempo_limite=pregunta_actual['tiempo_limite']
+        )
+        db.close()
+        return resp
+
+    except Exception as e:
+        if db:
+            try: db.close()
+            except: pass
+        flash(f'Error al cargar la pregunta: {str(e)}', 'error')
+        return redirect(url_for('home'))
+
+@app.route('/api/sesion/responder', methods=['POST'])
+def api_responder_pregunta():
+    """API para que un usuario individual guarde su respuesta."""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+
+    data = request.get_json()
+    pin = data.get('pin')
+    pregunta_id = data.get('pregunta_id')
+    opcion_id = data.get('opcion_id')
+    tiempo_respuesta = data.get('tiempo_respuesta')
+
+    if not all([pin, pregunta_id, opcion_id, tiempo_respuesta is not None]):
+        return jsonify({'success': False, 'message': 'Faltan datos en la solicitud'}), 400
+
+    db = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+
+        # 1. Obtener la sesión de juego y el cuestionario
+        cursor.execute("""
+            SELECT sj.id as sesion_id
+            FROM sesiones_juego sj JOIN cuestionarios c ON sj.cuestionario_id = c.id
+            WHERE c.pin = %s AND sj.user_id = %s AND sj.estado = 'en_progreso'
+            LIMIT 1
+        """, (pin, g.user['id']))
+        sesion_info = cursor.fetchone()
+
+        if not sesion_info:
+            # Si no existe, la creamos
+            cursor.execute("SELECT id FROM cuestionarios WHERE pin = %s", (pin,))
+            quiz = cursor.fetchone()
+            if not quiz:
+                return jsonify({'success': False, 'message': 'PIN no válido'}), 404
+            
+            # Usamos la nueva columna user_id y la columna created_by para el creador
+            cursor.execute("""
+                INSERT INTO sesiones_juego (cuestionario_id, user_id, estado, fecha_inicio, created_by)
+                VALUES (%s, %s, 'en_progreso', NOW(), %s)
+            """, (quiz['id'], g.user['id'], g.user['id']))
+            sesion_id = cursor.lastrowid
+        else:
+            sesion_id = sesion_info['sesion_id']
+
+        # 2. Verificar si la respuesta es correcta y calcular puntos
+        cursor.execute("SELECT es_correcta FROM opciones_respuesta WHERE id = %s", (opcion_id,))
+        opcion = cursor.fetchone()
+        es_correcta = opcion['es_correcta'] if opcion else False
+
+        cursor.execute("SELECT tiempo_limite, puntos FROM preguntas WHERE id = %s", (pregunta_id,))
+        pregunta = cursor.fetchone()
+        puntos_base = pregunta['puntos'] if pregunta else 1000
+
+        puntos_obtenidos = 0
+        if es_correcta:
+            # Fórmula de puntos: (1 - (tiempo_respuesta / tiempo_limite / 2)) * puntos_base
+            tiempo_limite = pregunta['tiempo_limite'] if pregunta else 30
+            puntos_obtenidos = round((1 - (float(tiempo_respuesta) / tiempo_limite / 2)) * puntos_base)
+
+        # 3. Guardar la respuesta
+        cursor.execute("""
+            INSERT INTO respuestas_participantes (sesion_juego_id, user_id, pregunta_id, opcion_id, es_correcta, puntos_obtenidos, tiempo_respuesta)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (sesion_id, g.user['id'], pregunta_id, opcion_id, es_correcta, puntos_obtenidos, tiempo_respuesta))
+
+        db.commit()
+        return jsonify({'success': True, 'correct': bool(es_correcta), 'points': puntos_obtenidos})
+
+    except Exception as e:
+        if db: db.rollback()
+        return jsonify({'success': False, 'message': f'Error al guardar respuesta: {str(e)}'}), 500
 
 @app.route('/explore')
 def explore():
@@ -1163,17 +1395,33 @@ def api_grupo_ready():
         
         all_ready = (total_miembros > 0 and listos == total_miembros)
         
-        # 5) Si todos listos, marcar sesión como 'iniciado'
+        # 5) Si todos listos, pasar a 'en_progreso' y setear started_at
         if all_ready:
-            cursor.execute("UPDATE sesiones_grupo SET estado = 'iniciado' WHERE id = %s", (sesion_id,))
+            cursor.execute("""
+                UPDATE sesiones_grupo
+                SET estado = 'en_progreso', started_at = NOW()
+                WHERE id = %s
+            """, (sesion_id,))
+        
+        # 6) Obtener la lista actualizada de miembros y su estado "listo"
+        cursor.execute("""
+            SELECT u.id, u.username, COALESCE(ues.esta_listo, 0) as ready
+            FROM grupo_miembros gm
+            JOIN users u ON gm.user_id = u.id
+            LEFT JOIN usuario_estado_grupo ues ON ues.user_id = u.id AND ues.sesion_id = %s
+            WHERE gm.grupo_id = %s
+        """, (sesion_id, grupo_id))
+        
+        miembros_actualizados = cursor.fetchall()
         
         db.commit()
         cursor.close(); db.close()
         
-        return jsonify({'success': True, 'all_ready': all_ready, 'ready_count': listos, 'total': total_miembros})
+        return jsonify({'success': True, 'all_ready': all_ready, 'members': miembros_actualizados})
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
 
 
 @app.route('/api/grupo/status/<int:sesion_id>')
@@ -1256,18 +1504,34 @@ def api_grupo_results(sesion_id):
         db = bd.obtener_conexion()
         cursor = db.cursor()
         
-        # Obtener puntuaciones de todos los usuarios
+        # Obtener el total de preguntas del cuestionario de esta sesión
         cursor.execute("""
-            SELECT u.username, SUM(rg.puntos) as score
+            SELECT COUNT(p.id) as total_preguntas
+            FROM sesiones_grupo sg
+            JOIN preguntas p ON sg.cuestionario_id = p.cuestionario_id
+            WHERE sg.id = %s
+        """, (sesion_id,))
+        total_preguntas_row = cursor.fetchone()
+        total_preguntas = total_preguntas_row['total_preguntas'] if total_preguntas_row else 0
+
+        # Obtener puntuaciones y aciertos de todos los usuarios
+        cursor.execute("""
+            SELECT 
+                u.username, 
+                SUM(rg.puntos) as score,
+                SUM(rg.es_correcta) as correct_answers
             FROM respuestas_grupo rg
             JOIN users u ON rg.user_id = u.id
             WHERE rg.sesion_id = %s
             GROUP BY u.id, u.username
             ORDER BY score DESC
         """, (sesion_id,))
-        
         resultados = cursor.fetchall()
-        
+
+        # Añadir el total de preguntas a cada resultado
+        for r in resultados:
+            r['total_questions'] = total_preguntas
+
         cursor.close()
         db.close()
         
@@ -1278,6 +1542,110 @@ def api_grupo_results(sesion_id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/resultados/<pin>')
+def resultados_quiz(pin):
+    """Página de resultados para una sesión de juego individual."""
+    if not g.user:
+        flash('Debes iniciar sesión para ver los resultados.', 'warning')
+        return redirect(url_for('login'))
+
+    db = None
+    game_data = {
+        "totalTime": 0,
+        "questions": [],
+        "participants": []
+    }
+
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+
+        # 1. Obtener el cuestionario por PIN
+        cursor.execute("""
+            SELECT id, titulo, created_at FROM cuestionarios WHERE pin = %s
+        """, (pin,))
+        quiz_info = cursor.fetchone()
+
+        if not quiz_info:
+            flash('Cuestionario con ese PIN no encontrado.', 'error')
+            return redirect(url_for('home'))
+
+        cuestionario_id = quiz_info['id']
+
+        # 2. Obtener todas las preguntas del cuestionario para el JSON
+        cursor.execute("""
+            SELECT id, texto_pregunta as text, orden
+            FROM preguntas
+            WHERE cuestionario_id = %s ORDER BY orden
+        """, (cuestionario_id,))
+        game_data['questions'] = cursor.fetchall()
+
+        # 3. Obtener todas las sesiones de juego para este cuestionario
+        cursor.execute("""
+            SELECT id, user_id, fecha_inicio, fecha_fin FROM sesiones_juego
+            WHERE cuestionario_id = %s AND user_id IS NOT NULL
+        """, (cuestionario_id,))
+        sesiones = cursor.fetchall()
+
+        if not sesiones:
+            flash('Aún no se ha jugado ninguna partida para este cuestionario.', 'info')
+            return redirect(url_for('quiz_details', cuestionario_id=cuestionario_id))
+
+        # 4. Procesar los resultados de todas las sesiones
+        participants_map = {}
+        total_game_duration = 0
+
+        for sesion in sesiones:
+            # Calcular duración total del juego
+            if sesion.get('fecha_inicio') and sesion.get('fecha_fin'):
+                duration = (sesion['fecha_fin'] - sesion['fecha_inicio']).total_seconds()
+                total_game_duration = max(total_game_duration, duration)
+
+            # Obtener respuestas de esta sesión
+            cursor.execute("""
+                SELECT
+                    rp.user_id,
+                    u.username,
+                    rp.pregunta_id,
+                    rp.es_correcta,
+                    rp.puntos_obtenidos,
+                    rp.tiempo_respuesta,
+                    op.texto_opcion as choice
+                FROM respuestas_participantes rp
+                JOIN users u ON rp.user_id = u.id
+                LEFT JOIN opciones_respuesta op ON rp.opcion_id = op.id
+                WHERE rp.sesion_juego_id = %s
+            """, (sesion['id'],))
+            respuestas = cursor.fetchall()
+
+            for r in respuestas:
+                user_id = r['user_id']
+                if user_id not in participants_map:
+                    participants_map[user_id] = {
+                        "id": user_id,
+                        "name": r['username'],
+                        "answers": []
+                    }
+                
+                participants_map[user_id]['answers'].append({
+                    "questionId": r['pregunta_id'],
+                    "correct": bool(r['es_correcta']),
+                    "points": r['puntos_obtenidos'],
+                    "time": float(r['tiempo_respuesta']) if r['tiempo_respuesta'] is not None else 0,
+                    "choice": r['choice'] or "N/A"
+                })
+
+        game_data['participants'] = list(participants_map.values())
+        game_data['totalTime'] = total_game_duration
+
+        return render_template('resultados_quiz.html',
+                               title=f"Resultados de {quiz_info['titulo']}",
+                               game_data_json=json.dumps(game_data, default=str))
+
+    except Exception as e:
+        flash(f'Error al cargar los resultados: {str(e)}', 'error')
+        return redirect(url_for('home'))
 
 if __name__ == '__main__':
     # Ya no es necesario crear la carpeta aquí; se crea arriba en tiempo de carga.

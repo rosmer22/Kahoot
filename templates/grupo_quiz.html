@@ -25,7 +25,7 @@
                     </div>
                     <span class="member-name">{{ miembro.username }}</span>
                     <div class="member-status">
-                        <span class="status-indicator {% if miembro.activo %}online{% else %}offline{% endif %}"></span>
+                        <span class="status-indicator {% if miembro.esta_listo %}ready{% else %}waiting{% endif %}"></span>
                     </div>
                 </div>
                 {% endfor %}
@@ -123,370 +123,393 @@
         </div>
     </div>
 </main>
-
-<!-- Modal de Confirmación -->
-<div class="modal" id="confirmModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Confirmar Respuesta</h3>
-        </div>
-        <div class="modal-body">
-            <p>¿Estás seguro de tu respuesta?</p>
-            <div class="selected-answer" id="selectedAnswerText"></div>
-        </div>
-        <div class="modal-actions">
-            <button class="btn-secondary" onclick="closeConfirmModal()">Cambiar</button>
-            <button class="btn-primary" onclick="confirmAnswer()">Confirmar</button>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block page_js %}
 <script>
-    // Variables globales
-    const sesionId = {{ sesion_id }};
-    const userId = {{ g.user.id if g.user else 0 }};
-    let currentQuestion = 0;
-    let questions = [];
-    let userAnswers = [];
-    let isReady = false;
-    let selectedAnswer = null;
-    let questionTimer = null;
+/* =========================
+   Variables globales
+   ========================= */
+const sesionId = {{ sesion_id }};
+const userId = {{ g.user.id if g.user else 0 }};
+let currentQuestion = 0;
+let questions = [];
+let userAnswers = [];
+let isReady = false;
+let questionTimer = null;
+let gameStarted = false; // evita iniciar dos veces
 
-    // Elementos del DOM
-    const statusWaiting = document.getElementById('statusWaiting');
-    const statusStarting = document.getElementById('statusStarting');
-    const statusActive = document.getElementById('statusActive');
-    const resultsContainer = document.getElementById('resultsContainer');
-    const questionContainer = document.getElementById('questionContainer');
-    const readyBtn = document.getElementById('readyBtn');
-    const membersList = document.getElementById('membersList');
-    const confirmModal = document.getElementById('confirmModal');
+// Elementos del DOM
+const statusWaiting = document.getElementById('statusWaiting');
+const statusStarting = document.getElementById('statusStarting');
+const statusActive   = document.getElementById('statusActive');
+const questionContainer = document.getElementById('questionContainer');
+const readyBtn     = document.getElementById('readyBtn');
+const membersList  = document.getElementById('membersList');
+const confirmModal = document.getElementById('confirmModal');
 
-    // Inicialización
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeQuiz();
-        setupEventListeners();
-        startPolling();
-    });
+/* =========================
+   Inicialización
+   ========================= */
+document.addEventListener('DOMContentLoaded', function () {
+  initializeQuiz();
+  setupEventListeners();
+  startPolling();
+});
 
-    function initializeQuiz() {
-        console.log('Inicializando cuestionario en grupo...');
-        // Aquí se cargarían las preguntas del cuestionario
-        loadQuestions();
+function initializeQuiz() {
+  // Cargar preguntas (ya vienen del backend en JSON)
+  questions = JSON.parse({{ preguntas_json | tojson }});
+}
+
+/* =========================
+   Eventos
+   ========================= */
+function setupEventListeners() {
+  if (readyBtn) readyBtn.addEventListener('click', toggleReady);
+
+  // Selección de respuesta (delegado)
+  document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('answer-option') || e.target.closest('.answer-option')) {
+      const target = e.target.classList.contains('answer-option') ? e.target : e.target.closest('.answer-option');
+      handleAnswerSelection(target); // Cambiado a handleAnswerSelection
     }
+  });
+}
 
-    function setupEventListeners() {
-        readyBtn.addEventListener('click', toggleReady);
-        
-        // Event listeners para respuestas
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('answer-option')) {
-                selectAnswer(e.target);
-            }
-        });
-    }
+/* =========================
+   Estado "Listo" (Ready)
+   ========================= */
+function toggleReady() {
+  isReady = !isReady;
+  toggleReadyVisuals(); // <-- Llama a la función que actualiza la UI inmediatamente
 
-    function loadQuestions() {
-        const questionsData = JSON.parse('{{ preguntas_json | tojson | safe }}');
-        questions = questionsData;
-    }
+  sendReadyStatus(isReady);
+}
 
-    function toggleReady() {
+function sendReadyStatus(ready) {
+  fetch('/api/grupo/ready', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sesion_id: sesionId,
+      user_id: userId,
+      ready: ready
+    })
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      if (!data.success) {
+        // Si falla, revertir el estado visual del botón
         isReady = !isReady;
-        
-        if (isReady) {
-            readyBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                Listo ✓
-            `;
-            readyBtn.classList.add('ready');
-        } else {
-            readyBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                Estoy Listo
-            `;
-            readyBtn.classList.remove('ready');
+        toggleReadyVisuals();
+        return;
+      }
+      if (data.members) updateMembersStatus(data.members);
+
+      // Si el servidor detectó que TODOS están listos, arrancamos ya
+      if (data.all_ready && !gameStarted) {
+        gameStarted = true;
+        startQuiz();
+      }
+    })
+    .catch(() => {});
+}
+
+function updateMembersStatus(members) {
+  members.forEach((member) => {
+    const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
+    if (memberEl) {
+      const indicator = memberEl.querySelector('.status-indicator');
+      indicator.classList.remove('ready', 'waiting');
+      indicator.classList.add(member.ready ? 'ready' : 'waiting');
+    }
+  });
+}
+
+/* =========================
+   Inicio del Quiz
+   ========================= */
+function startQuiz() {
+    // Cambiar secciones de estado
+    if (statusWaiting) statusWaiting.style.display = 'none';
+    if (statusStarting) statusStarting.style.display = 'block';
+
+    let countdown = 3; // Inicia en 3, pero puedes cambiarlo a 5
+    const countdownElement = document.getElementById('countdown');
+    if (countdownElement) countdownElement.textContent = countdown;
+
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdownElement) countdownElement.textContent = countdown;
+
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            startQuestions();
         }
+    }, 1000);
+}
 
-        // Enviar estado al servidor
-        sendReadyStatus(isReady);
+function startQuestions() {
+  // Ocultar todo el contenedor de estado (lobby y countdown)
+  if (document.getElementById('quizStatus')) document.getElementById('quizStatus').style.display = 'none';
+  if (questionContainer) questionContainer.style.display = 'block';
+
+  showQuestion(0);
+}
+
+/* =========================
+   Render de Pregunta
+   ========================= */
+function showQuestion(questionIndex) {
+  if (questionIndex >= questions.length) {
+    endQuiz();
+    return;
+  }
+
+  // Limpiar timer previo
+  if (questionTimer) {
+    clearInterval(questionTimer);
+    questionTimer = null;
+  }
+
+  currentQuestion = questionIndex;
+  const question = questions[questionIndex];
+
+  // Texto de pregunta
+  const qText = document.getElementById('questionText');
+  if (qText) qText.textContent = question.text;
+
+  // Opciones
+  const answersContainer = document.getElementById('answersContainer');
+  if (answersContainer) {
+    answersContainer.innerHTML = '';
+    question.options.forEach((option) => {
+      const optionElement = document.createElement('div');
+      optionElement.className = 'answer-option';
+      optionElement.dataset.optionId = option.id;
+      optionElement.innerHTML = `
+        <div class="option-content">
+          <span class="option-text">${option.text}</span>
+        </div>
+      `;
+      answersContainer.appendChild(optionElement);
+    });
+  }
+
+  // Progreso
+  updateProgress(questionIndex + 1, questions.length);
+
+  // Temporizador
+  startQuestionTimer(question.time_limit || 30);
+}
+
+function handleAnswerSelection(optionElement) {
+  // Quitar selección previa
+  document.querySelectorAll('.answer-option').forEach((opt) => {
+    opt.classList.remove('selected');
+  });
+
+  // Seleccionar
+  optionElement.classList.add('selected');
+  const selectedOptionId = parseInt(optionElement.dataset.optionId, 10);
+
+  userAnswers.push({
+    question_id: questions[currentQuestion].id,
+    answer_id: selectedOptionId,
+    time_taken: questions[currentQuestion].time_limit - getRemainingTime()
+  });
+
+  // Enviar al backend inmediatamente
+  sendAnswer(questions[currentQuestion].id, selectedOptionId);
+
+  setTimeout(() => {
+    showQuestion(currentQuestion + 1);
+  }, 600);
+}
+
+function sendAnswer(questionId, answerId) {
+  fetch('/api/grupo/answer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sesion_id: sesionId,
+      user_id: userId,
+      question_id: questionId,
+      answer_id: answerId
+    })
+  }).catch(() => {});
+}
+
+/* =========================
+   Timer de Pregunta
+   ========================= */
+function startQuestionTimer(seconds) {
+  const timerElement = document.getElementById('timerValue');
+  let timeLeft = seconds;
+
+  if (timerElement) timerElement.textContent = timeLeft;
+
+  questionTimer = setInterval(() => {
+    timeLeft--;
+    if (timerElement) timerElement.textContent = timeLeft;
+
+    if (timeLeft < 0) {
+      clearInterval(questionTimer);
+      questionTimer = null;
+      // Pasar a la siguiente al vencer el tiempo
+      showQuestion(currentQuestion + 1);
+    }
+  }, 1000);
+}
+
+function getRemainingTime() {
+  const el = document.getElementById('timerValue');
+  if (!el) return 0;
+  const val = parseInt(el.textContent, 10);
+  return Number.isNaN(val) ? 0 : val;
+}
+
+/* =========================
+   Progreso y Fin
+   ========================= */
+function updateProgress(current, total) {
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+
+  const percentage = (current / total) * 100;
+  if (progressFill) progressFill.style.width = percentage + '%';
+  if (progressText) progressText.textContent = `Pregunta ${current} de ${total}`;
+}
+
+function endQuiz() {
+  if (statusActive) statusActive.style.display = 'none';
+  if (questionContainer) questionContainer.style.display = 'none';
+  if (resultsContainer) resultsContainer.style.display = 'block';
+  loadResults();
+}
+
+function loadResults() {
+  fetch(`/api/grupo/results/${sesionId}`)
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.success) displayResults(data.results || []);
+    })
+    .catch(() => {});
+}
+
+function displayResults(results) {
+  const leaderboard = document.getElementById('leaderboard');
+  const groupScore  = document.getElementById('groupScore');
+
+  if (!leaderboard || !groupScore) return;
+
+  let totalScore = 0;
+  leaderboard.innerHTML = '';
+
+  results.forEach((result, index) => {
+    totalScore += (result.score || 0);
+
+    const el = document.createElement('div');
+    const rank = index + 1;
+    el.className = 'result-item';
+
+    let rankDisplay = rank;
+    if (rank === 1) {
+        el.classList.add('rank-1');
+        rankDisplay = '🥇';
+    } else if (rank === 2) {
+        el.classList.add('rank-2');
+        rankDisplay = '🥈';
+    } else if (rank === 3) {
+        el.classList.add('rank-3');
+        rankDisplay = '🥉';
     }
 
-    function sendReadyStatus(ready) {
-        fetch('/api/grupo/ready', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                sesion_id: sesionId,
-                user_id: userId,
-                ready: ready
-            })
-        }).then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                updateMembersStatus(data.members);
-            }
-        });
-    }
+    el.innerHTML = `
+      <div class="result-rank">${rankDisplay}</div>
+      <div class="result-user">
+        <div class="user-avatar">
+          <img src="/static/img/robot_ico.png" alt="Avatar">
+        </div>
+        <span class="user-name">${result.username}</span>
+      </div>
+      <div class="result-score">
+        <strong>${result.score} pts</strong>
+        <small>${result.correct_answers || 0} / ${result.total_questions} aciertos</small>
+      </div>
+    `;
+    leaderboard.appendChild(el);
+  });
 
-    function updateMembersStatus(members) {
-        membersList.innerHTML = '';
-        members.forEach(member => {
-            const memberElement = document.createElement('div');
-            memberElement.className = 'member-item';
-            memberElement.innerHTML = `
-                <div class="member-avatar">
-                    <img src="/static/img/robot_ico.png" alt="Avatar">
-                </div>
-                <span class="member-name">${member.username}</span>
-                <div class="member-status">
-                    <span class="status-indicator ${member.ready ? 'ready' : 'waiting'}"></span>
-                </div>
-            `;
-            membersList.appendChild(memberElement);
-        });
-    }
+  groupScore.textContent = totalScore;
+}
 
-    function startQuiz() {
-        statusWaiting.style.display = 'none';
-        statusStarting.style.display = 'block';
-        
-        let countdown = 3;
-        const countdownElement = document.getElementById('countdown');
-        
-        const countdownInterval = setInterval(() => {
-            countdownElement.textContent = countdown;
-            countdown--;
-            
-            if (countdown < 0) {
-                clearInterval(countdownInterval);
-                startQuestions();
-            }
-        }, 1000);
-    }
+function restartQuiz() {
+  if (confirm('¿Estás seguro de que quieres reiniciar el cuestionario?')) {
+    window.location.reload();
+  }
+}
 
-    function startQuestions() {
-        statusStarting.style.display = 'none';
-        statusActive.style.display = 'block';
-        questionContainer.style.display = 'block';
-        
-        showQuestion(0);
-    }
-
-    function showQuestion(questionIndex) {
-        if (questionIndex >= questions.length) {
-            endQuiz();
-            return;
+/* =========================
+   Polling de Estado (Servidor -> Cliente)
+   El backend devuelve: 'esperando' | 'en_progreso' | 'finalizado'
+   ========================= */
+function startPolling() {
+  // Polling para el estado del juego
+  const gameStatusInterval = setInterval(() => {
+    fetch(`/api/grupo/status/${sesionId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          if (updateQuizStatus(data.status)) {
+            clearInterval(gameStatusInterval); // Detener polling si el juego empieza o termina
+          }
         }
+      })
+      .catch(() => {});
+  }, 3000); // Cada 3 segundos
 
-        currentQuestion = questionIndex;
-        const question = questions[questionIndex];
-        
-        // Mostrar pregunta
-        document.getElementById('questionText').textContent = question.text;
-        
-        // Mostrar opciones
-        const answersContainer = document.getElementById('answersContainer');
-        answersContainer.innerHTML = '';
-        
-        question.options.forEach(option => {
-            const optionElement = document.createElement('div');
-            optionElement.className = 'answer-option';
-            optionElement.dataset.optionId = option.id;
-            optionElement.innerHTML = `
-                <div class="option-content">
-                    <span class="option-text">${option.text}</span>
-                </div>
-            `;
-            answersContainer.appendChild(optionElement);
-        });
+  // Polling para el estado de los miembros (solo mientras se espera)
+  // Esto se podría combinar con el anterior, pero lo separamos por claridad.
+  // La función sendReadyStatus ya actualiza, esto es un seguro.
+}
 
-        // Actualizar progreso
-        updateProgress(questionIndex + 1, questions.length);
-        
-        // Iniciar temporizador
-        startQuestionTimer(question.time_limit);
+function updateQuizStatus(status) {
+  // Mapea exactamente los estados que devuelve tu BD/servidor
+  if (status === 'esperando') {
+    // seguimos en lobby
+    // Podríamos añadir un fetch aquí para actualizar la lista de miembros
+    // si alguien más se une, pero por ahora lo dejamos así.
+    return false;
+  }
+  if (status === 'en_progreso') {
+    if (!gameStarted) {
+      gameStarted = true;
+      startQuiz();
     }
+    return true; // El juego ha comenzado, detener polling de estado
+  }
+  if (status === 'finalizado') {
+    endQuiz();
+    return true; // El juego ha finalizado, detener polling
+  }
+  return false;
+}
 
-    function selectAnswer(optionElement) {
-        // Remover selección anterior
-        document.querySelectorAll('.answer-option').forEach(opt => {
-            opt.classList.remove('selected');
-        });
-        
-        // Seleccionar nueva opción
-        optionElement.classList.add('selected');
-        selectedAnswer = parseInt(optionElement.dataset.optionId);
-        
-        // Mostrar modal de confirmación
-        const question = questions[currentQuestion];
-        const selectedOption = question.options.find(opt => opt.id === selectedAnswer);
-        document.getElementById('selectedAnswerText').textContent = selectedOption.text;
-        confirmModal.style.display = 'flex';
+function toggleReadyVisuals() {
+    const indicator = membersList.querySelector(`.member-item[data-user-id="${userId}"] .status-indicator`);
+    if (isReady) {
+        readyBtn.classList.add('ready');
+        readyBtn.querySelector('svg').style.display = 'inline';
+        if (indicator) indicator.classList.replace('waiting', 'ready');
+    } else {
+        readyBtn.classList.remove('ready');
+        if (indicator) indicator.classList.replace('ready', 'waiting');
     }
+}
 
-    function confirmAnswer() {
-        if (selectedAnswer) {
-            // Guardar respuesta
-            userAnswers.push({
-                question_id: questions[currentQuestion].id,
-                answer_id: selectedAnswer,
-                time_taken: questions[currentQuestion].time_limit - getRemainingTime()
-            });
-            
-            // Enviar respuesta al servidor
-            sendAnswer(questions[currentQuestion].id, selectedAnswer);
-            
-            // Limpiar selección
-            selectedAnswer = null;
-            closeConfirmModal();
-            
-            // Pasar a siguiente pregunta
-            setTimeout(() => {
-                showQuestion(currentQuestion + 1);
-            }, 1000);
-        }
-    }
-
-    function closeConfirmModal() {
-        confirmModal.style.display = 'none';
-    }
-
-    function sendAnswer(questionId, answerId) {
-        fetch('/api/grupo/answer', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                sesion_id: sesionId,
-                user_id: userId,
-                question_id: questionId,
-                answer_id: answerId
-            })
-        });
-    }
-
-    function startQuestionTimer(seconds) {
-        const timerElement = document.getElementById('timerValue');
-        let timeLeft = seconds;
-        
-        questionTimer = setInterval(() => {
-            timerElement.textContent = timeLeft;
-            timeLeft--;
-            
-            if (timeLeft < 0) {
-                clearInterval(questionTimer);
-                // Tiempo agotado, pasar a siguiente pregunta
-                showQuestion(currentQuestion + 1);
-            }
-        }, 1000);
-    }
-
-    function getRemainingTime() {
-        return parseInt(document.getElementById('timerValue').textContent);
-    }
-
-    function updateProgress(current, total) {
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        
-        const percentage = (current / total) * 100;
-        progressFill.style.width = percentage + '%';
-        progressText.textContent = `Pregunta ${current} de ${total}`;
-    }
-
-    function endQuiz() {
-        statusActive.style.display = 'none';
-        questionContainer.style.display = 'none';
-        resultsContainer.style.display = 'block';
-        
-        // Cargar resultados
-        loadResults();
-    }
-
-    function loadResults() {
-        fetch(`/api/grupo/results/${sesionId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                displayResults(data.results);
-            }
-        });
-    }
-
-    function displayResults(results) {
-        const leaderboard = document.getElementById('leaderboard');
-        const groupScore = document.getElementById('groupScore');
-        
-        let totalScore = 0;
-        leaderboard.innerHTML = '';
-        
-        results.forEach((result, index) => {
-            totalScore += result.score;
-            
-            const resultElement = document.createElement('div');
-            resultElement.className = 'result-item';
-            resultElement.innerHTML = `
-                <div class="result-rank">${index + 1}</div>
-                <div class="result-user">
-                    <div class="user-avatar">
-                        <img src="/static/img/robot_ico.png" alt="Avatar">
-                    </div>
-                    <span class="user-name">${result.username}</span>
-                </div>
-                <div class="result-score">${result.score} pts</div>
-            `;
-            leaderboard.appendChild(resultElement);
-        });
-        
-        groupScore.textContent = totalScore;
-    }
-
-    function restartQuiz() {
-        if (confirm('¿Estás seguro de que quieres reiniciar el cuestionario?')) {
-            window.location.reload();
-        }
-    }
-
-    function startPolling() {
-        // Polling para actualizar estado del cuestionario
-        setInterval(() => {
-            fetch(`/api/grupo/status/${sesionId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateQuizStatus(data.status);
-                }
-            });
-        }, 2000);
-    }
-
-    function updateQuizStatus(status) {
-        switch(status) {
-            case 'waiting':
-                // Todos esperando
-                break;
-            case 'starting':
-                startQuiz();
-                break;
-            case 'active':
-                // Cuestionario activo
-                break;
-            case 'finished':
-                endQuiz();
-                break;
-        }
-    }
-
-    console.log('✅ Cuestionario en grupo inicializado');
+console.log('✅ Cuestionario en grupo inicializado');
 </script>
+
 {% endblock %}
