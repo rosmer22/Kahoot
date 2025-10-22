@@ -149,6 +149,16 @@
     width: max-content;
   }
   .panel-grid { grid-template-columns: 1fr; }
+  /* --- Responsividad del Modal de Configuración --- */
+  .config-body {
+    grid-template-columns: 1fr; /* Apila el menú y el contenido */
+    min-height: 450px; /* Aumenta la altura mínima en móvil */
+  }
+  .cfg-nav {
+    flex-direction: row; /* Menú de navegación horizontal */
+    border-right: none;
+    border-bottom: 1px solid #bdbdbd;
+  }
 }
 /* ===== Modal Configuración ===== */
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:saturate(120%) blur(1px);z-index:80}

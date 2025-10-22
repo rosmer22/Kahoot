@@ -150,6 +150,50 @@
         pointer-events: none;
     }
 </style>
+<style>
+    /* --- Estilos de la sección de características --- */
+    .features-section {
+        padding: 4rem 2rem;
+        background-color: #f3f3f3; /* El color de fondo de la curva */
+    }
+
+    .feature-row {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        max-width: 1000px;
+        margin: 0 auto 4rem auto;
+    }
+
+    /* Alternar el orden de imagen y texto */
+    .feature-row:nth-child(even) {
+        flex-direction: row-reverse;
+    }
+
+    .feature-text {
+        flex: 1;
+    }
+
+    .feature-text h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .feature-image {
+        flex: 1;
+        max-width: 450px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Media Query para responsividad */
+    @media (max-width: 768px) {
+        .feature-row, .feature-row:nth-child(even) {
+            flex-direction: column; /* Apilar en vertical */
+        }
+    }
+</style>
 {% endblock %}
 {% block content %}
 <main class="hero-section">
