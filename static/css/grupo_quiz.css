@@ -281,6 +281,9 @@
     .group-info h1 {
         font-size: 1.5rem;
     }
+    .countdown {
+        font-size: 4rem; /* Reducir tamaño del contador en móviles */
+    }
 }
 
 /* Estilos para el modal de confirmación y resultados (pueden ir aquí o en su propio archivo) */

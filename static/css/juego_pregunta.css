@@ -149,3 +149,7 @@
         font-size: 1.25rem;
     }
 }
+
+@media (max-width: 480px) {
+    .game-container { padding: 1rem; }
+}

@@ -227,7 +227,7 @@
   background: #a8a8a8;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 900px) {
   .cards {
     grid-template-columns: repeat(2, 1fr);
   }

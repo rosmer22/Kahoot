@@ -316,3 +316,9 @@
     background: #f3f4f6;
 }
 
+/* --- Responsividad --- */
+@media (max-width: 768px) {
+    .header-inner {
+        flex-direction: column;
+    }
+}
