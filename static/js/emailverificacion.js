@@ -1,63 +1,44 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const resendBtn = document.getElementById('resend-code-btn');
-    const flashContainer = document.querySelector('.flash-messages-container');
     const codigoInput = document.getElementById('codigo');
     const submitBtn = document.querySelector('.submit-btn');
+    const resendBtn = document.getElementById('resend-code-btn');
+    const flashContainer = document.querySelector('.flash-messages-container');
 
-    // === VALIDACIÓN DINÁMICA DEL CÓDIGO ===
-    function validarCodigo() {
-        const value = codigoInput.value.trim();
-        const isValid = /^\d{6}$/.test(value);
+    // Función para validar solo números y habilitar botón
+    function validateCode() {
+        // Eliminar cualquier carácter no numérico
+        codigoInput.value = codigoInput.value.replace(/\D/g, '');
 
-        if (isValid) {
+        if (codigoInput.value.length === 6) {
             submitBtn.disabled = false;
-            submitBtn.style.backgroundColor = 'var(--color-secundario-amarillo)';
-            submitBtn.style.cursor = 'pointer';
+            submitBtn.classList.add('enabled');
         } else {
             submitBtn.disabled = true;
-            submitBtn.style.backgroundColor = 'var(--color-gris-boton)';
-            submitBtn.style.cursor = 'not-allowed';
+            submitBtn.classList.remove('enabled');
         }
     }
 
-    // Escuchar cambios en el campo
-    codigoInput.addEventListener('input', validarCodigo);
+    codigoInput.addEventListener('input', validateCode);
 
-    // Estado inicial
-    submitBtn.disabled = true;
-    submitBtn.style.backgroundColor = 'var(--color-gris-boton)';
-    submitBtn.style.cursor = 'not-allowed';
-
-    // === REENVÍO DE CÓDIGO (tu lógica existente) ===
+    // Reenviar código
     resendBtn.addEventListener('click', function() {
-        // Deshabilitar el botón y mostrar estado de carga
         resendBtn.disabled = true;
         const originalText = resendBtn.textContent;
         resendBtn.textContent = 'Enviando...';
 
-        fetch(resendVerificationCodeUrl, {
+        fetch("{{ url_for('resend_verification_code') }}", {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Content-Type': 'application/json' }
         })
         .then(response => response.json())
         .then(data => {
-            // Limpiar mensajes anteriores
             flashContainer.innerHTML = '';
-
-            // Crear y mostrar el nuevo mensaje flash
             const flashDiv = document.createElement('div');
             flashDiv.textContent = data.message;
             flashDiv.classList.add('flash-message');
-            if (data.success) {
-                flashDiv.classList.add('flash-info'); // O 'flash-success'
-            } else {
-                flashDiv.classList.add('flash-error');
-            }
+            flashDiv.classList.add(data.success ? 'flash-info' : 'flash-error');
             flashContainer.appendChild(flashDiv);
 
-            // Iniciar un temporizador para reactivar el botón
             let countdown = 30;
             resendBtn.textContent = `Reenviar en ${countdown}s`;
             const interval = setInterval(() => {
@@ -72,4 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 1000);
         });
     });
+
+    // Estado inicial del botón
+    submitBtn.disabled = true;
 });

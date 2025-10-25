@@ -1,166 +1,20 @@
 {% extends "base.html" %}
 {% block page_css %}
-    <meta name="description" content="Verifica tu correo electrónico ingresando el código de 6 dígitos que te enviamos" />
-    <meta name="author" content="Verificación Segura" />
+<meta name="description" content="Verifica tu correo electrónico ingresando el código de 6 dígitos que te enviamos" />
+<meta name="author" content="Verificación Segura" />
 
-    <meta property="og:title" content="Verificación de Correo - Código de Seguridad" />
-    <meta property="og:description" content="Verifica tu correo electrónico de forma rápida y segura" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+<meta property="og:title" content="Verificación de Correo - Código de Seguridad" />
+<meta property="og:description" content="Verifica tu correo electrónico de forma rápida y segura" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-    <style>
-        :root {
-            /* Variables de color consistentes con login.css */
-            --color-secundario-amarillo: #fdd867;
-            --color-fondo-claro: #f0f0f0;
-            --color-texto: #333333;
-            --color-gris-claro-tarjeta: #e9e9e9;
-            --color-gris-boton: #b0b0b0;
-            --color-borde-input: #b8b8b8;
-        }
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content="@lovable_dev" />
+<meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-        .verification-section {
-            background-color: var(--color-secundario-amarillo); /* Fondo amarillo como en login */
-            flex-grow: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 4rem 2rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .auth-card {
-            background-color: var(--color-gris-claro-tarjeta);
-            padding: 2.5rem 3rem;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 480px;
-            z-index: 1;
-            border: 1px solid #ddd;
-            text-align: center;
-        }
-
-        .auth-card h2 {
-            text-align: center;
-            font-size: 2.2rem;
-            font-weight: 600;
-            margin-top: 0;
-            margin-bottom: 0.5rem;
-            color: var(--color-texto);
-        }
-
-        .auth-card .subtitle {
-            color: #666;
-            margin-bottom: 2.5rem;
-            font-size: 1.1rem;
-        }
-
-        .auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .auth-form .field {
-            text-align: left;
-        }
-
-        .auth-form .label {
-            display: block;
-            margin-bottom: 0.75rem;
-            font-weight: 500;
-            color: #555;
-            font-size: 1.1rem;
-        }
-
-        .auth-form .input {
-            width: 100%;
-            padding: 1rem;
-            border: 1px solid var(--color-borde-input);
-            background-color: #fff;
-            border-radius: 12px;
-            font-size: 1rem;
-            box-sizing: border-box;
-            text-align: center; /* Centrar el texto del código */
-            letter-spacing: 0.5rem; /* Espaciar los dígitos */
-        }
-
-        .auth-form .submit-btn {
-            width: 100%;
-            padding: 1rem;
-            border: none;
-            border-radius: 12px;
-            background-color: var(--color-gris-boton);
-            color: #444;
-            font-size: 1.2rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            margin-top: 1rem;
-        }
-
-        .auth-form .submit-btn:hover {
-            background-color: #a0a0a0;
-        }
-
-        /* Contenedor para los mensajes flash */
-        .flash-messages-container {
-            margin-top: 2rem;
-            text-align: center;
-        }
-
-        .flash-message {
-            padding: 0.8rem 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-            border: 1px solid transparent;
-        }
-
-        .flash-success {
-            background-color: #d4edda;
-            color: #155724;
-            border-color: #c3e6cb;
-        }
-
-        .flash-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border-color: #f5c6cb;
-        }
-
-        .flash-info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border-color: #bee5eb;
-        }
-
-        /* Curva decorativa */
-        .verification-section .curve { 
-            position: absolute; 
-            bottom: -1px; 
-            left: 0; 
-            width: 100%; 
-            overflow: hidden; 
-            line-height: 0; 
-            z-index: 0; 
-        }
-        .verification-section .curve svg { 
-            position: relative; 
-            display: block; 
-            width: calc(100% + 1.3px); 
-            height: 180px; 
-        }
-        .verification-section .curve .shape-fill { 
-            fill: var(--color-fondo-claro); /* Relleno que coincide con el fondo de la sección de abajo */
-        }
-    </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/emailverificacion.css') }}">
 {% endblock %}
+
 {% block content %}
 <main class="verification-section">
     <div class="auth-card">
@@ -172,24 +26,13 @@
                 <label class="label" for="codigo">Código de 6 dígitos</label>
                 <input class="input" type="text" id="codigo" name="codigo" placeholder="123456" required maxlength="6" pattern="\d{6}" title="El código debe tener 6 dígitos.">
             </div>
-            <button class="submit-btn" type="submit">Verificar</button>
+            <button class="submit-btn" type="submit" disabled>Verificar</button>
         </form>
 
         <div class="resend-container">
             <p>¿No recibiste el código?</p>
             <button id="resend-code-btn" class="resend-btn">Reenviar código</button>
         </div>
-
-        <style>
-            .resend-container {
-                margin-top: 2rem;
-                font-size: 0.95rem;
-            }
-            .resend-btn {
-                background: none; border: none; color: #007bff; text-decoration: underline; cursor: pointer; font-size: inherit; padding: 0;
-            }
-            .resend-btn:disabled { color: #6c757d; cursor: not-allowed; text-decoration: none; }
-        </style>
 
         <!-- Contenedor para los mensajes flash -->
         <div class="flash-messages-container">
@@ -212,55 +55,8 @@
         </svg>
     </div>
 </main>
+{% endblock %}
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const resendBtn = document.getElementById('resend-code-btn');
-    const flashContainer = document.querySelector('.flash-messages-container');
-
-    resendBtn.addEventListener('click', function() {
-        // Deshabilitar el botón y mostrar estado de carga
-        resendBtn.disabled = true;
-        const originalText = resendBtn.textContent;
-        resendBtn.textContent = 'Enviando...';
-
-        fetch("{{ url_for('resend_verification_code') }}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Limpiar mensajes anteriores
-            flashContainer.innerHTML = '';
-
-            // Crear y mostrar el nuevo mensaje flash
-            const flashDiv = document.createElement('div');
-            flashDiv.textContent = data.message;
-            flashDiv.classList.add('flash-message');
-            if (data.success) {
-                flashDiv.classList.add('flash-info'); // O 'flash-success'
-            } else {
-                flashDiv.classList.add('flash-error');
-            }
-            flashContainer.appendChild(flashDiv);
-
-            // Iniciar un temporizador para reactivar el botón
-            let countdown = 30;
-            resendBtn.textContent = `Reenviar en ${countdown}s`;
-            const interval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    resendBtn.textContent = `Reenviar en ${countdown}s`;
-                } else {
-                    clearInterval(interval);
-                    resendBtn.disabled = false;
-                    resendBtn.textContent = originalText;
-                }
-            }, 1000);
-        });
-    });
-});
-</script>
+{% block page_js %}
+<script src="{{ url_for('static', filename='js/emailverificacion.js') }}"></script>
 {% endblock %}
