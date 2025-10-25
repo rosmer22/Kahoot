@@ -1,20 +1,15 @@
-
 {% extends "base.html" %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}">
 <style>
-    /* Estilos para el botón de mostrar/ocultar contraseña */
     .password-wrapper {
         position: relative;
         width: 100%;
     }
-
     .password-wrapper .input {
         width: 100%;
         padding-right: 3rem;
-        /* Espacio para el botón */
     }
-
     .toggle-password {
         position: absolute;
         right: 0.75rem;
@@ -29,26 +24,36 @@
         align-items: center;
         justify-content: center;
     }
-
-    /* Estilos para el campo de términos y condiciones */
     .terms-field {
         display: flex;
-        align-items: flex-start; /* Alinear con el texto si es largo */
+        align-items: flex-start;
         gap: 0.75rem;
         font-size: 0.875rem;
         color: #555;
         margin-top: 1.25rem;
         line-height: 1.4;
     }
-
     .terms-field a {
-        color: var(--accent, #007bff); /* Usar variable de color si existe */
+        color: var(--accent, #007bff);
         text-decoration: none;
     }
-
     .terms-field a:hover { text-decoration: underline; }
+    /* Feedback contraseña */
+    #passwordFeedback {
+        color: black;
+        font-size: 0.9rem;
+        margin-top: 0.3rem;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+    }
+    #passwordFeedback ul {
+        margin: 0.3rem 0 0 1.2rem;
+        padding: 0;
+    }
 </style>
 {% endblock %}
+
 {% block content %}
 <main class="register-section">
     <div class="auth-card">
@@ -76,12 +81,13 @@
                         </svg>
                     </span>
                 </div>
+                <div id="passwordFeedback"></div>
             </div>
             <div class="terms-field">
                 <input type="checkbox" id="terms" name="terms" required>
                 <label for="terms">Al continuar aceptas las <a href="#">condiciones de uso</a> y la <a href="#">política de privacidad</a>.</label>
             </div>
-            <button class="submit-btn" type="submit">Registrarme</button>
+            <button class="submit-btn" type="submit" disabled>Registrarme</button>
         </form>
     </div>
     <div class="curve" aria-hidden="true">
@@ -91,22 +97,7 @@
     </div>
 </main>
 {% endblock %}
-{% block page_js %}
-<script>
-    function togglePassword(inputId) {
-        const input = document.getElementById(inputId);
-        const button = input.parentElement.querySelector('.toggle-password');
-        const svg = button.querySelector('svg');
 
-        if (input.type === 'password') {
-            input.type = 'text';
-            // Cambiar a icono de ojo abierto
-            svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
-        } else {
-            input.type = 'password';
-            // Cambiar a icono de ojo cerrado (original)
-            svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
-        }
-    }
-</script>
+{% block page_js %}
+<script src="{{ url_for('static', filename='js/register.js') }}"></script>
 {% endblock %}
