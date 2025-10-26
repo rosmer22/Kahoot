@@ -90,7 +90,6 @@
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
 
-    /* Validación visual para contraseñas */
     .password-wrapper .input:valid {
         border-color: #28a745;
     }
@@ -99,18 +98,13 @@
         border-color: #dc3545;
     }
 
-    /* Animación sutil para los inputs */
     .password-wrapper .input {
         animation: subtle-pulse 3s infinite;
     }
 
     @keyframes subtle-pulse {
-        0%, 100% {
-            box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-        }
-        50% {
-            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
-        }
+        0%, 100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+        50% { box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); }
     }
 
     .toggle-password {
@@ -139,19 +133,19 @@
         font-size: 0.9rem;
     }
 
-    /* Estilos mejorados para el botón Confirmar */
+    /* 🔸 Botón Confirmar con color #ff9f2a */
     .submit-btn {
         width: 100%;
         padding: 1.2rem 2rem;
         border: none;
         border-radius: 12px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #ffb347 0%, #ff9f2a 100%);
         color: white;
         font-size: 1.2rem;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 4px 15px rgba(255,159,42,0.4);
         position: relative;
         overflow: hidden;
         text-transform: uppercase;
@@ -161,13 +155,13 @@
 
     .submit-btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-        background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        box-shadow: 0 6px 20px rgba(255,159,42,0.6);
+        background: linear-gradient(135deg, #ffab2a 0%, #e18b00 100%);
     }
 
     .submit-btn:active {
         transform: translateY(0);
-        box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 2px 10px rgba(255,159,42,0.3);
     }
 
     .submit-btn::before {
@@ -177,7 +171,7 @@
         left: -100%;
         width: 100%;
         height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
         transition: left 0.5s;
     }
 
@@ -201,7 +195,6 @@
         text-decoration: underline;
     }
 
-    /* Estilos para mensajes de error */
     .error-message {
         background-color: #f8d7da;
         color: #721c24;
@@ -219,7 +212,6 @@
         font-size: 1.2rem;
     }
 
-    /* Curva decorativa */
     .change-password-section .curve {
         position: absolute;
         bottom: -1px;
@@ -252,7 +244,6 @@
         <h2>Cambiar Contraseña</h2>
         <p class="subtitle">Ingresa tu nueva contraseña para continuar</p>
         
-        <!-- Mensajes de error -->
         {% if mensaje %}
         <div class="error-message">
             <span class="error-icon">⚠️</span>
@@ -268,9 +259,7 @@
                     <span class="toggle-password" onclick="togglePassword('new-password')">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24">
-                            </path>
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
                             <line x1="1" y1="1" x2="23" y2="23"></line>
                         </svg>
                     </span>
@@ -285,9 +274,7 @@
                     <span class="toggle-password" onclick="togglePassword('confirm-password')">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24">
-                            </path>
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
                             <line x1="1" y1="1" x2="23" y2="23"></line>
                         </svg>
                     </span>
@@ -309,7 +296,6 @@
 {% endblock %}
 {% block page_js %}
 <script>
-    // Función para mostrar/ocultar contraseña
     function togglePassword(inputId) {
         const input = document.getElementById(inputId);
         const button = input.parentElement.querySelector('.toggle-password');
@@ -317,70 +303,54 @@
 
         if (input.type === 'password') {
             input.type = 'text';
-            // Cambiar a icono de ojo abierto
             svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
         } else {
             input.type = 'password';
-            // Cambiar a icono de ojo cerrado (original)
             svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
         }
     }
 
-    // Validación en tiempo real
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('changePasswordForm');
         const newPassword = document.getElementById('new-password');
         const confirmPassword = document.getElementById('confirm-password');
         const submitBtn = document.querySelector('.submit-btn');
 
-        // Función para validar contraseñas
         function validatePasswords() {
             const newPass = newPassword.value;
             const confirmPass = confirmPassword.value;
-            
-            // Verificar longitud mínima
             if (newPass.length < 8) {
                 newPassword.style.borderColor = '#dc3545';
                 return false;
             } else {
                 newPassword.style.borderColor = '#28a745';
             }
-
-            // Verificar que las contraseñas coincidan
             if (confirmPass && newPass !== confirmPass) {
                 confirmPassword.style.borderColor = '#dc3545';
                 return false;
             } else if (confirmPass) {
                 confirmPassword.style.borderColor = '#28a745';
             }
-
             return newPass.length >= 8 && newPass === confirmPass;
         }
 
-        // Event listeners para validación en tiempo real
         newPassword.addEventListener('input', validatePasswords);
         confirmPassword.addEventListener('input', validatePasswords);
 
-        // Validación al enviar el formulario
         form.addEventListener('submit', function(e) {
             if (!validatePasswords()) {
                 e.preventDefault();
                 alert('Por favor, verifica que las contraseñas coincidan y tengan al menos 8 caracteres.');
                 return false;
             }
-
-            // Mostrar estado de carga
             submitBtn.innerHTML = '⏳ Procesando...';
             submitBtn.disabled = true;
         });
 
-        // Efecto de carga en el botón
         submitBtn.addEventListener('click', function() {
             if (validatePasswords()) {
                 this.style.transform = 'scale(0.98)';
-                setTimeout(() => {
-                    this.style.transform = 'scale(1)';
-                }, 150);
+                setTimeout(() => { this.style.transform = 'scale(1)'; }, 150);
             }
         });
     });

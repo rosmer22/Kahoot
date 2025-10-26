@@ -11,9 +11,9 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
     <style>
         :root {
-            /* Variables de color consistentes con login.css */
             --color-secundario-amarillo: #fdd867;
             --color-fondo-claro: #f0f0f0;
             --color-texto: #333333;
@@ -23,7 +23,7 @@
         }
 
         .verification-section {
-            background-color: var(--color-secundario-amarillo); /* Fondo amarillo como en login */
+            background-color: var(--color-secundario-amarillo);
             flex-grow: 1;
             display: flex;
             justify-content: center;
@@ -46,7 +46,6 @@
         }
 
         .auth-card h2 {
-            text-align: center;
             font-size: 2.2rem;
             font-weight: 600;
             margin-top: 0;
@@ -87,53 +86,43 @@
             font-size: 1.2rem;
             font-weight: 600;
             box-sizing: border-box;
-            text-align: center; /* Centrar el texto del código */
-            letter-spacing: 0.5rem; /* Espaciar los dígitos */
+            text-align: center;
+            letter-spacing: 0.5rem;
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .auth-form .input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        /* Animación para el input del código */
-        .auth-form .input {
             animation: pulse 2s infinite;
         }
 
         @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
-            }
-            70% {
-                box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-            }
+            0% { box-shadow: 0 0 0 0 rgba(255,159,42,0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255,159,42,0); }
+            100% { box-shadow: 0 0 0 0 rgba(255,159,42,0); }
         }
 
-        /* Estilos para el placeholder */
+        .auth-form .input:focus {
+            outline: none;
+            border-color: #ff9f2a;
+            box-shadow: 0 0 0 3px rgba(255,159,42,0.15);
+        }
+
         .auth-form .input::placeholder {
             color: #bbb;
             font-weight: 400;
         }
 
-        /* Estilos mejorados para el botón Verificar */
+        /* 🔸 Botón principal Verificar (naranja) */
         .auth-form .submit-btn {
             width: 100%;
             padding: 1.2rem 2rem;
             border: none;
             border-radius: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #ffb347 0%, #ff9f2a 100%);
             color: white;
             font-size: 1.2rem;
             font-weight: 600;
-            cursor: pointer;
+            cursor: not-allowed;
+            opacity: 0.6;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(255,159,42,0.4);
             position: relative;
             overflow: hidden;
             text-transform: uppercase;
@@ -141,15 +130,20 @@
             margin-top: 1rem;
         }
 
-        .auth-form .submit-btn:hover {
+        .auth-form .submit-btn.active {
+            cursor: pointer;
+            opacity: 1;
+        }
+
+        .auth-form .submit-btn.active:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            box-shadow: 0 6px 20px rgba(255,159,42,0.6);
+            background: linear-gradient(135deg, #ffab2a 0%, #e18b00 100%);
         }
 
         .auth-form .submit-btn:active {
             transform: translateY(0);
-            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 2px 10px rgba(255,159,42,0.3);
         }
 
         .auth-form .submit-btn::before {
@@ -159,7 +153,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
             transition: left 0.5s;
         }
 
@@ -167,7 +161,7 @@
             left: 100%;
         }
 
-        /* Contenedor para los mensajes flash */
+        /* Flash messages */
         .flash-messages-container {
             margin-top: 2rem;
             text-align: center;
@@ -199,7 +193,7 @@
             border-color: #bee5eb;
         }
 
-        /* Curva decorativa */
+        /* Curva decorativa inferior */
         .verification-section .curve {
             position: absolute;
             bottom: -1px;
@@ -209,17 +203,19 @@
             line-height: 0;
             z-index: 0;
         }
+
         .verification-section .curve svg {
-            position: relative;
-            display: block;
             width: calc(100% + 1.3px);
             height: 180px;
+            display: block;
         }
+
         .verification-section .curve .shape-fill {
-            fill: var(--color-fondo-claro); /* Relleno que coincide con el fondo de la sección de abajo */
+            fill: var(--color-fondo-claro);
         }
     </style>
 {% endblock %}
+
 {% block content %}
 <main class="verification-section">
     <div class="auth-card">
@@ -231,7 +227,7 @@
                 <label for="codigo" class="label">Código de verificación:</label>
                 <input type="text" id="codigo" name="codigo" class="input" required maxlength="6" pattern="\d{6}" title="Debe tener 6 dígitos" placeholder="000000">
             </div>
-            <button type="submit" class="submit-btn">✅ Verificar</button>
+            <button type="submit" id="verificar-btn" class="submit-btn" disabled>✅ Verificar</button>
         </form>
 
         <div class="flash-messages-container">
@@ -254,51 +250,30 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const resendBtn = document.getElementById('resend-code-btn');
-    const flashContainer = document.querySelector('.flash-messages-container');
+    // 🔒 Permitir solo números y activar botón solo con 6 dígitos
+    const inputCodigo = document.getElementById('codigo');
+    const btnVerificar = document.getElementById('verificar-btn');
 
-    resendBtn.addEventListener('click', function() {
-        // Deshabilitar el botón y mostrar estado de carga
-        resendBtn.disabled = true;
-        const originalText = resendBtn.textContent;
-        resendBtn.textContent = 'Enviando...';
+    inputCodigo.addEventListener('input', () => {
+        inputCodigo.value = inputCodigo.value.replace(/[^0-9]/g, ''); // solo números
 
-        fetch("{{ url_for('resend_verification_code') }}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Limpiar mensajes anteriores
-            flashContainer.innerHTML = '';
+        if (inputCodigo.value.length === 6) {
+            btnVerificar.disabled = false;
+            btnVerificar.classList.add('active');
+        } else {
+            btnVerificar.disabled = true;
+            btnVerificar.classList.remove('active');
+        }
+    });
 
-            // Crear y mostrar el nuevo mensaje flash
-            const flashDiv = document.createElement('div');
-            flashDiv.textContent = data.message;
-            flashDiv.classList.add('flash-message');
-            if (data.success) {
-                flashDiv.classList.add('flash-info'); // O 'flash-success'
-            } else {
-                flashDiv.classList.add('flash-error');
-            }
-            flashContainer.appendChild(flashDiv);
-
-            // Iniciar un temporizador para reactivar el botón
-            let countdown = 30;
-            resendBtn.textContent = `Reenviar en ${countdown}s`;
-            const interval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    resendBtn.textContent = `Reenviar en ${countdown}s`;
-                } else {
-                    clearInterval(interval);
-                    resendBtn.disabled = false;
-                    resendBtn.textContent = originalText;
-                }
-            }, 1000);
-        });
+    // Bloquear letras o espacios al pegar
+    inputCodigo.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        const onlyNumbers = text.replace(/[^0-9]/g, '');
+        inputCodigo.value = onlyNumbers.slice(0, 6);
+        btnVerificar.disabled = inputCodigo.value.length !== 6;
+        btnVerificar.classList.toggle('active', inputCodigo.value.length === 6);
     });
 });
 </script>
