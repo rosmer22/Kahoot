@@ -3,11 +3,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 <style>
     :root {
-        --color-secundario-amarillo: #fdd867;
+        --color-secundario-amarillo: #ffd36a;
         --color-fondo-claro: #f0f0f0;
         --color-texto: #333333;
         --color-gris-claro-tarjeta: #e9e9e9;
-        --color-gris-boton: #b0b0b0;
         --color-borde-input: #b8b8b8;
     }
 
@@ -55,10 +54,6 @@
         gap: 1.5rem;
     }
 
-    .auth-form .field {
-        margin-bottom: 1.5rem;
-    }
-
     .auth-form .label {
         display: block;
         margin-bottom: 0.75rem;
@@ -80,31 +75,13 @@
         background-color: #fff;
         border-radius: 12px;
         font-size: 1rem;
-        box-sizing: border-box;
         transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }
 
     .password-wrapper .input:focus {
         outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-
-    .password-wrapper .input:valid {
-        border-color: #28a745;
-    }
-
-    .password-wrapper .input:invalid:not(:placeholder-shown) {
-        border-color: #dc3545;
-    }
-
-    .password-wrapper .input {
-        animation: subtle-pulse 3s infinite;
-    }
-
-    @keyframes subtle-pulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
-        50% { box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); }
+        border-color: #ffd36a;
+        box-shadow: 0 0 0 3px rgba(255,211,106,0.2);
     }
 
     .toggle-password {
@@ -122,61 +99,47 @@
         justify-content: center;
     }
 
-    .toggle-password:hover {
-        color: #333;
-    }
+    .toggle-password:hover { color: #333; }
 
-    .hint {
-        display: block;
-        margin-top: 0.5rem;
-        color: #666;
+    /* Feedback de contraseña (solo texto negro) */
+    .password-feedback {
+        color: #000;
         font-size: 0.9rem;
+        margin-top: 0.3rem;
+        transition: all 0.3s ease;
+    }
+    .password-feedback ul {
+        margin: 0.3rem 0 0 1.2rem;
+        padding: 0;
+        list-style-type: disc;
     }
 
-    /* 🔸 Botón Confirmar con color #ff9f2a */
+    /* Botón cambiar contraseña */
     .submit-btn {
         width: 100%;
         padding: 1.2rem 2rem;
         border: none;
         border-radius: 12px;
-        background: linear-gradient(135deg, #ffb347 0%, #ff9f2a 100%);
-        color: white;
+        background: linear-gradient(135deg, #ffeb9a 0%, #ffd36a 100%);
+        color: #333;
         font-size: 1.2rem;
         font-weight: 600;
-        cursor: pointer;
+        cursor: not-allowed;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(255,159,42,0.4);
-        position: relative;
-        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(255,211,106,0.4);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-top: 1rem;
     }
 
-    .submit-btn:hover {
+    .submit-btn.enabled {
+        cursor: pointer;
+    }
+
+    .submit-btn.enabled:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255,159,42,0.6);
-        background: linear-gradient(135deg, #ffab2a 0%, #e18b00 100%);
-    }
-
-    .submit-btn:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 10px rgba(255,159,42,0.3);
-    }
-
-    .submit-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
-        transition: left 0.5s;
-    }
-
-    .submit-btn:hover::before {
-        left: 100%;
+        box-shadow: 0 6px 20px rgba(255,211,106,0.6);
+        background: linear-gradient(135deg, #ffe27c 0%, #e2b957 100%);
     }
 
     .helper-text {
@@ -191,26 +154,7 @@
         font-weight: 500;
     }
 
-    .helper-text a:hover {
-        text-decoration: underline;
-    }
-
-    .error-message {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: 500;
-    }
-
-    .error-icon {
-        font-size: 1.2rem;
-    }
+    .helper-text a:hover { text-decoration: underline; }
 
     .change-password-section .curve {
         position: absolute;
@@ -219,14 +163,6 @@
         width: 100%;
         overflow: hidden;
         line-height: 0;
-        z-index: 0;
-    }
-
-    .change-password-section .curve svg {
-        position: relative;
-        display: block;
-        width: calc(100% + 1.3px);
-        height: 180px;
     }
 
     .change-password-section .curve .shape-fill {
@@ -234,16 +170,13 @@
     }
 </style>
 {% endblock %}
-{% block header %}
-  {% include "_header_guest.html" %}
-{% endblock %}
 
 {% block content %}
 <main class="change-password-section">
     <div class="auth-card">
         <h2>Cambiar Contraseña</h2>
         <p class="subtitle">Ingresa tu nueva contraseña para continuar</p>
-        
+
         {% if mensaje %}
         <div class="error-message">
             <span class="error-icon">⚠️</span>
@@ -264,7 +197,7 @@
                         </svg>
                     </span>
                 </div>
-                <small class="hint">Mínimo 8 caracteres</small>
+                <div id="newFeedback" class="password-feedback"></div>
             </div>
 
             <div class="field">
@@ -279,80 +212,85 @@
                         </svg>
                     </span>
                 </div>
+                <div id="confirmFeedback" class="password-feedback"></div>
             </div>
 
-            <button class="submit-btn" type="submit">🔒 Confirmar Cambio</button>
+            <button class="submit-btn" type="submit" disabled>🔒 Cambiar Contraseña</button>
         </form>
 
         <p class="helper-text">¿Recordaste tu contraseña? <a href="{{ url_for('login') }}">Iniciar sesión</a></p>
     </div>
-    
+
     <div class="curve" aria-hidden="true">
         <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
             <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
         </svg>
     </div>
 </main>
-{% endblock %}
-{% block page_js %}
-<script>
-    function togglePassword(inputId) {
-        const input = document.getElementById(inputId);
-        const button = input.parentElement.querySelector('.toggle-password');
-        const svg = button.querySelector('svg');
 
-        if (input.type === 'password') {
-            input.type = 'text';
-            svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const newPass = document.getElementById('new-password');
+    const confirmPass = document.getElementById('confirm-password');
+    const newFeedback = document.getElementById('newFeedback');
+    const confirmFeedback = document.getElementById('confirmFeedback');
+    const submitBtn = document.querySelector('.submit-btn');
+
+    const rules = [
+        { text: 'Mínimo 8 caracteres', test: p => /^.{8,}$/.test(p) },
+        { text: 'Al menos 1 mayúscula (A–Z)', test: p => /[A-Z]/.test(p) },
+        { text: 'Al menos 1 minúscula (a–z)', test: p => /[a-z]/.test(p) },
+        { text: 'Al menos 1 carácter especial (!@#$%^&*)', test: p => /[^A-Za-z0-9]/.test(p) },
+    ];
+
+    function renderFeedback(pwdVal, feedbackBox) {
+        const missing = rules.filter(r => !r.test(pwdVal));
+        if (missing.length === 0) {
+            feedbackBox.innerHTML = '';
+            return true;
+        }
+        let html = '<ul>';
+        missing.forEach(r => html += `<li>${r.text}</li>`);
+        html += '</ul>';
+        feedbackBox.innerHTML = html;
+        return false;
+    }
+
+    function validateBoth() {
+        const newOK = renderFeedback(newPass.value, newFeedback);
+        const passwordsMatch = newPass.value && confirmPass.value && newPass.value === confirmPass.value;
+
+        if (!passwordsMatch && confirmPass.value !== '') {
+            confirmFeedback.innerHTML = '<ul><li>Las contraseñas no coinciden</li></ul>';
         } else {
-            input.type = 'password';
-            svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+            confirmFeedback.innerHTML = '';
+        }
+
+        // Habilitar si ambas condiciones se cumplen
+        if (newOK && passwordsMatch) {
+            submitBtn.disabled = false;
+            submitBtn.classList.add('enabled');
+        } else {
+            submitBtn.disabled = true;
+            submitBtn.classList.remove('enabled');
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('changePasswordForm');
-        const newPassword = document.getElementById('new-password');
-        const confirmPassword = document.getElementById('confirm-password');
-        const submitBtn = document.querySelector('.submit-btn');
+    newPass.addEventListener('input', validateBoth);
+    confirmPass.addEventListener('input', validateBoth);
+    submitBtn.disabled = true;
+});
 
-        function validatePasswords() {
-            const newPass = newPassword.value;
-            const confirmPass = confirmPassword.value;
-            if (newPass.length < 8) {
-                newPassword.style.borderColor = '#dc3545';
-                return false;
-            } else {
-                newPassword.style.borderColor = '#28a745';
-            }
-            if (confirmPass && newPass !== confirmPass) {
-                confirmPassword.style.borderColor = '#dc3545';
-                return false;
-            } else if (confirmPass) {
-                confirmPassword.style.borderColor = '#28a745';
-            }
-            return newPass.length >= 8 && newPass === confirmPass;
-        }
-
-        newPassword.addEventListener('input', validatePasswords);
-        confirmPassword.addEventListener('input', validatePasswords);
-
-        form.addEventListener('submit', function(e) {
-            if (!validatePasswords()) {
-                e.preventDefault();
-                alert('Por favor, verifica que las contraseñas coincidan y tengan al menos 8 caracteres.');
-                return false;
-            }
-            submitBtn.innerHTML = '⏳ Procesando...';
-            submitBtn.disabled = true;
-        });
-
-        submitBtn.addEventListener('click', function() {
-            if (validatePasswords()) {
-                this.style.transform = 'scale(0.98)';
-                setTimeout(() => { this.style.transform = 'scale(1)'; }, 150);
-            }
-        });
-    });
+function togglePassword(id) {
+    const input = document.getElementById(id);
+    const svg = input.parentElement.querySelector('svg');
+    if (input.type === 'password') {
+        input.type = 'text';
+        svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+    } else {
+        input.type = 'password';
+        svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+    }
+}
 </script>
 {% endblock %}
