@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jugando - RoBot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/juego_grupo.css') }}">
+    <style>
+        /* Estilos adicionales para flash messages sin base.css */
+        .flash-messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .flash-message {
+            padding: 1rem 1.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: slideInRight 0.3s ease;
+        }
+        .flash-success { background: #22c55e; color: white; }
+        .flash-error { background: #ef4444; color: white; }
+        .flash-warning { background: #f59e0b; color: white; }
+        .flash-info { background: #3b82f6; color: white; }
+        .flash-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-left: 1rem;
+            opacity: 0.8;
+        }
+        .flash-close:hover { opacity: 1; }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="flash-message flash-{{ category }}">
+                {{ message }}
+                <button class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+<main class="juego-grupo-container">
+    <!-- Header con info del grupo -->
+    <div class="game-header">
+        <div class="group-info">
+            <h2>{{ grupo.nombre }}</h2>
+            <p>{{ cuestionario.titulo }}</p>
+        </div>
+        <div class="progress-container">
+            <div class="progress-text" id="progressText">Pregunta 1 de {{ total_preguntas }}</div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor de pregunta -->
+    <div class="question-section" id="questionSection">
+        <div class="timer-container">
+            <div class="timer-circle">
+                <svg class="timer-svg" viewBox="0 0 100 100">
+                    <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                    <circle class="timer-progress" id="timerProgress" cx="50" cy="50" r="45"></circle>
+                </svg>
+                <div class="timer-text" id="timerText">30</div>
+            </div>
+        </div>
+
+        <div class="question-card">
+            <h1 class="question-text" id="questionText">Cargando pregunta...</h1>
+            
+            <div class="answers-grid" id="answersGrid">
+                <!-- Las opciones se generarán dinámicamente -->
+            </div>
+
+            <div class="waiting-message" id="waitingMessage" style="display: none;">
+                <div class="spinner"></div>
+                <p>Esperando a que todos respondan...</p>
+                <p class="waiting-count" id="waitingCount">0/0 han respondido</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pantalla de transición entre preguntas -->
+    <div class="transition-screen" id="transitionScreen" style="display: none;">
+        <div class="transition-content">
+            <div class="transition-icon" id="transitionIcon">✓</div>
+            <h2 id="transitionTitle">¡Correcta!</h2>
+            <p id="transitionPoints">+850 puntos</p>
+            <p class="transition-subtitle">Siguiente pregunta...</p>
+        </div>
+    </div>
+
+    <!-- Pantalla de carga final -->
+    <div class="loading-screen" id="loadingScreen" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner-large"></div>
+            <h2>Calculando resultados...</h2>
+            <p>Espera un momento</p>
+        </div>
+    </div>
+</main>
+
+<script>
+// ==========================================
+// Variables Globales
+// ==========================================
+const sesionId = {{ sesion_id }};
+const userId = {{ g.user.id if g.user else 0 }};
+const questions = JSON.parse({{ preguntas_json | tojson }});
+const totalQuestions = {{ total_preguntas }};
+
+let currentQuestionIndex = 0;
+let currentQuestion = null;
+let timeLeft = 30;
+let timerInterval = null;
+let hasAnswered = false;
+let selectedAnswer = null;
+let questionStartTime = null;
+let checkAnswersInterval = null;
+
+// Elementos DOM
+const questionText = document.getElementById('questionText');
+const answersGrid = document.getElementById('answersGrid');
+const timerText = document.getElementById('timerText');
+const timerProgress = document.getElementById('timerProgress');
+const progressText = document.getElementById('progressText');
+const progressBar = document.getElementById('progressBar');
+const waitingMessage = document.getElementById('waitingMessage');
+const waitingCount = document.getElementById('waitingCount');
+const questionSection = document.getElementById('questionSection');
+const transitionScreen = document.getElementById('transitionScreen');
+const loadingScreen = document.getElementById('loadingScreen');
+
+// ==========================================
+// Inicialización
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎮 Iniciando juego en grupo...');
+    console.log(`Total de preguntas: ${totalQuestions}`);
+    
+    // Mostrar primera pregunta
+    showQuestion(0);
+});
+
+// ==========================================
+// Función Principal: Mostrar Pregunta
+// ==========================================
+function showQuestion(index) {
+    if (index >= questions.length) {
+        // Juego terminado
+        finishGame();
+        return;
+    }
+
+    currentQuestionIndex = index;
+    currentQuestion = questions[index];
+    hasAnswered = false;
+    selectedAnswer = null;
+    questionStartTime = Date.now();
+
+    // Resetear UI
+    questionSection.style.display = 'block';
+    transitionScreen.style.display = 'none';
+    waitingMessage.style.display = 'none';
+
+    // Actualizar progreso
+    const progress = ((index + 1) / totalQuestions) * 100;
+    progressBar.style.width = progress + '%';
+    progressText.textContent = `Pregunta ${index + 1} de ${totalQuestions}`;
+
+    // Mostrar pregunta
+    questionText.textContent = currentQuestion.text;
+
+    // Generar opciones
+    answersGrid.innerHTML = '';
+    currentQuestion.options.forEach((option, idx) => {
+        const answerBtn = document.createElement('button');
+        answerBtn.className = 'answer-btn';
+        answerBtn.dataset.optionId = option.id;
+        answerBtn.textContent = option.text;
+        answerBtn.onclick = () => selectAnswer(option.id, answerBtn);
+        answersGrid.appendChild(answerBtn);
+    });
+
+    // Iniciar temporizador
+    timeLeft = currentQuestion.time_limit || 30;
+    startTimer();
+
+    console.log(`📝 Mostrando pregunta ${index + 1}: ${currentQuestion.text}`);
+}
+
+// ==========================================
+// Temporizador
+// ==========================================
+function startTimer() {
+    const totalTime = currentQuestion.time_limit || 30;
+    const circumference = 2 * Math.PI * 45; // radio = 45
+    
+    timerText.textContent = timeLeft;
+    timerProgress.style.strokeDasharray = circumference;
+    timerProgress.style.strokeDashoffset = 0;
+
+    if (timerInterval) clearInterval(timerInterval);
+
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        timerText.textContent = timeLeft;
+
+        // Actualizar círculo de progreso
+        const progress = timeLeft / totalTime;
+        const offset = circumference * (1 - progress);
+        timerProgress.style.strokeDashoffset = offset;
+
+        // Cambiar color cuando queda poco tiempo
+        if (timeLeft <= 5) {
+            timerProgress.style.stroke = '#ef4444';
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            if (!hasAnswered) {
+                // Tiempo agotado sin responder
+                handleTimeOut();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+// ==========================================
+// Selección de Respuesta
+// ==========================================
+function selectAnswer(optionId, btnElement) {
+    if (hasAnswered) return; // Ya respondió
+
+    hasAnswered = true;
+    selectedAnswer = optionId;
+    stopTimer();
+
+    // Calcular tiempo de respuesta
+    const timeToAnswer = Math.floor((Date.now() - questionStartTime) / 1000);
+
+    // Marcar visualmente la selección
+    document.querySelectorAll('.answer-btn').forEach(btn => {
+        btn.disabled = true;
+        btn.classList.remove('selected');
+    });
+    btnElement.classList.add('selected');
+
+    // Enviar respuesta al servidor
+    sendAnswer(currentQuestion.id, optionId, timeToAnswer);
+
+    // Mostrar mensaje de espera
+    waitingMessage.style.display = 'block';
+    
+    // Iniciar polling para verificar si todos respondieron
+    startCheckingAnswers();
+}
+
+// ==========================================
+// Envío de Respuesta
+// ==========================================
+async function sendAnswer(questionId, answerId, timeToAnswer) {
+    try {
+        const response = await fetch('/api/grupo/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sesion_id: sesionId,
+                question_id: questionId,
+                answer_id: answerId,
+                tiempo_respuesta: timeToAnswer
+            })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log(`✅ Respuesta enviada. Correcta: ${result.correct}, Puntos: ${result.points}`);
+            // Guardar resultado para mostrar en transición
+            currentQuestion.userResult = {
+                correct: result.correct,
+                points: result.points
+            };
+        } else {
+            console.error('❌ Error al enviar respuesta:', result.message);
+        }
+    } catch (error) {
+        console.error('❌ Error de red:', error);
+    }
+}
+
+// ==========================================
+// Timeout (sin respuesta)
+// ==========================================
+function handleTimeOut() {
+    hasAnswered = true;
+    
+    // Deshabilitar botones
+    document.querySelectorAll('.answer-btn').forEach(btn => {
+        btn.disabled = true;
+    });
+
+    // Mostrar mensaje de espera
+    waitingMessage.style.display = 'block';
+    waitingCount.textContent = 'Tiempo agotado. Esperando a otros jugadores...';
+    
+    // Iniciar polling para verificar si todos respondieron
+    startCheckingAnswers();
+}
+
+// ==========================================
+// Polling: Verificar si todos respondieron
+// ==========================================
+function startCheckingAnswers() {
+    if (checkAnswersInterval) clearInterval(checkAnswersInterval);
+
+    checkAnswersInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/grupo/pregunta-estado/${sesionId}/${currentQuestion.id}`);
+            const result = await response.json();
+
+            if (result.success) {
+                // Actualizar contador
+                waitingCount.textContent = `${result.answered}/${result.total} han respondido`;
+
+                // Si todos respondieron, pasar a siguiente pregunta
+                if (result.all_answered) {
+                    clearInterval(checkAnswersInterval);
+                    stopTimer();
+                    showTransition();
+                }
+            }
+        } catch (error) {
+            console.error('Error al verificar estado:', error);
+        }
+    }, 1000); // Cada segundo
+}
+
+// ==========================================
+// Pantalla de Transición
+// ==========================================
+function showTransition() {
+    questionSection.style.display = 'none';
+    transitionScreen.style.display = 'flex';
+
+    const icon = document.getElementById('transitionIcon');
+    const title = document.getElementById('transitionTitle');
+    const points = document.getElementById('transitionPoints');
+
+    if (currentQuestion.userResult) {
+        if (currentQuestion.userResult.correct) {
+            icon.textContent = '✓';
+            icon.className = 'transition-icon correct';
+            title.textContent = '¡Correcta!';
+            points.textContent = `+${currentQuestion.userResult.points} puntos`;
+        } else {
+            icon.textContent = '✗';
+            icon.className = 'transition-icon incorrect';
+            title.textContent = 'Incorrecta';
+            points.textContent = '0 puntos';
+        }
+    } else {
+        // Sin respuesta
+        icon.textContent = '⏱';
+        icon.className = 'transition-icon timeout';
+        title.textContent = 'Tiempo agotado';
+        points.textContent = '0 puntos';
+    }
+
+    // Después de 3 segundos, mostrar siguiente pregunta
+    setTimeout(() => {
+        showQuestion(currentQuestionIndex + 1);
+    }, 3000);
+}
+
+// ==========================================
+// Finalizar Juego
+// ==========================================
+function finishGame() {
+    console.log('🏁 Juego finalizado');
+    
+    // Mostrar pantalla de carga
+    questionSection.style.display = 'none';
+    transitionScreen.style.display = 'none';
+    loadingScreen.style.display = 'flex';
+
+    // Actualizar estado de sesión a finalizado
+    updateSessionStatus();
+
+    // Redirigir a resultados después de 2 segundos
+    setTimeout(() => {
+        window.location.href = `/grupo/resultados/${sesionId}`;
+    }, 2000);
+}
+
+// ==========================================
+// Actualizar Estado de Sesión
+// ==========================================
+async function updateSessionStatus() {
+    try {
+        await fetch(`/api/grupo/finalizar-sesion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sesion_id: sesionId })
+        });
+    } catch (error) {
+        console.error('Error al finalizar sesión:', error);
+    }
+}
+
+console.log('✅ Sistema de juego en grupo inicializado');
+</script>
+</body>
+</html>
+

@@ -14,9 +14,20 @@
                 <span class="pin">PIN: {{ cuestionario.pin }}</span>
                 <span class="questions-count">{{ cuestionario.preguntas_count }} preguntas</span>
             </div>
+            <div class="session-code-display">
+                <div class="code-label">Código de Sala:</div>
+                <div class="code-value">{{ session_code }}</div>
+                <button class="btn-copy-code" onclick="copySessionCode('{{ session_code }}', event)" title="Copiar código">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+            <p class="session-info">Comparte este código con los miembros del grupo para que se unan</p>
         </div>
         <div class="group-members">
-            <h3>Miembros del Grupo</h3>
+            <h3>Miembros en la Sala</h3>
             <div class="members-list" id="membersList">
                 {% for miembro in miembros %}
                 <div class="member-item" data-user-id="{{ miembro.id }}">
@@ -251,11 +262,8 @@ function startQuiz() {
 }
 
 function startQuestions() {
-  // Ocultar todo el contenedor de estado (lobby y countdown)
-  if (document.getElementById('quizStatus')) document.getElementById('quizStatus').style.display = 'none';
-  if (questionContainer) questionContainer.style.display = 'block';
-
-  showQuestion(0);
+  // Redirigir a la página de juego en lugar de mostrar aquí
+  window.location.href = `/grupo/juego/${sesionId}`;
 }
 
 /* =========================
@@ -455,6 +463,8 @@ function restartQuiz() {
    Polling de Estado (Servidor -> Cliente)
    El backend devuelve: 'esperando' | 'en_progreso' | 'finalizado'
    ========================= */
+let membersPollingInterval = null;
+
 function startPolling() {
   // Polling para el estado del juego
   const gameStatusInterval = setInterval(() => {
@@ -464,34 +474,90 @@ function startPolling() {
         if (data.success) {
           if (updateQuizStatus(data.status)) {
             clearInterval(gameStatusInterval); // Detener polling si el juego empieza o termina
+            if (membersPollingInterval) {
+              clearInterval(membersPollingInterval);
+            }
           }
         }
       })
       .catch(() => {});
   }, 3000); // Cada 3 segundos
 
-  // Polling para el estado de los miembros (solo mientras se espera)
-  // Esto se podría combinar con el anterior, pero lo separamos por claridad.
-  // La función sendReadyStatus ya actualiza, esto es un seguro.
+  // Polling para actualizar la lista de miembros en tiempo real
+  membersPollingInterval = setInterval(() => {
+    fetch(`/api/grupo/miembros/${sesionId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.members) {
+          updateMembersList(data.members);
+        }
+      })
+      .catch(() => {});
+  }, 2000); // Cada 2 segundos
+}
+
+function updateMembersList(members) {
+  if (!membersList) return;
+  
+  // Guardar el HTML actual para comparar
+  const currentMemberIds = Array.from(membersList.querySelectorAll('.member-item'))
+    .map(item => item.dataset.userId);
+  
+  const newMemberIds = members.map(m => String(m.id));
+  
+  // Si hay cambios, actualizar la lista completa
+  if (JSON.stringify(currentMemberIds.sort()) !== JSON.stringify(newMemberIds.sort())) {
+    membersList.innerHTML = '';
+    
+    members.forEach((member) => {
+      const memberItem = document.createElement('div');
+      memberItem.className = 'member-item';
+      memberItem.dataset.userId = member.id;
+      
+      const statusClass = member.ready ? 'ready' : 'waiting';
+      
+      memberItem.innerHTML = `
+        <div class="member-avatar">
+          <img src="/static/img/robot_ico.png" alt="Avatar">
+        </div>
+        <span class="member-name">${member.username}</span>
+        <div class="member-status">
+          <span class="status-indicator ${statusClass}"></span>
+        </div>
+      `;
+      
+      membersList.appendChild(memberItem);
+    });
+  } else {
+    // Solo actualizar el estado de los miembros existentes
+    members.forEach((member) => {
+      const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
+      if (memberEl) {
+        const indicator = memberEl.querySelector('.status-indicator');
+        indicator.classList.remove('ready', 'waiting');
+        indicator.classList.add(member.ready ? 'ready' : 'waiting');
+      }
+    });
+  }
 }
 
 function updateQuizStatus(status) {
   // Mapea exactamente los estados que devuelve tu BD/servidor
   if (status === 'esperando') {
     // seguimos en lobby
-    // Podríamos añadir un fetch aquí para actualizar la lista de miembros
-    // si alguien más se une, pero por ahora lo dejamos así.
     return false;
   }
   if (status === 'en_progreso') {
     if (!gameStarted) {
       gameStarted = true;
-      startQuiz();
+      // Redirigir directamente al juego
+      window.location.href = `/grupo/juego/${sesionId}`;
     }
     return true; // El juego ha comenzado, detener polling de estado
   }
   if (status === 'finalizado') {
-    endQuiz();
+    // Redirigir a resultados
+    window.location.href = `/grupo/resultados/${sesionId}`;
     return true; // El juego ha finalizado, detener polling
   }
   return false;
@@ -507,6 +573,36 @@ function toggleReadyVisuals() {
         readyBtn.classList.remove('ready');
         if (indicator) indicator.classList.replace('ready', 'waiting');
     }
+}
+
+// Función para copiar el código de sesión
+function copySessionCode(code, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    navigator.clipboard.writeText(code).then(() => {
+        // Mostrar feedback visual
+        const btn = event.target.closest('.btn-copy-code');
+        if (!btn) return;
+        
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        `;
+        btn.style.background = '#4caf50';
+        btn.disabled = true;
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = '';
+            btn.disabled = false;
+        }, 2000);
+    }).catch((err) => {
+        console.error('Error al copiar:', err);
+        alert('Error al copiar el código. Copia manualmente: ' + code);
+    });
 }
 
 console.log('✅ Cuestionario en grupo inicializado');

@@ -138,8 +138,8 @@
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
       </svg>
     </div>
-    <h2>Unirse a un Cuestionario</h2>
-    <p class="join-subtitle">Ingresa el código PIN para comenzar</p>
+    <h2>Unirse a un Cuestionario o Sala</h2>
+    <p class="join-subtitle">Ingresa el código PIN de cuestionario o código de sala grupal</p>
     
     <form id="joinForm" class="join-form" onsubmit="return joinGame(event)">
       <div class="pin-input-group">
@@ -147,8 +147,8 @@
           type="text" 
           id="pinInput" 
           class="pin-code-input" 
-          placeholder="Ejemplo: ABC123" 
-          maxlength="6" 
+          placeholder="PIN o Código de Sala" 
+          maxlength="10" 
           autocomplete="off" 
           required
         >
@@ -174,18 +174,46 @@
 <script>
 function joinGame(event) {
   event.preventDefault();
-  const pin = document.getElementById("pinInput").value.trim().toUpperCase();
+  const code = document.getElementById("pinInput").value.trim().toUpperCase();
   const errorBox = document.getElementById("errorMessage");
 
-  if (!pin || pin.length < 4) {
-    errorBox.textContent = "Por favor, ingresa un código PIN válido.";
+  if (!code || code.length < 4) {
+    errorBox.textContent = "Por favor, ingresa un código válido.";
     errorBox.classList.remove("hidden");
     return false;
   }
 
-  // Redirigir a la ruta del cuestionario según el PIN
-  window.location.href = `/cuestionario/${pin}/espera`;
+  // Si el código tiene 6 caracteres, intentar unirse a sesión de grupo
+  if (code.length === 6) {
+    joinGroupSession(code, errorBox);
+  } else {
+    // PIN de cuestionario individual
+    window.location.href = `/cuestionario/${code}/espera`;
+  }
   return false;
+}
+
+async function joinGroupSession(sessionCode, errorBox) {
+  try {
+    const response = await fetch('/api/grupo/unirse-sesion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_code: sessionCode })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // Redirigir a la página de la sesión del grupo
+      window.location.href = `/grupo/quiz/${result.sesion_id}`;
+    } else {
+      errorBox.textContent = result.message || 'Código de sala inválido o no tienes acceso';
+      errorBox.classList.remove("hidden");
+    }
+  } catch (error) {
+    errorBox.textContent = 'Error de conexión. Intenta nuevamente.';
+    errorBox.classList.remove("hidden");
+  }
 }
 </script>
 {% endblock %}

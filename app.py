@@ -1272,7 +1272,7 @@ def grupo_quiz(sesion_id):
         
         # Obtener información de la sesión
         cursor.execute("""
-            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado,
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code,
                    g.nombre as grupo_nombre, c.titulo, c.pin, c.descripcion
             FROM sesiones_grupo sg
             JOIN grupos g ON sg.grupo_id = g.id
@@ -1296,14 +1296,22 @@ def grupo_quiz(sesion_id):
             flash('No eres miembro de este grupo', 'error')
             return redirect(url_for('grupos'))
         
-        # Obtener miembros del grupo
+        # Registrar automáticamente al usuario en la sesión si no está ya
+        cursor.execute("""
+            INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
+            VALUES (%s, %s, 0)
+            ON DUPLICATE KEY UPDATE user_id = user_id
+        """, (sesion_id, g.user['id']))
+        
+        db.commit()
+        
+        # Obtener SOLO los miembros que se han unido a esta sesión (están en usuario_estado_grupo)
         cursor.execute("""
             SELECT u.id, u.username, ues.esta_listo
-            FROM grupo_miembros gm
-            JOIN users u ON gm.user_id = u.id
-            LEFT JOIN usuario_estado_grupo ues ON ues.user_id = u.id AND ues.sesion_id = %s
-            WHERE gm.grupo_id = %s
-        """, (sesion_id, sesion['grupo_id']))
+            FROM usuario_estado_grupo ues
+            JOIN users u ON ues.user_id = u.id
+            WHERE ues.sesion_id = %s
+        """, (sesion_id,))
         
         miembros = cursor.fetchall()
         
@@ -1339,6 +1347,7 @@ def grupo_quiz(sesion_id):
         
         return render_template('grupo_quiz.html', 
                              sesion_id=sesion_id,
+                             session_code=sesion['session_code'],
                              grupo={'nombre': sesion['grupo_nombre']},
                              cuestionario={
                                  'titulo': sesion['titulo'],
@@ -1352,9 +1361,77 @@ def grupo_quiz(sesion_id):
         flash(f'Error al cargar el cuestionario: {str(e)}', 'error')
         return redirect(url_for('grupos'))
 
+@app.route('/api/grupo/unirse-sesion', methods=['POST'])
+def api_unirse_sesion_grupo():
+    """API para unirse a una sesión de grupo usando el código de sala"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    session_code = data.get('session_code', '').strip().upper()
+    
+    if not session_code or len(session_code) != 6:
+        return jsonify({'success': False, 'message': 'Código de sala inválido'}), 400
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # 1. Buscar la sesión por código
+        cursor.execute("""
+            SELECT sg.id, sg.grupo_id, sg.estado, g.nombre as grupo_nombre
+            FROM sesiones_grupo sg
+            JOIN grupos g ON sg.grupo_id = g.id
+            WHERE sg.session_code = %s
+        """, (session_code,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            cursor.close(); db.close()
+            return jsonify({'success': False, 'message': 'Código de sala no encontrado'}), 404
+        
+        # 2. Verificar que el usuario es miembro del grupo
+        cursor.execute("""
+            SELECT id FROM grupo_miembros 
+            WHERE grupo_id = %s AND user_id = %s
+        """, (sesion['grupo_id'], g.user['id']))
+        
+        if not cursor.fetchone():
+            cursor.close(); db.close()
+            return jsonify({'success': False, 'message': 'No eres miembro de este grupo'}), 403
+        
+        # 3. Verificar el estado de la sesión
+        if sesion['estado'] == 'finalizado':
+            cursor.close(); db.close()
+            return jsonify({'success': False, 'message': 'Esta sesión ya ha finalizado'}), 400
+        
+        # 4. Registrar al usuario en la sesión si no está ya
+        cursor.execute("""
+            INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
+            VALUES (%s, %s, 0)
+            ON DUPLICATE KEY UPDATE user_id = user_id
+        """, (sesion['id'], g.user['id']))
+        
+        db.commit()
+        cursor.close(); db.close()
+        
+        return jsonify({
+            'success': True,
+            'sesion_id': sesion['id'],
+            'grupo_nombre': sesion['grupo_nombre'],
+            'message': f'Te has unido a la sala del grupo {sesion["grupo_nombre"]}'
+        })
+        
+    except Exception as e:
+        if db:
+            try: db.close()
+            except: pass
+        return jsonify({'success': False, 'message': f'Error al unirse a la sesión: {str(e)}'}), 500
+
 @app.route('/api/grupo/ready', methods=['POST'])
 def api_grupo_ready():
-    """API para marcar usuario como listo y, si todos están listos, iniciar la sesión."""
+    """API para marcar usuario como listo y, si todos los que están en la sala están listos, iniciar la sesión."""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
     
@@ -1381,9 +1458,14 @@ def api_grupo_ready():
             return jsonify({'success': False, 'message': 'Sesión no encontrada'}), 404
         grupo_id = row['grupo_id']
         
-        # 3) Contar miembros del grupo
-        cursor.execute("SELECT COUNT(*) AS total FROM grupo_miembros WHERE grupo_id = %s", (grupo_id,))
-        total_miembros = cursor.fetchone()['total']
+        # 3) CAMBIO CLAVE: Contar usuarios que se UNIERON A LA SALA (están en usuario_estado_grupo)
+        # en lugar de contar todos los miembros del grupo
+        cursor.execute("""
+            SELECT COUNT(*) AS total_en_sala
+            FROM usuario_estado_grupo
+            WHERE sesion_id = %s
+        """, (sesion_id,))
+        total_en_sala = cursor.fetchone()['total_en_sala']
         
         # 4) Contar cuántos están listos en esta sesión
         cursor.execute("""
@@ -1393,9 +1475,10 @@ def api_grupo_ready():
         """, (sesion_id,))
         listos = cursor.fetchone()['listos']
         
-        all_ready = (total_miembros > 0 and listos == total_miembros)
+        # 5) Todos están listos si hay al menos 1 persona en la sala y todos están listos
+        all_ready = (total_en_sala > 0 and listos == total_en_sala)
         
-        # 5) Si todos listos, pasar a 'en_progreso' y setear started_at
+        # 6) Si todos listos, pasar a 'en_progreso' y setear started_at
         if all_ready:
             cursor.execute("""
                 UPDATE sesiones_grupo
@@ -1403,14 +1486,13 @@ def api_grupo_ready():
                 WHERE id = %s
             """, (sesion_id,))
         
-        # 6) Obtener la lista actualizada de miembros y su estado "listo"
+        # 7) Obtener la lista actualizada SOLO de usuarios que están en la sala
         cursor.execute("""
-            SELECT u.id, u.username, COALESCE(ues.esta_listo, 0) as ready
-            FROM grupo_miembros gm
-            JOIN users u ON gm.user_id = u.id
-            LEFT JOIN usuario_estado_grupo ues ON ues.user_id = u.id AND ues.sesion_id = %s
-            WHERE gm.grupo_id = %s
-        """, (sesion_id, grupo_id))
+            SELECT u.id, u.username, ues.esta_listo as ready
+            FROM usuario_estado_grupo ues
+            JOIN users u ON ues.user_id = u.id
+            WHERE ues.sesion_id = %s
+        """, (sesion_id,))
         
         miembros_actualizados = cursor.fetchall()
         
@@ -1423,6 +1505,145 @@ def api_grupo_ready():
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 
+
+@app.route('/grupo/juego/<int:sesion_id>')
+def grupo_juego(sesion_id):
+    """Página para jugar el cuestionario en grupo (solo cuando está en progreso)"""
+    if not g.user:
+        flash('Debes iniciar sesión para participar', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code,
+                   g.nombre as grupo_nombre, c.titulo, c.pin
+            FROM sesiones_grupo sg
+            JOIN grupos g ON sg.grupo_id = g.id
+            JOIN cuestionarios c ON sg.cuestionario_id = c.id
+            WHERE sg.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('grupos'))
+        
+        # Verificar que el usuario es miembro del grupo
+        cursor.execute("""
+            SELECT id FROM grupo_miembros 
+            WHERE grupo_id = %s AND user_id = %s
+        """, (sesion['grupo_id'], g.user['id']))
+        
+        if not cursor.fetchone():
+            flash('No eres miembro de este grupo', 'error')
+            return redirect(url_for('grupos'))
+        
+        # Verificar que el usuario está en la sesión
+        cursor.execute("""
+            SELECT id FROM usuario_estado_grupo
+            WHERE sesion_id = %s AND user_id = %s
+        """, (sesion_id, g.user['id']))
+        
+        if not cursor.fetchone():
+            flash('No estás registrado en esta sesión', 'error')
+            return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
+        
+        # Verificar estado de la sesión
+        if sesion['estado'] != 'en_progreso':
+            if sesion['estado'] == 'esperando':
+                return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
+            elif sesion['estado'] == 'finalizado':
+                return redirect(url_for('grupo_resultados', sesion_id=sesion_id))
+        
+        # Obtener preguntas del cuestionario
+        cursor.execute("""
+            SELECT p.id, p.texto_pregunta, p.tiempo_limite, p.puntos, p.orden
+            FROM preguntas p
+            WHERE p.cuestionario_id = %s
+            ORDER BY p.orden ASC
+        """, (sesion['cuestionario_id'],))
+        
+        preguntas = cursor.fetchall()
+
+        # Obtener opciones para cada pregunta
+        preguntas_con_opciones = []
+        for pregunta in preguntas:
+            cursor.execute("""
+                SELECT id, texto_opcion, es_correcta, orden
+                FROM opciones_respuesta
+                WHERE pregunta_id = %s
+                ORDER BY orden ASC
+            """, (pregunta['id'],))
+            opciones = cursor.fetchall()
+            preguntas_con_opciones.append({
+                'id': pregunta['id'],
+                'text': pregunta['texto_pregunta'],
+                'time_limit': pregunta['tiempo_limite'],
+                'points': pregunta['puntos'],
+                'orden': pregunta['orden'],
+                'options': [{'id': o['id'], 'text': o['texto_opcion'], 'is_correct': bool(o['es_correcta'])} for o in opciones]
+            })
+        
+        # Obtener miembros en la sesión
+        cursor.execute("""
+            SELECT u.id, u.username
+            FROM usuario_estado_grupo ues
+            JOIN users u ON ues.user_id = u.id
+            WHERE ues.sesion_id = %s
+        """, (sesion_id,))
+        
+        miembros = cursor.fetchall()
+        
+        cursor.close()
+        db.close()
+        
+        return render_template('juego_grupo.html', 
+                             sesion_id=sesion_id,
+                             grupo={'nombre': sesion['grupo_nombre']},
+                             cuestionario={'titulo': sesion['titulo']},
+                             preguntas_json=json.dumps(preguntas_con_opciones),
+                             total_preguntas=len(preguntas),
+                             miembros=miembros)
+        
+    except Exception as e:
+        flash(f'Error al cargar el juego: {str(e)}', 'error')
+        return redirect(url_for('grupos'))
+
+@app.route('/api/grupo/miembros/<int:sesion_id>')
+def api_grupo_miembros(sesion_id):
+    """API para obtener la lista actualizada de miembros en una sesión"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener miembros que están en la sesión
+        cursor.execute("""
+            SELECT u.id, u.username, ues.esta_listo as ready
+            FROM usuario_estado_grupo ues
+            JOIN users u ON ues.user_id = u.id
+            WHERE ues.sesion_id = %s
+            ORDER BY ues.created_at ASC
+        """, (sesion_id,))
+        
+        miembros = cursor.fetchall()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'members': miembros
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/api/grupo/status/<int:sesion_id>')
 def api_grupo_status(sesion_id):
@@ -1453,7 +1674,7 @@ def api_grupo_status(sesion_id):
 
 @app.route('/api/grupo/answer', methods=['POST'])
 def api_grupo_answer():
-    """API para enviar respuesta del usuario"""
+    """API para enviar respuesta del usuario con cálculo de puntos"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
     
@@ -1461,29 +1682,116 @@ def api_grupo_answer():
     sesion_id = data.get('sesion_id')
     question_id = data.get('question_id')
     answer_id = data.get('answer_id')
+    tiempo_respuesta = data.get('tiempo_respuesta', 0)
     
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
         
-        # Obtener información de la opción
+        # Obtener información de la opción y la pregunta
         cursor.execute("""
-            SELECT es_correcta FROM opciones_respuesta 
-            WHERE id = %s AND pregunta_id = %s
+            SELECT o.es_correcta, p.puntos, p.tiempo_limite
+            FROM opciones_respuesta o
+            JOIN preguntas p ON o.pregunta_id = p.id
+            WHERE o.id = %s AND o.pregunta_id = %s
         """, (answer_id, question_id))
         
-        opcion = cursor.fetchone()
-        if not opcion:
+        resultado = cursor.fetchone()
+        if not resultado:
             return jsonify({'success': False, 'message': 'Opción no encontrada'})
+        
+        # Calcular puntos (más rápido = más puntos)
+        es_correcta = resultado['es_correcta']
+        puntos = 0
+        if es_correcta:
+            puntos_base = resultado['puntos'] or 1000
+            tiempo_limite = resultado['tiempo_limite'] or 30
+            # Fórmula: puntaje = puntaje_base * (tiempo_restante / tiempo_total)
+            tiempo_restante = max(0, tiempo_limite - tiempo_respuesta)
+            factor_tiempo = tiempo_restante / tiempo_limite
+            puntos = int(puntos_base * factor_tiempo)
         
         # Guardar respuesta
         cursor.execute("""
-            INSERT INTO respuestas_grupo (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE opcion_id = %s, es_correcta = %s, puntos = %s
-        """, (sesion_id, g.user['id'], question_id, answer_id, 
-              opcion['es_correcta'], 10 if opcion['es_correcta'] else 0,
-              answer_id, opcion['es_correcta'], 10 if opcion['es_correcta'] else 0))
+            INSERT INTO respuestas_grupo (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE opcion_id = %s, es_correcta = %s, puntos = %s, tiempo_respuesta = %s
+        """, (sesion_id, g.user['id'], question_id, answer_id, es_correcta, puntos, tiempo_respuesta,
+              answer_id, es_correcta, puntos, tiempo_respuesta))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'correct': bool(es_correcta),
+            'points': puntos
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/api/grupo/pregunta-estado/<int:sesion_id>/<int:pregunta_id>')
+def api_grupo_pregunta_estado(sesion_id, pregunta_id):
+    """API para verificar si todos respondieron una pregunta"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Contar total de usuarios en la sesión
+        cursor.execute("""
+            SELECT COUNT(*) as total
+            FROM usuario_estado_grupo
+            WHERE sesion_id = %s
+        """, (sesion_id,))
+        total_usuarios = cursor.fetchone()['total']
+        
+        # Contar cuántos ya respondieron esta pregunta
+        cursor.execute("""
+            SELECT COUNT(*) as respondidos
+            FROM respuestas_grupo
+            WHERE sesion_id = %s AND pregunta_id = %s
+        """, (sesion_id, pregunta_id))
+        respondidos = cursor.fetchone()['respondidos']
+        
+        cursor.close()
+        db.close()
+        
+        todos_respondieron = (total_usuarios > 0 and respondidos >= total_usuarios)
+        
+        return jsonify({
+            'success': True,
+            'all_answered': todos_respondieron,
+            'total': total_usuarios,
+            'answered': respondidos
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/api/grupo/finalizar-sesion', methods=['POST'])
+def api_finalizar_sesion():
+    """API para marcar la sesión como finalizada"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Actualizar estado de la sesión
+        cursor.execute("""
+            UPDATE sesiones_grupo
+            SET estado = 'finalizado', finished_at = NOW()
+            WHERE id = %s
+        """, (sesion_id,))
         
         db.commit()
         cursor.close()
@@ -1492,7 +1800,73 @@ def api_grupo_answer():
         return jsonify({'success': True})
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/grupo/resultados/<int:sesion_id>')
+def grupo_resultados(sesion_id):
+    """Página de resultados finales de la sesión de grupo"""
+    if not g.user:
+        flash('Debes iniciar sesión para ver los resultados', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id,
+                   g.nombre as grupo_nombre, c.titulo as cuestionario_titulo
+            FROM sesiones_grupo sg
+            JOIN grupos g ON sg.grupo_id = g.id
+            JOIN cuestionarios c ON sg.cuestionario_id = c.id
+            WHERE sg.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('grupos'))
+        
+        # Obtener el total de preguntas
+        cursor.execute("""
+            SELECT COUNT(p.id) as total_preguntas
+            FROM preguntas p
+            WHERE p.cuestionario_id = %s
+        """, (sesion['cuestionario_id'],))
+        total_preguntas = cursor.fetchone()['total_preguntas']
+
+        # Obtener resultados de todos los participantes
+        cursor.execute("""
+            SELECT 
+                u.id,
+                u.username, 
+                COALESCE(SUM(rg.puntos), 0) as score,
+                COALESCE(SUM(rg.es_correcta), 0) as correct_answers,
+                COUNT(DISTINCT rg.pregunta_id) as preguntas_respondidas
+            FROM usuario_estado_grupo ues
+            JOIN users u ON ues.user_id = u.id
+            LEFT JOIN respuestas_grupo rg ON rg.user_id = u.id AND rg.sesion_id = %s
+            WHERE ues.sesion_id = %s
+            GROUP BY u.id, u.username
+            ORDER BY score DESC, correct_answers DESC
+        """, (sesion_id, sesion_id))
+        resultados = cursor.fetchall()
+
+        cursor.close()
+        db.close()
+        
+        return render_template('grupo_resultados.html', 
+                             sesion_id=sesion_id,
+                             grupo_nombre=sesion['grupo_nombre'],
+                             cuestionario_titulo=sesion['cuestionario_titulo'],
+                             resultados=resultados,
+                             total_preguntas=total_preguntas)
+        
+    except Exception as e:
+        flash(f'Error al cargar resultados: {str(e)}', 'error')
+        return redirect(url_for('grupos'))
 
 @app.route('/api/grupo/results/<int:sesion_id>')
 def api_grupo_results(sesion_id):

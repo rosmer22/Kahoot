@@ -1,7 +1,7 @@
 -- MySQL dump 10.13  Distrib 8.0.40, for Linux (x86_64)
 --
 -- Host: Grupo2dawb.mysql.pythonanywhere-services.com    Database: Grupo2dawb$Kahoot
--- ------------------------------------------------------
+-- 
 -- Server version	8.0.40
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
@@ -467,7 +467,7 @@ UNLOCK TABLES;
 -- Dump completed on 2025-10-21 22:35:27
 
 
------------------
+
 -- 1. Añadir la columna user_id a sesiones_juego para registrar quién está jugando.
 ALTER TABLE `sesiones_juego`
 ADD COLUMN `user_id` INT NULL AFTER `cuestionario_id`,

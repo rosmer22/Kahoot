@@ -5,6 +5,6 @@ def obtener_conexion():
                                 password='',
                                 db='robot',
                                 user='root',
-                                port=3327,
+                                port=3306,
                                 charset='utf8mb4',
                                 cursorclass=pymysql.cursors.DictCursor)

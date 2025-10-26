@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Resultados - RoBot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_resultados.css') }}">
+    <style>
+        /* Estilos adicionales para flash messages sin base.css */
+        .flash-messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .flash-message {
+            padding: 1rem 1.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: slideInRight 0.3s ease;
+        }
+        .flash-success { background: #22c55e; color: white; }
+        .flash-error { background: #ef4444; color: white; }
+        .flash-warning { background: #f59e0b; color: white; }
+        .flash-info { background: #3b82f6; color: white; }
+        .flash-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-left: 1rem;
+            opacity: 0.8;
+        }
+        .flash-close:hover { opacity: 1; }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="flash-message flash-{{ category }}">
+                {{ message }}
+                <button class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+<main class="resultados-container">
+    <!-- Header -->
+    <div class="results-header">
+        <div class="trophy-icon">🏆</div>
+        <h1>¡Juego Finalizado!</h1>
+        <p class="subtitle">{{ grupo_nombre }} - {{ cuestionario_titulo }}</p>
+    </div>
+
+    <!-- Podio (Top 3) -->
+    <div class="podium">
+        {% if resultados|length >= 2 %}
+        <div class="podium-place second">
+            <div class="podium-medal">🥈</div>
+            <div class="podium-avatar">
+                <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
+            </div>
+            <h3>{{ resultados[1].username }}</h3>
+            <p class="podium-score">{{ resultados[1].score }} pts</p>
+            <p class="podium-accuracy">{{ resultados[1].correct_answers }}/{{ total_preguntas }} correctas</p>
+            <div class="podium-bar second-bar"></div>
+        </div>
+        {% endif %}
+
+        {% if resultados|length >= 1 %}
+        <div class="podium-place first">
+            <div class="crown">👑</div>
+            <div class="podium-medal">🥇</div>
+            <div class="podium-avatar winner">
+                <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
+            </div>
+            <h3>{{ resultados[0].username }}</h3>
+            <p class="podium-score">{{ resultados[0].score }} pts</p>
+            <p class="podium-accuracy">{{ resultados[0].correct_answers }}/{{ total_preguntas }} correctas</p>
+            <div class="podium-bar first-bar"></div>
+        </div>
+        {% endif %}
+
+        {% if resultados|length >= 3 %}
+        <div class="podium-place third">
+            <div class="podium-medal">🥉</div>
+            <div class="podium-avatar">
+                <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
+            </div>
+            <h3>{{ resultados[2].username }}</h3>
+            <p class="podium-score">{{ resultados[2].score }} pts</p>
+            <p class="podium-accuracy">{{ resultados[2].correct_answers }}/{{ total_preguntas }} correctas</p>
+            <div class="podium-bar third-bar"></div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tabla completa de resultados -->
+    <div class="results-table-container">
+        <h2>Tabla de Resultados Completa</h2>
+        <div class="results-table">
+            <div class="table-header">
+                <div class="col-rank">Posición</div>
+                <div class="col-player">Jugador</div>
+                <div class="col-correct">Correctas</div>
+                <div class="col-score">Puntos</div>
+            </div>
+            {% for resultado in resultados %}
+            <div class="table-row {% if loop.index == 1 %}first{% elif loop.index == 2 %}second{% elif loop.index == 3 %}third{% endif %}">
+                <div class="col-rank">
+                    {% if loop.index == 1 %}
+                        <span class="rank-badge gold">#1</span>
+                    {% elif loop.index == 2 %}
+                        <span class="rank-badge silver">#2</span>
+                    {% elif loop.index == 3 %}
+                        <span class="rank-badge bronze">#3</span>
+                    {% else %}
+                        <span class="rank-number">#{{ loop.index }}</span>
+                    {% endif %}
+                </div>
+                <div class="col-player">
+                    <div class="player-avatar-small">
+                        <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
+                    </div>
+                    <span class="player-name">{{ resultado.username }}</span>
+                </div>
+                <div class="col-correct">
+                    <span class="correct-badge">{{ resultado.correct_answers }}/{{ total_preguntas }}</span>
+                </div>
+                <div class="col-score">
+                    <span class="score-value">{{ resultado.score }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="actions">
+        <button class="btn-primary" onclick="window.location.href='/'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            Volver al Inicio
+        </button>
+        <button class="btn-secondary" onclick="shareResults()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            Compartir Resultados
+        </button>
+    </div>
+</main>
+
+<script>
+// Animaciones de entrada
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar podio
+    setTimeout(() => {
+        document.querySelectorAll('.podium-place').forEach((place, index) => {
+            place.style.animation = `slideUp 0.6s ease ${index * 0.2}s forwards`;
+        });
+    }, 300);
+
+    // Animar tabla
+    setTimeout(() => {
+        document.querySelectorAll('.table-row').forEach((row, index) => {
+            row.style.animation = `fadeInUp 0.4s ease ${index * 0.05}s forwards`;
+            row.style.opacity = '0';
+        });
+    }, 800);
+
+    // Confetti para el ganador
+    if (typeof confetti !== 'undefined') {
+        setTimeout(() => {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }, 1000);
+    }
+});
+
+// Función para compartir resultados
+function shareResults() {
+    const text = `¡Jugué {{ cuestionario_titulo }} en {{ grupo_nombre }}! Mira los resultados en RoBot.`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'Resultados del Quiz',
+            text: text,
+            url: window.location.href
+        }).catch(() => {});
+    } else {
+        // Fallback: copiar al portapapeles
+        navigator.clipboard.writeText(text + ' ' + window.location.href).then(() => {
+            alert('¡Enlace copiado al portapapeles!');
+        });
+    }
+}
+
+// CSS para animaciones
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideUp {
+        from {
+            transform: translateY(50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes fadeInUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+`;
+document.head.appendChild(style);
+
+console.log('✅ Página de resultados cargada');
+</script>
+</body>
+</html>
+
