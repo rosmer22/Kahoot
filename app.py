@@ -4,7 +4,7 @@ from werkzeug.security import check_password_hash
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.exceptions import HTTPException
 from flask_mail import Mail, Message
 import random
@@ -44,12 +44,12 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 def get_drive_credentials():
     """Obtiene o refresca las credenciales de Google Drive"""
     creds = None
-    
+
     # Cargar token guardado si existe
     if os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, 'rb') as token:
             creds = pickle.load(token)
-    
+
     # Si no hay credenciales válidas, retorna None (se necesita autorizar)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -64,42 +64,42 @@ def get_drive_credentials():
                 return None
         else:
             return None
-    
+
     return creds
 
 # === Helper: Subir archivo a Google Drive ===
 def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
     """
     Sube un archivo a Google Drive usando OAuth
-    
+
     Args:
         file_stream: BytesIO con el contenido del archivo
         filename: Nombre del archivo
         mimetype: Tipo MIME del archivo
-        
+
     Returns:
         dict: {'success': bool, 'file_id': str, 'file_url': str, 'needs_auth': bool} o error
     """
     try:
         # Obtener credenciales
         creds = get_drive_credentials()
-        
+
         if not creds:
             return {
                 'success': False,
                 'needs_auth': True,
                 'message': 'Se requiere autorización. Por favor, autoriza la aplicación primero.'
             }
-        
+
         # Crear servicio de Drive
         service = build('drive', 'v3', credentials=creds)
-        
+
         # Metadata del archivo
         file_metadata = {
             'name': filename,
             'parents': [GOOGLE_DRIVE_FOLDER_ID]
         }
-        
+
         # Subir archivo
         media = MediaIoBaseUpload(file_stream, mimetype=mimetype, resumable=True)
         file = service.files().create(
@@ -107,7 +107,7 @@ def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxm
             media_body=media,
             fields='id, webViewLink'
         ).execute()
-        
+
         return {
             'success': True,
             'needs_auth': False,
@@ -115,7 +115,7 @@ def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxm
             'file_url': file.get('webViewLink'),
             'message': 'Archivo subido exitosamente a Google Drive'
         }
-        
+
     except Exception as e:
         return {
             'success': False,
@@ -171,31 +171,31 @@ def authorize_drive():
     if not is_auth():
         flash('Debes iniciar sesión primero', 'error')
         return redirect(url_for('login'))
-    
+
     try:
         # Generar redirect_uri
         redirect_uri = url_for('oauth2callback', _external=True)
         print(f"\n🔍 DEBUG: Redirect URI = {redirect_uri}\n")
-        
+
         # Crear flujo de OAuth
         flow = Flow.from_client_secrets_file(
             OAUTH_CONFIG_FILE,
             scopes=SCOPES,
             redirect_uri=redirect_uri
         )
-        
+
         # Generar URL de autorización
         authorization_url, state = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
             prompt='consent'
         )
-        
+
         # Guardar state en sesión para verificación
         session['oauth_state'] = state
-        
+
         return redirect(authorization_url)
-        
+
     except Exception as e:
         flash(f'Error al iniciar autorización: {str(e)}', 'error')
         return redirect(url_for('home'))
@@ -206,11 +206,11 @@ def oauth2callback():
     if not is_auth():
         flash('Debes iniciar sesión primero', 'error')
         return redirect(url_for('login'))
-    
+
     try:
         # Verificar state para prevenir CSRF
         state = session.get('oauth_state')
-        
+
         # Crear flujo de OAuth
         flow = Flow.from_client_secrets_file(
             OAUTH_CONFIG_FILE,
@@ -218,18 +218,18 @@ def oauth2callback():
             state=state,
             redirect_uri=url_for('oauth2callback', _external=True)
         )
-        
+
         # Intercambiar código por credenciales
         flow.fetch_token(authorization_response=request.url)
-        
+
         # Guardar credenciales
         creds = flow.credentials
         with open(TOKEN_FILE, 'wb') as token:
             pickle.dump(creds, token)
-        
+
         flash('¡Autorización exitosa! Ahora puedes exportar resultados a Google Drive.', 'success')
         return redirect(url_for('home'))
-        
+
     except Exception as e:
         flash(f'Error durante la autorización: {str(e)}', 'error')
         return redirect(url_for('home'))
@@ -239,7 +239,7 @@ def check_drive_auth():
     """Verifica si la aplicación está autorizada para Google Drive"""
     if not is_auth():
         return jsonify({'authorized': False, 'message': 'Usuario no autenticado'})
-    
+
     creds = get_drive_credentials()
     return jsonify({
         'authorized': creds is not None,
@@ -365,7 +365,7 @@ def register():
 
         # Generar código de verificación
         codigo = random.randint(100000, 999999)
-        expira = datetime.datetime.now() + datetime.timedelta(minutes=10)
+        expira = datetime.now() + timedelta(minutes=10)
 
         usuarios_pendientes[email] = {
             'username': username,
@@ -405,7 +405,7 @@ def codigo_recuperacion():
 
             codigos[email] = {
                 'codigo': codigo,
-                'expira': datetime.datetime.now() + datetime.timedelta(minutes=10)
+                'expira': datetime.now() + timedelta(minutes=10)
             }
 
             try:
@@ -444,7 +444,7 @@ def verify_email():
         codigo_ingresado = request.form.get('codigo')
         datos = usuarios_pendientes.get(email)
 
-        if datos and str(datos['codigo']) == codigo_ingresado and datetime.datetime.now() < datos['expira']:
+        if datos and str(datos['codigo']) == codigo_ingresado and datetime.now() < datos['expira']:
             # Crear usuario definitivo
             user_controller.insertar_usuario(datos['username'], email, datos['password'])
 
@@ -486,7 +486,7 @@ def verificar_codigo_recuperacion():
         codigo_ingresado = request.form.get('codigo')
         datos = codigos.get(email)
 
-        if datos and str(datos['codigo']) == codigo_ingresado and datetime.datetime.now() < datos['expira']:
+        if datos and str(datos['codigo']) == codigo_ingresado and datetime.now() < datos['expira']:
             # Código válido → redirige al formulario de cambio de contraseña
             codigos.pop(email, None)
             return redirect(url_for('cambiar_contra'))  # 👈 ajusta este nombre si tu función de cambio de contraseña tiene otro nombre
@@ -508,7 +508,7 @@ def resend_verification_code():
 
     # Generar nuevo código y actualizar datos
     codigo = random.randint(100000, 999999)
-    expira = datetime.datetime.now() + datetime.timedelta(minutes=10)
+    expira = datetime.now() + timedelta(minutes=10)
 
     usuarios_pendientes[email]['codigo'] = codigo
     usuarios_pendientes[email]['expira'] = expira
@@ -605,32 +605,63 @@ def my_quizzes():
 
 @app.route('/lobby/<int:cuestionario_id>')
 def lobby(cuestionario_id):
-    """Muestra el lobby de espera para un cuestionario."""
+    """Muestra el lobby de espera para un cuestionario - REHECHA DESDE CERO"""
     if not g.user:
         flash('Debes iniciar sesión para acceder a esta página.', 'warning')
         return redirect(url_for('login'))
 
     modo = request.args.get('modo', 'individual')
 
+    # Si el modo es grupal, usar EXACTAMENTE la misma lógica que grupos
+    if modo == 'grupal':
+        try:
+            db = bd.obtener_conexion()
+            cursor = db.cursor()
+
+            # Verificar que el cuestionario existe
+            cursor.execute("SELECT id FROM cuestionarios WHERE id = %s", (cuestionario_id,))
+            if not cursor.fetchone():
+                flash('Cuestionario no encontrado.', 'error')
+                return redirect(url_for('my_quizzes'))
+
+            # Generar session_code único (COPIA EXACTA de api_iniciar_cuestionario_grupo)
+            import string
+            import random
+            while True:
+                session_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                cursor.execute("SELECT id FROM sesiones_grupo WHERE session_code = %s", (session_code,))
+                if not cursor.fetchone():
+                    break
+
+            # Crear sesión (COPIA EXACTA de api_iniciar_cuestionario_grupo)
+            cursor.execute("""
+                INSERT INTO sesiones_grupo (grupo_id, cuestionario_id, iniciado_por, created_at, session_code)
+                VALUES (NULL, %s, %s, NOW(), %s)
+            """, (None, cuestionario_id, g.user['id'], session_code))
+
+            sesion_id = cursor.lastrowid
+            db.commit()
+            cursor.close()
+            db.close()
+
+            # Redirigir directamente a grupo_quiz (COPIA EXACTA de grupos)
+            return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
+
+        except Exception as e:
+            flash(f'Error al crear la sesión: {str(e)}', 'error')
+            return redirect(url_for('my_quizzes'))
+
+    # Modo individual (sin cambios)
     db = bd.obtener_conexion()
     cursor = db.cursor()
-
-    # Obtener detalles del cuestionario
     cursor.execute("SELECT id, titulo, pin FROM cuestionarios WHERE id = %s", (cuestionario_id,))
     quiz = cursor.fetchone()
+    cursor.close()
+    db.close()
 
     if not quiz:
         flash('Cuestionario no encontrado.', 'error')
         return redirect(url_for('my_quizzes'))
-
-    # Si el modo es grupal, redirigir a la página de grupos por ahora
-    if modo == 'grupal':
-        # This is a temporary solution, as the group flow from here is not clear.
-        flash('La función de iniciar un quiz grupal desde aquí no está implementada. Por favor, inicia el quiz desde la página del grupo.', 'info')
-        return redirect(url_for('grupos'))
-
-    cursor.close()
-    db.close()
 
     return render_template('lobby.html', quiz=quiz, pin=quiz['pin'], modo=modo)
 
@@ -798,7 +829,7 @@ def api_responder_pregunta():
             quiz = cursor.fetchone()
             if not quiz:
                 return jsonify({'success': False, 'message': 'PIN no válido'}), 404
-            
+
             # Usamos la nueva columna user_id y la columna created_by para el creador
             cursor.execute("""
                 INSERT INTO sesiones_juego (cuestionario_id, user_id, estado, fecha_inicio, created_by)
@@ -840,10 +871,10 @@ def api_responder_pregunta():
 def explore():
     """Explorar cuestionarios públicos (versión que consulta BD)."""
     search_query = request.args.get('q', '').strip()
-    
+
     db = bd.obtener_conexion()
     cursor = db.cursor()
-    
+
     if search_query:
         # Búsqueda por título o PIN
         cursor.execute(
@@ -854,7 +885,7 @@ def explore():
                    COALESCE(descripcion, '') as descripcion,
                    imagen_portada
             FROM cuestionarios
-            WHERE estado = 'publico' 
+            WHERE estado = 'publico'
             AND (LOWER(titulo) LIKE LOWER(%s) OR CAST(pin AS CHAR) LIKE %s)
             ORDER BY created_at DESC
             """,
@@ -874,7 +905,7 @@ def explore():
             ORDER BY created_at DESC
             """
         )
-    
+
     items = cursor.fetchall()
     cursor.close()
     db.close()
@@ -1177,11 +1208,11 @@ def grupos():
     if not g.user:
         flash('Debes iniciar sesión para acceder a los grupos', 'warning')
         return redirect(url_for('login'))
-    
+
     # Obtener grupos del usuario
     db = bd.obtener_conexion()
     cursor = db.cursor()
-    
+
     # Grupos donde el usuario es miembro
     cursor.execute("""
         SELECT g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at,
@@ -1195,9 +1226,9 @@ def grupos():
         GROUP BY g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at, g.admin_id
         ORDER BY g.created_at DESC
     """, (g.user['id'], g.user['id']))
-    
+
     mis_grupos = cursor.fetchall()
-    
+
     # Grupos públicos disponibles (donde el usuario NO es miembro)
     cursor.execute("""
         SELECT g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at,
@@ -1205,21 +1236,21 @@ def grupos():
                COUNT(gm.user_id) as miembros_count
         FROM grupos g
         LEFT JOIN grupo_miembros gm ON g.id = gm.grupo_id
-        WHERE g.es_publico = true 
+        WHERE g.es_publico = true
         AND g.id NOT IN (
             SELECT grupo_id FROM grupo_miembros WHERE user_id = %s
         )
         GROUP BY g.id, g.nombre, g.descripcion, g.codigo, g.es_publico, g.created_at
         ORDER BY g.created_at DESC
     """, (g.user['id'],))
-    
+
     grupos_publicos = cursor.fetchall()
     cursor.close()
     db.close()
-    
-    return render_template('grupos.html', 
-                         title='Grupos', 
-                         grupos=mis_grupos, 
+
+    return render_template('grupos.html',
+                         title='Grupos',
+                         grupos=mis_grupos,
                          grupos_publicos=grupos_publicos)
 
 @app.route('/api/grupos/crear', methods=['POST'])
@@ -1227,49 +1258,49 @@ def api_crear_grupo():
     """API para crear un nuevo grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     nombre = data.get('nombre', '').strip()
     descripcion = data.get('descripcion', '').strip()
     es_publico = data.get('es_publico', False)
-    
+
     if not nombre:
         return jsonify({'success': False, 'message': 'El nombre del grupo es requerido'})
-    
+
     # Generar código único de 8 caracteres
     import string
     import random
     codigo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Crear grupo
         cursor.execute("""
             INSERT INTO grupos (nombre, descripcion, codigo, es_publico, admin_id, created_at)
             VALUES (%s, %s, %s, %s, %s, NOW())
         """, (nombre, descripcion, codigo, es_publico, g.user['id']))
-        
+
         grupo_id = cursor.lastrowid
-        
+
         # Agregar admin como miembro
         cursor.execute("""
             INSERT INTO grupo_miembros (grupo_id, user_id, joined_at)
             VALUES (%s, %s, NOW())
         """, (grupo_id, g.user['id']))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({
-            'success': True, 
+            'success': True,
             'message': 'Grupo creado exitosamente',
             'grupo_id': grupo_id,
             'codigo': codigo
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error al crear grupo: {str(e)}'})
 
@@ -1278,48 +1309,48 @@ def api_unirse_grupo():
     """API para unirse a un grupo por código"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     codigo = data.get('codigo', '').strip().upper()
-    
+
     if len(codigo) != 8:
         return jsonify({'success': False, 'message': 'El código debe tener 8 caracteres'})
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Buscar grupo por código
         cursor.execute("SELECT id, nombre FROM grupos WHERE codigo = %s", (codigo,))
         grupo = cursor.fetchone()
-        
+
         if not grupo:
             return jsonify({'success': False, 'message': 'Grupo no encontrado'})
-        
+
         # Verificar si ya es miembro
         cursor.execute("""
-            SELECT id FROM grupo_miembros 
+            SELECT id FROM grupo_miembros
             WHERE grupo_id = %s AND user_id = %s
         """, (grupo['id'], g.user['id']))
-        
+
         if cursor.fetchone():
             return jsonify({'success': False, 'message': 'Ya eres miembro de este grupo'})
-        
+
         # Agregar como miembro
         cursor.execute("""
             INSERT INTO grupo_miembros (grupo_id, user_id, joined_at)
             VALUES (%s, %s, NOW())
         """, (grupo['id'], g.user['id']))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({
-            'success': True, 
+            'success': True,
             'message': f'Te has unido al grupo "{grupo["nombre"]}"'
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error al unirse al grupo: {str(e)}'})
 
@@ -1328,35 +1359,35 @@ def api_salir_grupo():
     """API para salir de un grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     grupo_id = data.get('grupo_id')
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Verificar si es miembro
         cursor.execute("""
-            SELECT id FROM grupo_miembros 
+            SELECT id FROM grupo_miembros
             WHERE grupo_id = %s AND user_id = %s
         """, (grupo_id, g.user['id']))
-        
+
         if not cursor.fetchone():
             return jsonify({'success': False, 'message': 'No eres miembro de este grupo'})
-        
+
         # Remover del grupo
         cursor.execute("""
-            DELETE FROM grupo_miembros 
+            DELETE FROM grupo_miembros
             WHERE grupo_id = %s AND user_id = %s
         """, (grupo_id, g.user['id']))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({'success': True, 'message': 'Has salido del grupo'})
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error al salir del grupo: {str(e)}'})
 
@@ -1365,11 +1396,11 @@ def api_grupos_cuestionarios():
     """API para obtener cuestionarios disponibles para grupos"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener cuestionarios públicos y del usuario
         cursor.execute("""
             SELECT c.id, c.titulo, c.descripcion, c.pin, c.imagen_portada,
@@ -1380,16 +1411,16 @@ def api_grupos_cuestionarios():
             GROUP BY c.id, c.titulo, c.descripcion, c.pin, c.imagen_portada
             ORDER BY c.created_at DESC
         """, (g.user['id'],))
-        
+
         cuestionarios = cursor.fetchall()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'quizzes': cuestionarios
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error al cargar cuestionarios: {str(e)}'})
 
@@ -1398,24 +1429,24 @@ def api_iniciar_cuestionario_grupo():
     """API para iniciar un cuestionario en grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     grupo_id = data.get('grupo_id')
     cuestionario_id = data.get('cuestionario_id')
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Verificar que el usuario es miembro del grupo
         cursor.execute("""
-            SELECT id FROM grupo_miembros 
+            SELECT id FROM grupo_miembros
             WHERE grupo_id = %s AND user_id = %s
         """, (grupo_id, g.user['id']))
-        
+
         if not cursor.fetchone():
             return jsonify({'success': False, 'message': 'No eres miembro de este grupo'})
-        
+
         # Generar un session_code único
         import string
         import random
@@ -1430,108 +1461,112 @@ def api_iniciar_cuestionario_grupo():
             INSERT INTO sesiones_grupo (grupo_id, cuestionario_id, iniciado_por, created_at, session_code)
             VALUES (%s, %s, %s, NOW(), %s)
         """, (grupo_id, cuestionario_id, g.user['id'], session_code))
-        
+
         sesion_id = cursor.lastrowid
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'sesion_id': sesion_id,
             'message': 'Cuestionario iniciado en el grupo'
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error al iniciar cuestionario: {str(e)}'})
 
 @app.route('/grupo/quiz/<int:sesion_id>')
 def grupo_quiz(sesion_id):
-    """Página para rendir cuestionario en grupo"""
+    """Página para rendir cuestionario en grupo - REHECHA DESDE CERO COPIANDO GRUPOS"""
     if not g.user:
         flash('Debes iniciar sesión para participar', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
-        # Obtener información de la sesión
+
+        # Obtener información de la sesión (COPIA EXACTA de grupos)
         cursor.execute("""
-            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code,
-                   g.nombre as grupo_nombre, c.titulo, c.pin, c.descripcion
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code, sg.iniciado_por,
+                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, c.titulo, c.pin, c.descripcion
             FROM sesiones_grupo sg
-            JOIN grupos g ON sg.grupo_id = g.id
+            LEFT JOIN grupos g ON sg.grupo_id = g.id
             JOIN cuestionarios c ON sg.cuestionario_id = c.id
             WHERE sg.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('grupos'))
-        
-        # Verificar que el usuario es miembro del grupo
-        cursor.execute("""
-            SELECT id FROM grupo_miembros 
-            WHERE grupo_id = %s AND user_id = %s
-        """, (sesion['grupo_id'], g.user['id']))
-        
-        if not cursor.fetchone():
-            flash('No eres miembro de este grupo', 'error')
-            return redirect(url_for('grupos'))
-        
-        # Registrar automáticamente al usuario en la sesión si no está ya
-        cursor.execute("""
-            INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
-            VALUES (%s, %s, 0)
-            ON DUPLICATE KEY UPDATE user_id = user_id
-        """, (sesion_id, g.user['id']))
-        
+
+        # Verificar membresía SOLO si hay grupo específico (COPIA EXACTA de grupos)
+        if sesion['grupo_id']:
+            cursor.execute("""
+                SELECT id FROM grupo_miembros
+                WHERE grupo_id = %s AND user_id = %s
+            """, (sesion['grupo_id'], g.user['id']))
+
+            if not cursor.fetchone():
+                flash('No eres miembro de este grupo', 'error')
+                return redirect(url_for('grupos'))
+
+        # Registrar al usuario en la sesión SOLO si NO es el creador (COPIA EXACTA de grupos)
+        if g.user['id'] != sesion['iniciado_por']:
+            cursor.execute("""
+                INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
+                VALUES (%s, %s, 0)
+                ON DUPLICATE KEY UPDATE user_id = user_id
+            """, (sesion_id, g.user['id']))
+
         db.commit()
-        
-        # Obtener SOLO los miembros que se han unido a esta sesión (están en usuario_estado_grupo)
+
+        # Obtener miembros (COPIA EXACTA de grupos)
         cursor.execute("""
             SELECT u.id, u.username, ues.esta_listo
             FROM usuario_estado_grupo ues
             JOIN users u ON ues.user_id = u.id
-            WHERE ues.sesion_id = %s
+            JOIN sesiones_grupo sg ON ues.sesion_id = sg.id
+            WHERE ues.sesion_id = %s AND ues.user_id != sg.iniciado_por
         """, (sesion_id,))
-        
         miembros = cursor.fetchall()
-        
-        # Obtener preguntas del cuestionario
+
+        # Obtener preguntas (COPIA EXACTA de grupos)
         cursor.execute("""
-            SELECT p.id, p.texto_pregunta, p.tiempo_limite, p.puntos
-            FROM preguntas p
-            WHERE p.cuestionario_id = %s
-            ORDER BY p.orden ASC
+            SELECT id, texto_pregunta, tiempo_limite
+            FROM preguntas
+            WHERE cuestionario_id = %s
+            ORDER BY orden
         """, (sesion['cuestionario_id'],))
-        
         preguntas = cursor.fetchall()
 
-        # Obtener opciones para cada pregunta
         preguntas_con_opciones = []
         for pregunta in preguntas:
             cursor.execute("""
                 SELECT id, texto_opcion, es_correcta
                 FROM opciones_respuesta
                 WHERE pregunta_id = %s
-                ORDER BY orden ASC
+                ORDER BY orden
             """, (pregunta['id'],))
             opciones = cursor.fetchall()
+
             preguntas_con_opciones.append({
                 'id': pregunta['id'],
                 'text': pregunta['texto_pregunta'],
                 'time_limit': pregunta['tiempo_limite'],
                 'options': [{'id': o['id'], 'text': o['texto_opcion'], 'is_correct': bool(o['es_correcta'])} for o in opciones]
             })
-        
+
         cursor.close()
         db.close()
-        
-        return render_template('grupo_quiz.html', 
+
+        # Verificar si es creador (COPIA EXACTA de grupos)
+        es_creador = (g.user['id'] == sesion['iniciado_por'])
+
+        return render_template('grupo_quiz.html',
                              sesion_id=sesion_id,
                              session_code=sesion['session_code'],
                              grupo={'nombre': sesion['grupo_nombre']},
@@ -1541,74 +1576,91 @@ def grupo_quiz(sesion_id):
                                  'preguntas_count': len(preguntas)
                              },
                              miembros=miembros,
-                             preguntas_json=json.dumps(preguntas_con_opciones))
-        
+                             preguntas_json=json.dumps(preguntas_con_opciones),
+                             es_creador=es_creador)
+
     except Exception as e:
         flash(f'Error al cargar el cuestionario: {str(e)}', 'error')
         return redirect(url_for('grupos'))
+
+@app.route('/unirse-sala')
+def unirse_sala():
+    """Página para unirse a una sala temporal usando código"""
+    if not g.user:
+        flash('Debes iniciar sesión para unirte a una sala', 'warning')
+        return redirect(url_for('login'))
+    
+    return render_template('unirse_sala.html')
+
 
 @app.route('/api/grupo/unirse-sesion', methods=['POST'])
 def api_unirse_sesion_grupo():
     """API para unirse a una sesión de grupo usando el código de sala"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     session_code = data.get('session_code', '').strip().upper()
-    
+
     if not session_code or len(session_code) != 6:
         return jsonify({'success': False, 'message': 'Código de sala inválido'}), 400
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
-        # 1. Buscar la sesión por código
+
+        # 1. Buscar la sesión por código (puede ser con o sin grupo específico)
         cursor.execute("""
-            SELECT sg.id, sg.grupo_id, sg.estado, g.nombre as grupo_nombre
+            SELECT sg.id, sg.grupo_id, sg.estado, sg.session_code,
+                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, c.titulo
             FROM sesiones_grupo sg
-            JOIN grupos g ON sg.grupo_id = g.id
+            LEFT JOIN grupos g ON sg.grupo_id = g.id
+            JOIN cuestionarios c ON sg.cuestionario_id = c.id
             WHERE sg.session_code = %s
         """, (session_code,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             cursor.close(); db.close()
             return jsonify({'success': False, 'message': 'Código de sala no encontrado'}), 404
-        
-        # 2. Verificar que el usuario es miembro del grupo
-        cursor.execute("""
-            SELECT id FROM grupo_miembros 
-            WHERE grupo_id = %s AND user_id = %s
-        """, (sesion['grupo_id'], g.user['id']))
-        
-        if not cursor.fetchone():
-            cursor.close(); db.close()
-            return jsonify({'success': False, 'message': 'No eres miembro de este grupo'}), 403
-        
+
+        # 2. Verificar que el usuario es miembro del grupo (solo si hay grupo específico)
+        if sesion['grupo_id']:
+            cursor.execute("""
+                SELECT id FROM grupo_miembros
+                WHERE grupo_id = %s AND user_id = %s
+            """, (sesion['grupo_id'], g.user['id']))
+
+            if not cursor.fetchone():
+                cursor.close(); db.close()
+                return jsonify({'success': False, 'message': 'No eres miembro de este grupo'}), 403
+        else:
+            # Para sesiones sin grupo específico, cualquier usuario puede unirse
+            pass
+
         # 3. Verificar el estado de la sesión
         if sesion['estado'] == 'finalizado':
             cursor.close(); db.close()
             return jsonify({'success': False, 'message': 'Esta sesión ya ha finalizado'}), 400
-        
+
         # 4. Registrar al usuario en la sesión si no está ya
         cursor.execute("""
             INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
             VALUES (%s, %s, 0)
             ON DUPLICATE KEY UPDATE user_id = user_id
         """, (sesion['id'], g.user['id']))
-        
+
         db.commit()
         cursor.close(); db.close()
-        
+
         return jsonify({
             'success': True,
             'sesion_id': sesion['id'],
             'grupo_nombre': sesion['grupo_nombre'],
             'message': f'Te has unido a la sala del grupo {sesion["grupo_nombre"]}'
         })
-        
+
     except Exception as e:
         if db:
             try: db.close()
@@ -1620,22 +1672,22 @@ def api_grupo_ready():
     """API para marcar usuario como listo y, si todos los que están en la sala están listos, iniciar la sesión."""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     sesion_id = data.get('sesion_id')
     ready = bool(data.get('ready', False))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # 1) Upsert del estado del usuario en la sesión
         cursor.execute("""
             INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo)
             VALUES (%s, %s, %s)
             ON DUPLICATE KEY UPDATE esta_listo = VALUES(esta_listo)
         """, (sesion_id, g.user['id'], ready))
-        
+
         # 2) Obtener grupo de la sesión
         cursor.execute("SELECT grupo_id FROM sesiones_grupo WHERE id = %s", (sesion_id,))
         row = cursor.fetchone()
@@ -1643,7 +1695,7 @@ def api_grupo_ready():
             cursor.close(); db.close()
             return jsonify({'success': False, 'message': 'Sesión no encontrada'}), 404
         grupo_id = row['grupo_id']
-        
+
         # 3) CAMBIO CLAVE: Contar usuarios que se UNIERON A LA SALA (están en usuario_estado_grupo)
         # en lugar de contar todos los miembros del grupo
         cursor.execute("""
@@ -1652,7 +1704,7 @@ def api_grupo_ready():
             WHERE sesion_id = %s
         """, (sesion_id,))
         total_en_sala = cursor.fetchone()['total_en_sala']
-        
+
         # 4) Contar cuántos están listos en esta sesión
         cursor.execute("""
             SELECT COUNT(*) AS listos
@@ -1660,10 +1712,10 @@ def api_grupo_ready():
             WHERE sesion_id = %s AND esta_listo = 1
         """, (sesion_id,))
         listos = cursor.fetchone()['listos']
-        
+
         # 5) Todos están listos si hay al menos 1 persona en la sala y todos están listos
         all_ready = (total_en_sala > 0 and listos == total_en_sala)
-        
+
         # 6) Si todos listos, pasar a 'en_progreso' y setear started_at
         if all_ready:
             cursor.execute("""
@@ -1671,7 +1723,7 @@ def api_grupo_ready():
                 SET estado = 'en_progreso', started_at = NOW()
                 WHERE id = %s
             """, (sesion_id,))
-        
+
         # 7) Obtener la lista actualizada SOLO de usuarios que están en la sala
         cursor.execute("""
             SELECT u.id, u.username, ues.esta_listo as ready
@@ -1679,14 +1731,14 @@ def api_grupo_ready():
             JOIN users u ON ues.user_id = u.id
             WHERE ues.sesion_id = %s
         """, (sesion_id,))
-        
+
         miembros_actualizados = cursor.fetchall()
-        
+
         db.commit()
         cursor.close(); db.close()
-        
+
         return jsonify({'success': True, 'all_ready': all_ready, 'members': miembros_actualizados})
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
@@ -1698,54 +1750,71 @@ def grupo_juego(sesion_id):
     if not g.user:
         flash('Debes iniciar sesión para participar', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la sesión
         cursor.execute("""
-            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code,
-                   g.nombre as grupo_nombre, c.titulo, c.pin
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code, sg.iniciado_por,
+                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, c.titulo, c.pin
             FROM sesiones_grupo sg
-            JOIN grupos g ON sg.grupo_id = g.id
+            LEFT JOIN grupos g ON sg.grupo_id = g.id
             JOIN cuestionarios c ON sg.cuestionario_id = c.id
             WHERE sg.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('grupos'))
-        
-        # Verificar que el usuario es miembro del grupo
+
+        # Verificar que el usuario es miembro del grupo (solo si hay grupo específico)
+        if sesion['grupo_id']:
+            cursor.execute("""
+                SELECT id FROM grupo_miembros
+                WHERE grupo_id = %s AND user_id = %s
+            """, (sesion['grupo_id'], g.user['id']))
+
+            if not cursor.fetchone():
+                flash('No eres miembro de este grupo', 'error')
+                return redirect(url_for('grupos'))
+        else:
+            # Para salas temporales, cualquier usuario puede acceder
+            pass
+
+        # Verificar que el usuario está en la sesión Y está listo (si no es el creador)
         cursor.execute("""
-            SELECT id FROM grupo_miembros 
-            WHERE grupo_id = %s AND user_id = %s
-        """, (sesion['grupo_id'], g.user['id']))
-        
-        if not cursor.fetchone():
-            flash('No eres miembro de este grupo', 'error')
-            return redirect(url_for('grupos'))
-        
-        # Verificar que el usuario está en la sesión
-        cursor.execute("""
-            SELECT id FROM usuario_estado_grupo
-            WHERE sesion_id = %s AND user_id = %s
+            SELECT ues.esta_listo, sg.iniciado_por
+            FROM usuario_estado_grupo ues
+            JOIN sesiones_grupo sg ON ues.sesion_id = sg.id
+            WHERE ues.sesion_id = %s AND ues.user_id = %s
         """, (sesion_id, g.user['id']))
         
-        if not cursor.fetchone():
+        usuario_sesion = cursor.fetchone()
+        
+        if not usuario_sesion:
             flash('No estás registrado en esta sesión', 'error')
+            cursor.close()
+            db.close()
             return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
         
+        # Si no es el creador y no está listo, no puede jugar
+        if g.user['id'] != usuario_sesion['iniciado_por'] and not usuario_sesion['esta_listo']:
+            flash('Debes estar listo para participar en el juego', 'error')
+            cursor.close()
+            db.close()
+            return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
+
         # Verificar estado de la sesión
         if sesion['estado'] != 'en_progreso':
             if sesion['estado'] == 'esperando':
                 return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
             elif sesion['estado'] == 'finalizado':
                 return redirect(url_for('grupo_resultados', sesion_id=sesion_id))
-        
+
         # Obtener preguntas del cuestionario
         cursor.execute("""
             SELECT p.id, p.texto_pregunta, p.tiempo_limite, p.puntos, p.orden
@@ -1753,7 +1822,7 @@ def grupo_juego(sesion_id):
             WHERE p.cuestionario_id = %s
             ORDER BY p.orden ASC
         """, (sesion['cuestionario_id'],))
-        
+
         preguntas = cursor.fetchall()
 
         # Obtener opciones para cada pregunta
@@ -1774,28 +1843,33 @@ def grupo_juego(sesion_id):
                 'orden': pregunta['orden'],
                 'options': [{'id': o['id'], 'text': o['texto_opcion'], 'is_correct': bool(o['es_correcta'])} for o in opciones]
             })
-        
-        # Obtener miembros en la sesión
+
+        # Obtener miembros en la sesión (EXCLUYENDO al creador)
         cursor.execute("""
             SELECT u.id, u.username
             FROM usuario_estado_grupo ues
             JOIN users u ON ues.user_id = u.id
-            WHERE ues.sesion_id = %s
+            JOIN sesiones_grupo sg ON ues.sesion_id = sg.id
+            WHERE ues.sesion_id = %s AND ues.user_id != sg.iniciado_por
         """, (sesion_id,))
-        
+
         miembros = cursor.fetchall()
-        
+
         cursor.close()
         db.close()
-        
-        return render_template('juego_grupo.html', 
+
+        # Verificar si es creador (COPIA EXACTA de grupos)
+        es_creador = (g.user['id'] == sesion['iniciado_por'])
+
+        return render_template('juego_grupo.html',
                              sesion_id=sesion_id,
                              grupo={'nombre': sesion['grupo_nombre']},
                              cuestionario={'titulo': sesion['titulo']},
                              preguntas_json=json.dumps(preguntas_con_opciones),
                              total_preguntas=len(preguntas),
-                             miembros=miembros)
-        
+                             miembros=miembros,
+                             es_creador=es_creador)
+
     except Exception as e:
         flash(f'Error al cargar el juego: {str(e)}', 'error')
         return redirect(url_for('grupos'))
@@ -1805,11 +1879,11 @@ def api_grupo_miembros(sesion_id):
     """API para obtener la lista actualizada de miembros en una sesión"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener miembros que están en la sesión
         cursor.execute("""
             SELECT u.id, u.username, ues.esta_listo as ready
@@ -1818,16 +1892,16 @@ def api_grupo_miembros(sesion_id):
             WHERE ues.sesion_id = %s
             ORDER BY ues.created_at ASC
         """, (sesion_id,))
-        
+
         miembros = cursor.fetchall()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'members': miembros
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
@@ -1836,25 +1910,25 @@ def api_grupo_status(sesion_id):
     """API para obtener el estado de la sesión"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         cursor.execute("SELECT estado FROM sesiones_grupo WHERE id = %s", (sesion_id,))
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             return jsonify({'success': False, 'message': 'Sesión no encontrada'})
-        
+
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'status': sesion['estado']
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
@@ -1863,17 +1937,17 @@ def api_grupo_answer():
     """API para enviar respuesta del usuario con cálculo de puntos"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     sesion_id = data.get('sesion_id')
     question_id = data.get('question_id')
     answer_id = data.get('answer_id')
     tiempo_respuesta = data.get('tiempo_respuesta', 0)
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la opción y la pregunta
         cursor.execute("""
             SELECT o.es_correcta, p.puntos, p.tiempo_limite
@@ -1881,11 +1955,11 @@ def api_grupo_answer():
             JOIN preguntas p ON o.pregunta_id = p.id
             WHERE o.id = %s AND o.pregunta_id = %s
         """, (answer_id, question_id))
-        
+
         resultado = cursor.fetchone()
         if not resultado:
             return jsonify({'success': False, 'message': 'Opción no encontrada'})
-        
+
         # Calcular puntos (más rápido = más puntos)
         es_correcta = resultado['es_correcta']
         puntos = 0
@@ -1896,7 +1970,7 @@ def api_grupo_answer():
             tiempo_restante = max(0, tiempo_limite - tiempo_respuesta)
             factor_tiempo = tiempo_restante / tiempo_limite
             puntos = int(puntos_base * factor_tiempo)
-        
+
         # Guardar respuesta
         cursor.execute("""
             INSERT INTO respuestas_grupo (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
@@ -1904,17 +1978,17 @@ def api_grupo_answer():
             ON DUPLICATE KEY UPDATE opcion_id = %s, es_correcta = %s, puntos = %s, tiempo_respuesta = %s
         """, (sesion_id, g.user['id'], question_id, answer_id, es_correcta, puntos, tiempo_respuesta,
               answer_id, es_correcta, puntos, tiempo_respuesta))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'correct': bool(es_correcta),
             'points': puntos
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
@@ -1923,19 +1997,20 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
     """API para verificar si todos respondieron una pregunta"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
-        # Contar total de usuarios en la sesión
+
+        # Contar total de usuarios en la sesión (EXCLUYENDO al creador/host)
         cursor.execute("""
             SELECT COUNT(*) as total
-            FROM usuario_estado_grupo
-            WHERE sesion_id = %s
+            FROM usuario_estado_grupo ues
+            JOIN sesiones_grupo sg ON ues.sesion_id = sg.id
+            WHERE ues.sesion_id = %s AND ues.user_id != sg.iniciado_por
         """, (sesion_id,))
         total_usuarios = cursor.fetchone()['total']
-        
+
         # Contar cuántos ya respondieron esta pregunta
         cursor.execute("""
             SELECT COUNT(*) as respondidos
@@ -1943,19 +2018,71 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
             WHERE sesion_id = %s AND pregunta_id = %s
         """, (sesion_id, pregunta_id))
         respondidos = cursor.fetchone()['respondidos']
-        
+
         cursor.close()
         db.close()
-        
+
         todos_respondieron = (total_usuarios > 0 and respondidos >= total_usuarios)
-        
+
         return jsonify({
             'success': True,
             'all_answered': todos_respondieron,
             'total': total_usuarios,
             'answered': respondidos
         })
-        
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/api/grupo/start-game', methods=['POST'])
+def api_start_game():
+    """API para que el creador inicie el juego con los que estén listos"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+
+        # Verificar que el usuario es el creador de la sesión
+        cursor.execute("""
+            SELECT iniciado_por FROM sesiones_grupo WHERE id = %s
+        """, (sesion_id,))
+        sesion_info = cursor.fetchone()
+
+        if not sesion_info or g.user['id'] != sesion_info['iniciado_por']:
+            return jsonify({'success': False, 'message': 'Solo el creador puede iniciar el juego'})
+
+        # Verificar que hay al menos un participante listo
+        cursor.execute("""
+            SELECT COUNT(*) as listos
+            FROM usuario_estado_grupo
+            WHERE sesion_id = %s AND esta_listo = 1
+        """, (sesion_id,))
+        listos = cursor.fetchone()['listos']
+
+        if listos == 0:
+            return jsonify({'success': False, 'message': 'No hay participantes listos para jugar'})
+
+        # Iniciar el juego
+        cursor.execute("""
+            UPDATE sesiones_grupo
+            SET estado = 'en_progreso', started_at = NOW()
+            WHERE id = %s
+        """, (sesion_id,))
+
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            'success': True,
+            'message': f'Juego iniciado con {listos} participantes listos'
+        })
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
@@ -1964,27 +2091,27 @@ def api_finalizar_sesion():
     """API para marcar la sesión como finalizada"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     sesion_id = data.get('sesion_id')
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Actualizar estado de la sesión
         cursor.execute("""
             UPDATE sesiones_grupo
             SET estado = 'finalizado', finished_at = NOW()
             WHERE id = %s
         """, (sesion_id,))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({'success': True})
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
@@ -1994,11 +2121,11 @@ def grupo_resultados(sesion_id):
     if not g.user:
         flash('Debes iniciar sesión para ver los resultados', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la sesión
         cursor.execute("""
             SELECT sg.id, sg.grupo_id, sg.cuestionario_id,
@@ -2008,13 +2135,13 @@ def grupo_resultados(sesion_id):
             JOIN cuestionarios c ON sg.cuestionario_id = c.id
             WHERE sg.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('grupos'))
-        
+
         # Obtener el total de preguntas
         cursor.execute("""
             SELECT COUNT(p.id) as total_preguntas
@@ -2025,9 +2152,9 @@ def grupo_resultados(sesion_id):
 
         # Obtener resultados de todos los participantes
         cursor.execute("""
-            SELECT 
+            SELECT
                 u.id,
-                u.username, 
+                u.username,
                 COALESCE(SUM(rg.puntos), 0) as score,
                 COALESCE(SUM(rg.es_correcta), 0) as correct_answers,
                 COUNT(DISTINCT rg.pregunta_id) as preguntas_respondidas
@@ -2042,14 +2169,14 @@ def grupo_resultados(sesion_id):
 
         cursor.close()
         db.close()
-        
-        return render_template('grupo_resultados.html', 
+
+        return render_template('grupo_resultados.html',
                              sesion_id=sesion_id,
                              grupo_nombre=sesion['grupo_nombre'],
                              cuestionario_titulo=sesion['cuestionario_titulo'],
                              resultados=resultados,
                              total_preguntas=total_preguntas)
-        
+
     except Exception as e:
         flash(f'Error al cargar resultados: {str(e)}', 'error')
         return redirect(url_for('grupos'))
@@ -2059,11 +2186,11 @@ def api_grupo_results(sesion_id):
     """API para obtener resultados del grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener el total de preguntas del cuestionario de esta sesión
         cursor.execute("""
             SELECT COUNT(p.id) as total_preguntas
@@ -2076,8 +2203,8 @@ def api_grupo_results(sesion_id):
 
         # Obtener puntuaciones y aciertos de todos los usuarios
         cursor.execute("""
-            SELECT 
-                u.username, 
+            SELECT
+                u.username,
                 SUM(rg.puntos) as score,
                 SUM(rg.es_correcta) as correct_answers
             FROM respuestas_grupo rg
@@ -2094,12 +2221,12 @@ def api_grupo_results(sesion_id):
 
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'results': resultados
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
@@ -2187,7 +2314,7 @@ def resultados_quiz(pin):
                         "name": r['username'],
                         "answers": []
                     }
-                
+
                 participants_map[user_id]['answers'].append({
                     "questionId": r['pregunta_id'],
                     "correct": bool(r['es_correcta']),
@@ -2216,24 +2343,24 @@ def api_iniciar_cuestionario_individual():
     """API para iniciar un cuestionario individual con sistema de sala"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     cuestionario_id = data.get('cuestionario_id')
-    
+
     if not cuestionario_id:
         return jsonify({'success': False, 'message': 'ID de cuestionario requerido'}), 400
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Verificar que el cuestionario existe
         cursor.execute("SELECT id, titulo FROM cuestionarios WHERE id = %s", (cuestionario_id,))
         cuestionario = cursor.fetchone()
-        
+
         if not cuestionario:
             return jsonify({'success': False, 'message': 'Cuestionario no encontrado'})
-        
+
         # Generar un session_code único de 6 caracteres
         import string
         import random
@@ -2252,19 +2379,19 @@ def api_iniciar_cuestionario_individual():
             INSERT INTO sesiones_individual (cuestionario_id, iniciado_por, session_code, created_at)
             VALUES (%s, %s, %s, NOW())
         """, (cuestionario_id, g.user['id'], session_code))
-        
+
         sesion_id = cursor.lastrowid
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'sesion_id': sesion_id,
             'session_code': session_code,
             'message': 'Sesión creada exitosamente'
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error al iniciar cuestionario: {str(e)}'})
 
@@ -2274,11 +2401,11 @@ def individual_quiz(sesion_id):
     if not g.user:
         flash('Debes iniciar sesión para participar', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la sesión
         cursor.execute("""
             SELECT si.id, si.cuestionario_id, si.estado, si.session_code,
@@ -2287,27 +2414,27 @@ def individual_quiz(sesion_id):
             JOIN cuestionarios c ON si.cuestionario_id = c.id
             WHERE si.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('my_quizzes'))
-        
+
         # Si la sesión ya finalizó, redirigir
         if sesion['estado'] == 'finalizado':
             flash('Esta sesión ya ha finalizado', 'info')
             return redirect(url_for('my_quizzes'))
-        
+
         # Registrar automáticamente al usuario en la sesión si no está ya
         cursor.execute("""
             INSERT INTO usuario_estado_individual (sesion_id, user_id, esta_listo)
             VALUES (%s, %s, 0)
             ON DUPLICATE KEY UPDATE user_id = user_id
         """, (sesion_id, g.user['id']))
-        
+
         db.commit()
-        
+
         # Obtener todos los usuarios en la sala
         cursor.execute("""
             SELECT u.id, u.username, uei.esta_listo
@@ -2316,33 +2443,33 @@ def individual_quiz(sesion_id):
             WHERE uei.sesion_id = %s
             ORDER BY uei.created_at ASC
         """, (sesion_id,))
-        
+
         participantes = cursor.fetchall()
-        
+
         # Obtener el número de preguntas
         cursor.execute("""
             SELECT COUNT(*) as count FROM preguntas WHERE cuestionario_id = %s
         """, (sesion['cuestionario_id'],))
-        
+
         preguntas_count = cursor.fetchone()['count']
-        
+
         cursor.close()
         db.close()
-        
+
         cuestionario_info = {
             'titulo': sesion['titulo'],
             'pin': sesion['pin'],
             'descripcion': sesion['descripcion'],
             'preguntas_count': preguntas_count
         }
-        
+
         return render_template('individual_quiz.html',
                              sesion_id=sesion_id,
                              session_code=sesion['session_code'],
                              cuestionario=cuestionario_info,
                              participantes=participantes,
                              user_id=g.user['id'])
-        
+
     except Exception as e:
         flash(f'Error al cargar la sala: {str(e)}', 'error')
         return redirect(url_for('my_quizzes'))
@@ -2352,48 +2479,48 @@ def api_unirse_sesion_individual():
     """API para unirse a una sesión individual usando el código de sala"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     session_code = data.get('session_code', '').strip().upper()
-    
+
     if len(session_code) != 6:
         return jsonify({'success': False, 'message': 'El código debe tener 6 caracteres'})
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Buscar sesión por código
         cursor.execute("""
-            SELECT id, estado FROM sesiones_individual 
+            SELECT id, estado FROM sesiones_individual
             WHERE session_code = %s
         """, (session_code,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             return jsonify({'success': False, 'message': 'Código de sala inválido'})
-        
+
         if sesion['estado'] == 'finalizado':
             return jsonify({'success': False, 'message': 'Esta sesión ya ha finalizado'})
-        
+
         # Registrar al usuario en la sesión
         cursor.execute("""
             INSERT INTO usuario_estado_individual (sesion_id, user_id, esta_listo)
             VALUES (%s, %s, 0)
             ON DUPLICATE KEY UPDATE user_id = user_id
         """, (sesion['id'], g.user['id']))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'sesion_id': sesion['id'],
             'message': 'Te has unido a la sesión'
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error al unirse: {str(e)}'})
 
@@ -2402,51 +2529,51 @@ def api_individual_ready():
     """API para marcar al usuario como listo en sesión individual"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     sesion_id = data.get('sesion_id')
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Verificar que el usuario está en la sesión
         cursor.execute("""
             SELECT id FROM usuario_estado_individual
             WHERE sesion_id = %s AND user_id = %s
         """, (sesion_id, g.user['id']))
-        
+
         if not cursor.fetchone():
             return jsonify({'success': False, 'message': 'No estás en esta sesión'})
-        
+
         # Marcar como listo
         cursor.execute("""
             UPDATE usuario_estado_individual
             SET esta_listo = 1
             WHERE sesion_id = %s AND user_id = %s
         """, (sesion_id, g.user['id']))
-        
+
         db.commit()
-        
+
         # Verificar si todos están listos
         cursor.execute("""
             SELECT COUNT(*) AS total_en_sala
             FROM usuario_estado_individual
             WHERE sesion_id = %s
         """, (sesion_id,))
-        
+
         total_en_sala = cursor.fetchone()['total_en_sala']
-        
+
         cursor.execute("""
             SELECT COUNT(*) AS listos
             FROM usuario_estado_individual
             WHERE sesion_id = %s AND esta_listo = 1
         """, (sesion_id,))
-        
+
         listos = cursor.fetchone()['listos']
-        
+
         all_ready = (total_en_sala > 0 and listos == total_en_sala)
-        
+
         if all_ready:
             # Actualizar estado de la sesión a 'en_progreso'
             cursor.execute("""
@@ -2455,10 +2582,10 @@ def api_individual_ready():
                 WHERE id = %s
             """, (sesion_id,))
             db.commit()
-        
+
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'all_ready': all_ready,
@@ -2466,7 +2593,7 @@ def api_individual_ready():
             'total_count': total_en_sala,
             'message': 'Marcado como listo' if not all_ready else '¡Todos listos! Iniciando...'
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
@@ -2476,11 +2603,11 @@ def individual_juego(sesion_id):
     if not g.user:
         flash('Debes iniciar sesión para participar', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la sesión
         cursor.execute("""
             SELECT si.id, si.cuestionario_id, si.estado, si.session_code,
@@ -2489,28 +2616,28 @@ def individual_juego(sesion_id):
             JOIN cuestionarios c ON si.cuestionario_id = c.id
             WHERE si.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('my_quizzes'))
-        
+
         # Verificar que el usuario está en la sesión
         cursor.execute("""
             SELECT id FROM usuario_estado_individual
             WHERE sesion_id = %s AND user_id = %s
         """, (sesion_id, g.user['id']))
-        
+
         if not cursor.fetchone():
             flash('No estás registrado en esta sesión', 'error')
             return redirect(url_for('individual_quiz', sesion_id=sesion_id))
-        
+
         # Verificar estado de la sesión
         if sesion['estado'] != 'en_progreso':
             flash('El juego aún no ha comenzado o ya finalizó', 'info')
             return redirect(url_for('individual_quiz', sesion_id=sesion_id))
-        
+
         # Obtener preguntas del cuestionario
         cursor.execute("""
             SELECT id, texto_pregunta, tiempo_limite, puntos, orden
@@ -2518,9 +2645,9 @@ def individual_juego(sesion_id):
             WHERE cuestionario_id = %s
             ORDER BY orden ASC
         """, (sesion['cuestionario_id'],))
-        
+
         preguntas = cursor.fetchall()
-        
+
         # Obtener opciones para cada pregunta
         preguntas_con_opciones = []
         for pregunta in preguntas:
@@ -2530,13 +2657,13 @@ def individual_juego(sesion_id):
                 WHERE pregunta_id = %s
                 ORDER BY orden ASC
             """, (pregunta['id'],))
-            
+
             opciones = cursor.fetchall()
-            
+
             pregunta_dict = dict(pregunta)
             pregunta_dict['opciones'] = opciones
             preguntas_con_opciones.append(pregunta_dict)
-        
+
         # Obtener participantes en la sala
         cursor.execute("""
             SELECT u.id, u.username
@@ -2544,19 +2671,19 @@ def individual_juego(sesion_id):
             JOIN users u ON uei.user_id = u.id
             WHERE uei.sesion_id = %s
         """, (sesion_id,))
-        
+
         participantes = cursor.fetchall()
-        
+
         cursor.close()
         db.close()
-        
-        return render_template('juego_individual.html', 
+
+        return render_template('juego_individual.html',
                              sesion_id=sesion_id,
                              cuestionario={'titulo': sesion['titulo']},
                              preguntas_json=json.dumps(preguntas_con_opciones),
                              total_preguntas=len(preguntas),
                              participantes=participantes)
-        
+
     except Exception as e:
         flash(f'Error al cargar el juego: {str(e)}', 'error')
         return redirect(url_for('my_quizzes'))
@@ -2566,11 +2693,11 @@ def api_individual_participantes(sesion_id):
     """API para obtener la lista actualizada de participantes en una sesión"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         cursor.execute("""
             SELECT u.id, u.username, uei.esta_listo as ready
             FROM usuario_estado_individual uei
@@ -2578,16 +2705,16 @@ def api_individual_participantes(sesion_id):
             WHERE uei.sesion_id = %s
             ORDER BY uei.created_at ASC
         """, (sesion_id,))
-        
+
         participantes = cursor.fetchall()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'participants': participantes
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
@@ -2596,25 +2723,25 @@ def api_individual_status(sesion_id):
     """API para obtener el estado de la sesión"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         cursor.execute("SELECT estado FROM sesiones_individual WHERE id = %s", (sesion_id,))
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             return jsonify({'success': False, 'message': 'Sesión no encontrada'})
-        
+
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'status': sesion['estado']
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
@@ -2623,17 +2750,17 @@ def api_individual_answer():
     """API para enviar respuesta en sesión individual (igual que grupos)"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     sesion_id = data.get('sesion_id')
     question_id = data.get('question_id')
     answer_id = data.get('answer_id')
     tiempo_respuesta = data.get('tiempo_respuesta', 0)
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la opción y la pregunta
         cursor.execute("""
             SELECT o.es_correcta, p.puntos, p.tiempo_limite
@@ -2641,11 +2768,11 @@ def api_individual_answer():
             JOIN preguntas p ON o.pregunta_id = p.id
             WHERE o.id = %s AND o.pregunta_id = %s
         """, (answer_id, question_id))
-        
+
         resultado = cursor.fetchone()
         if not resultado:
             return jsonify({'success': False, 'message': 'Opción no encontrada'})
-        
+
         # Calcular puntos (fórmula igual que grupos)
         es_correcta = resultado['es_correcta']
         puntos = 0
@@ -2656,7 +2783,7 @@ def api_individual_answer():
             tiempo_restante = max(0, tiempo_limite - tiempo_respuesta)
             factor_tiempo = tiempo_restante / tiempo_limite
             puntos = int(puntos_base * factor_tiempo)
-        
+
         # Guardar respuesta en la tabla correcta
         cursor.execute("""
             INSERT INTO respuestas_individual (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
@@ -2664,17 +2791,17 @@ def api_individual_answer():
             ON DUPLICATE KEY UPDATE opcion_id = %s, es_correcta = %s, puntos = %s, tiempo_respuesta = %s
         """, (sesion_id, g.user['id'], question_id, answer_id, es_correcta, puntos, tiempo_respuesta,
               answer_id, es_correcta, puntos, tiempo_respuesta))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({
             'success': True,
             'correct': bool(es_correcta),
             'points': puntos
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
@@ -2683,26 +2810,26 @@ def api_finalizar_sesion_individual():
     """API para marcar sesión individual como finalizada"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     sesion_id = data.get('sesion_id')
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         cursor.execute("""
             UPDATE sesiones_individual
             SET estado = 'finalizado', finished_at = NOW()
             WHERE id = %s
         """, (sesion_id,))
-        
+
         db.commit()
         cursor.close()
         db.close()
-        
+
         return jsonify({'success': True})
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
@@ -2712,11 +2839,11 @@ def individual_resultados(sesion_id):
     if not g.user:
         flash('Debes iniciar sesión para ver los resultados', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la sesión
         cursor.execute("""
             SELECT si.id, si.cuestionario_id, c.titulo as cuestionario_titulo
@@ -2724,13 +2851,13 @@ def individual_resultados(sesion_id):
             JOIN cuestionarios c ON si.cuestionario_id = c.id
             WHERE si.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('my_quizzes'))
-        
+
         # Obtener el total de preguntas
         cursor.execute("""
             SELECT COUNT(p.id) as total_preguntas
@@ -2741,9 +2868,9 @@ def individual_resultados(sesion_id):
 
         # Obtener resultados de todos los participantes
         cursor.execute("""
-            SELECT 
+            SELECT
                 u.id,
-                u.username, 
+                u.username,
                 COALESCE(SUM(ri.puntos), 0) as score,
                 COALESCE(SUM(ri.es_correcta), 0) as correct_answers,
                 COUNT(DISTINCT ri.pregunta_id) as preguntas_respondidas
@@ -2755,16 +2882,16 @@ def individual_resultados(sesion_id):
             ORDER BY score DESC, correct_answers DESC
         """, (sesion_id, sesion_id))
         resultados = cursor.fetchall()
-        
+
         cursor.close()
         db.close()
-        
+
         return render_template('individual_resultados.html',
                              sesion_id=sesion_id,
                              cuestionario_titulo=sesion['cuestionario_titulo'],
                              total_preguntas=total_preguntas,
                              resultados=resultados)
-        
+
     except Exception as e:
         flash(f'Error al cargar resultados: {str(e)}', 'error')
         return redirect(url_for('my_quizzes'))
@@ -2779,11 +2906,11 @@ def exportar_resultados_grupo_excel(sesion_id):
     if not g.user:
         flash('Debes iniciar sesión', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la sesión
         cursor.execute("""
             SELECT sg.id, sg.grupo_id, sg.cuestionario_id,
@@ -2793,13 +2920,13 @@ def exportar_resultados_grupo_excel(sesion_id):
             JOIN cuestionarios c ON sg.cuestionario_id = c.id
             WHERE sg.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('grupos'))
-        
+
         # Obtener el total de preguntas
         cursor.execute("""
             SELECT COUNT(p.id) as total_preguntas
@@ -2810,8 +2937,8 @@ def exportar_resultados_grupo_excel(sesion_id):
 
         # Obtener resultados de todos los participantes
         cursor.execute("""
-            SELECT 
-                u.username, 
+            SELECT
+                u.username,
                 COALESCE(SUM(rg.puntos), 0) as score,
                 COALESCE(SUM(rg.es_correcta), 0) as correct_answers,
                 COUNT(DISTINCT rg.pregunta_id) as preguntas_respondidas
@@ -2826,12 +2953,12 @@ def exportar_resultados_grupo_excel(sesion_id):
 
         cursor.close()
         db.close()
-        
+
         # Crear libro de Excel
         wb = Workbook()
         ws = wb.active
         ws.title = "Resultados"
-        
+
         # Estilos
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF", size=12)
@@ -2841,25 +2968,25 @@ def exportar_resultados_grupo_excel(sesion_id):
             top=Side(style='thin'),
             bottom=Side(style='thin')
         )
-        
+
         # Título
         ws.merge_cells('A1:E1')
         title_cell = ws['A1']
         title_cell.value = f"Resultados - {sesion['cuestionario_titulo']}"
         title_cell.font = Font(bold=True, size=16)
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
-        
+
         ws.merge_cells('A2:E2')
         subtitle_cell = ws['A2']
         subtitle_cell.value = f"Grupo: {sesion['grupo_nombre']}"
         subtitle_cell.font = Font(size=12)
         subtitle_cell.alignment = Alignment(horizontal='center', vertical='center')
-        
+
         ws.merge_cells('A3:E3')
         date_cell = ws['A3']
         date_cell.value = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
         date_cell.alignment = Alignment(horizontal='center')
-        
+
         # Headers
         headers = ['Posición', 'Jugador', 'Puntaje', 'Respuestas Correctas', 'Preguntas Respondidas']
         for col, header in enumerate(headers, start=1):
@@ -2869,7 +2996,7 @@ def exportar_resultados_grupo_excel(sesion_id):
             cell.font = header_font
             cell.alignment = Alignment(horizontal='center', vertical='center')
             cell.border = border
-        
+
         # Datos
         for idx, resultado in enumerate(resultados, start=1):
             row = idx + 5
@@ -2878,29 +3005,29 @@ def exportar_resultados_grupo_excel(sesion_id):
             ws.cell(row=row, column=3, value=resultado['score']).border = border
             ws.cell(row=row, column=4, value=f"{resultado['correct_answers']}/{total_preguntas}").border = border
             ws.cell(row=row, column=5, value=resultado['preguntas_respondidas']).border = border
-            
+
             # Alineación
             for col in range(1, 6):
                 ws.cell(row=row, column=col).alignment = Alignment(horizontal='center', vertical='center')
-        
+
         # Ajustar anchos de columna
         ws.column_dimensions['A'].width = 12
         ws.column_dimensions['B'].width = 25
         ws.column_dimensions['C'].width = 15
         ws.column_dimensions['D'].width = 22
         ws.column_dimensions['E'].width = 25
-        
+
         # Guardar en memoria
         output = BytesIO()
         wb.save(output)
         output.seek(0)
-        
+
         filename = f"Resultados_{sesion['grupo_nombre']}_{sesion['cuestionario_titulo']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+
         # ✅ SUBIR AUTOMÁTICAMENTE A GOOGLE DRIVE
         output_copy = BytesIO(output.getvalue())  # Copia para Drive
         drive_result = subir_a_google_drive(output_copy, filename)
-        
+
         if drive_result['success']:
             flash(f'✅ Resultados guardados en Google Drive', 'success')
         elif drive_result.get('needs_auth'):
@@ -2908,17 +3035,17 @@ def exportar_resultados_grupo_excel(sesion_id):
             session['needs_drive_auth'] = True
         else:
             flash(f'⚠️ Descarga lista, pero hubo un error al guardar en Drive: {drive_result.get("error", "Error desconocido")}', 'warning')
-        
+
         # Resetear el puntero para la descarga
         output.seek(0)
-        
+
         return send_file(
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
         )
-        
+
     except Exception as e:
         flash(f'Error al exportar resultados: {str(e)}', 'error')
         return redirect(url_for('grupo_resultados', sesion_id=sesion_id))
@@ -2929,11 +3056,11 @@ def exportar_resultados_individual_excel(sesion_id):
     if not g.user:
         flash('Debes iniciar sesión', 'warning')
         return redirect(url_for('login'))
-    
+
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información de la sesión
         cursor.execute("""
             SELECT si.id, si.cuestionario_id, c.titulo as cuestionario_titulo
@@ -2941,13 +3068,13 @@ def exportar_resultados_individual_excel(sesion_id):
             JOIN cuestionarios c ON si.cuestionario_id = c.id
             WHERE si.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
-        
+
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('my_quizzes'))
-        
+
         # Obtener el total de preguntas
         cursor.execute("""
             SELECT COUNT(p.id) as total_preguntas
@@ -2958,8 +3085,8 @@ def exportar_resultados_individual_excel(sesion_id):
 
         # Obtener resultados de todos los participantes
         cursor.execute("""
-            SELECT 
-                u.username, 
+            SELECT
+                u.username,
                 COALESCE(SUM(ri.puntos), 0) as score,
                 COALESCE(SUM(ri.es_correcta), 0) as correct_answers,
                 COUNT(DISTINCT ri.pregunta_id) as preguntas_respondidas
@@ -2971,15 +3098,15 @@ def exportar_resultados_individual_excel(sesion_id):
             ORDER BY score DESC, correct_answers DESC
         """, (sesion_id, sesion_id))
         resultados = cursor.fetchall()
-        
+
         cursor.close()
         db.close()
-        
+
         # Crear libro de Excel
         wb = Workbook()
         ws = wb.active
         ws.title = "Resultados"
-        
+
         # Estilos
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF", size=12)
@@ -2989,25 +3116,25 @@ def exportar_resultados_individual_excel(sesion_id):
             top=Side(style='thin'),
             bottom=Side(style='thin')
         )
-        
+
         # Título
         ws.merge_cells('A1:E1')
         title_cell = ws['A1']
         title_cell.value = f"Resultados - {sesion['cuestionario_titulo']}"
         title_cell.font = Font(bold=True, size=16)
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
-        
+
         ws.merge_cells('A2:E2')
         subtitle_cell = ws['A2']
         subtitle_cell.value = "Sesión Individual"
         subtitle_cell.font = Font(size=12)
         subtitle_cell.alignment = Alignment(horizontal='center', vertical='center')
-        
+
         ws.merge_cells('A3:E3')
         date_cell = ws['A3']
         date_cell.value = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
         date_cell.alignment = Alignment(horizontal='center')
-        
+
         # Headers
         headers = ['Posición', 'Jugador', 'Puntaje', 'Respuestas Correctas', 'Preguntas Respondidas']
         for col, header in enumerate(headers, start=1):
@@ -3017,7 +3144,7 @@ def exportar_resultados_individual_excel(sesion_id):
             cell.font = header_font
             cell.alignment = Alignment(horizontal='center', vertical='center')
             cell.border = border
-        
+
         # Datos
         for idx, resultado in enumerate(resultados, start=1):
             row = idx + 5
@@ -3026,29 +3153,29 @@ def exportar_resultados_individual_excel(sesion_id):
             ws.cell(row=row, column=3, value=resultado['score']).border = border
             ws.cell(row=row, column=4, value=f"{resultado['correct_answers']}/{total_preguntas}").border = border
             ws.cell(row=row, column=5, value=resultado['preguntas_respondidas']).border = border
-            
+
             # Alineación
             for col in range(1, 6):
                 ws.cell(row=row, column=col).alignment = Alignment(horizontal='center', vertical='center')
-        
+
         # Ajustar anchos de columna
         ws.column_dimensions['A'].width = 12
         ws.column_dimensions['B'].width = 25
         ws.column_dimensions['C'].width = 15
         ws.column_dimensions['D'].width = 22
         ws.column_dimensions['E'].width = 25
-        
+
         # Guardar en memoria
         output = BytesIO()
         wb.save(output)
         output.seek(0)
-        
+
         filename = f"Resultados_{sesion['cuestionario_titulo']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+
         # ✅ SUBIR AUTOMÁTICAMENTE A GOOGLE DRIVE
         output_copy = BytesIO(output.getvalue())  # Copia para Drive
         drive_result = subir_a_google_drive(output_copy, filename)
-        
+
         if drive_result['success']:
             flash(f'✅ Resultados guardados en Google Drive', 'success')
         elif drive_result.get('needs_auth'):
@@ -3056,17 +3183,17 @@ def exportar_resultados_individual_excel(sesion_id):
             session['needs_drive_auth'] = True
         else:
             flash(f'⚠️ Descarga lista, pero hubo un error al guardar en Drive: {drive_result.get("error", "Error desconocido")}', 'warning')
-        
+
         # Resetear el puntero para la descarga
         output.seek(0)
-        
+
         return send_file(
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
         )
-        
+
     except Exception as e:
         flash(f'Error al exportar resultados: {str(e)}', 'error')
         return redirect(url_for('individual_resultados', sesion_id=sesion_id))
