@@ -9,9 +9,11 @@ from werkzeug.exceptions import HTTPException
 from flask_mail import Mail, Message
 import random
 import bd
-from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
+import pickle
 import logging
 import os
 import re
@@ -29,14 +31,46 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)            # crea si no existe (fu
 
 app.config['UPLOAD_FOLDER'] = str(UPLOAD_DIR)            # ruta ABSOLUTA para guardar archivos
 
-# === Config Google Drive ===
-GOOGLE_DRIVE_CREDENTIALS_FILE = str(BASE_DIR / 'robot-cuestionarios-0c0d91bed8ea.json')
+# === Config Google Drive OAuth ===
+OAUTH_CONFIG_FILE = str(BASE_DIR / 'oauth_config.json')
+TOKEN_FILE = str(BASE_DIR / 'token.pickle')
 GOOGLE_DRIVE_FOLDER_ID = '1v1lgL9bQQMNPcfFFmvkHHo0KDpk5MOiV'
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+
+# Permitir HTTP en desarrollo local (solo para OAuth)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+# === Helper: Obtener credenciales de Google Drive ===
+def get_drive_credentials():
+    """Obtiene o refresca las credenciales de Google Drive"""
+    creds = None
+    
+    # Cargar token guardado si existe
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, 'rb') as token:
+            creds = pickle.load(token)
+    
+    # Si no hay credenciales válidas, retorna None (se necesita autorizar)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                # Guardar token actualizado
+                with open(TOKEN_FILE, 'wb') as token:
+                    pickle.dump(creds, token)
+            except Exception as e:
+                # Si falla el refresh, necesita reautorizar
+                return None
+        else:
+            return None
+    
+    return creds
 
 # === Helper: Subir archivo a Google Drive ===
 def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
     """
-    Sube un archivo a Google Drive
+    Sube un archivo a Google Drive usando OAuth
     
     Args:
         file_stream: BytesIO con el contenido del archivo
@@ -44,17 +78,21 @@ def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxm
         mimetype: Tipo MIME del archivo
         
     Returns:
-        dict: {'success': bool, 'file_id': str, 'file_url': str} o error
+        dict: {'success': bool, 'file_id': str, 'file_url': str, 'needs_auth': bool} o error
     """
     try:
-        # Autenticación con Service Account
-        credentials = service_account.Credentials.from_service_account_file(
-            GOOGLE_DRIVE_CREDENTIALS_FILE,
-            scopes=['https://www.googleapis.com/auth/drive.file']
-        )
+        # Obtener credenciales
+        creds = get_drive_credentials()
+        
+        if not creds:
+            return {
+                'success': False,
+                'needs_auth': True,
+                'message': 'Se requiere autorización. Por favor, autoriza la aplicación primero.'
+            }
         
         # Crear servicio de Drive
-        service = build('drive', 'v3', credentials=credentials)
+        service = build('drive', 'v3', credentials=creds)
         
         # Metadata del archivo
         file_metadata = {
@@ -67,12 +105,12 @@ def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxm
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id, webViewLink',
-            supportsAllDrives=True  # Permite guardar en carpetas compartidas
+            fields='id, webViewLink'
         ).execute()
         
         return {
             'success': True,
+            'needs_auth': False,
             'file_id': file.get('id'),
             'file_url': file.get('webViewLink'),
             'message': 'Archivo subido exitosamente a Google Drive'
@@ -81,6 +119,7 @@ def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxm
     except Exception as e:
         return {
             'success': False,
+            'needs_auth': False,
             'error': str(e),
             'message': f'Error al subir a Google Drive: {str(e)}'
         }
@@ -121,6 +160,91 @@ def is_auth():
 @app.context_processor
 def inject_globals():
     return dict(is_auth=is_auth(), user=g.user)
+
+
+# =====================
+#  Rutas OAuth Google Drive
+# =====================
+@app.route('/authorize-drive')
+def authorize_drive():
+    """Inicia el proceso de autorización OAuth para Google Drive"""
+    if not is_auth():
+        flash('Debes iniciar sesión primero', 'error')
+        return redirect(url_for('login'))
+    
+    try:
+        # Generar redirect_uri
+        redirect_uri = url_for('oauth2callback', _external=True)
+        print(f"\n🔍 DEBUG: Redirect URI = {redirect_uri}\n")
+        
+        # Crear flujo de OAuth
+        flow = Flow.from_client_secrets_file(
+            OAUTH_CONFIG_FILE,
+            scopes=SCOPES,
+            redirect_uri=redirect_uri
+        )
+        
+        # Generar URL de autorización
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'
+        )
+        
+        # Guardar state en sesión para verificación
+        session['oauth_state'] = state
+        
+        return redirect(authorization_url)
+        
+    except Exception as e:
+        flash(f'Error al iniciar autorización: {str(e)}', 'error')
+        return redirect(url_for('home'))
+
+@app.route('/oauth2callback')
+def oauth2callback():
+    """Callback de OAuth después de la autorización"""
+    if not is_auth():
+        flash('Debes iniciar sesión primero', 'error')
+        return redirect(url_for('login'))
+    
+    try:
+        # Verificar state para prevenir CSRF
+        state = session.get('oauth_state')
+        
+        # Crear flujo de OAuth
+        flow = Flow.from_client_secrets_file(
+            OAUTH_CONFIG_FILE,
+            scopes=SCOPES,
+            state=state,
+            redirect_uri=url_for('oauth2callback', _external=True)
+        )
+        
+        # Intercambiar código por credenciales
+        flow.fetch_token(authorization_response=request.url)
+        
+        # Guardar credenciales
+        creds = flow.credentials
+        with open(TOKEN_FILE, 'wb') as token:
+            pickle.dump(creds, token)
+        
+        flash('¡Autorización exitosa! Ahora puedes exportar resultados a Google Drive.', 'success')
+        return redirect(url_for('home'))
+        
+    except Exception as e:
+        flash(f'Error durante la autorización: {str(e)}', 'error')
+        return redirect(url_for('home'))
+
+@app.route('/check-drive-auth')
+def check_drive_auth():
+    """Verifica si la aplicación está autorizada para Google Drive"""
+    if not is_auth():
+        return jsonify({'authorized': False, 'message': 'Usuario no autenticado'})
+    
+    creds = get_drive_credentials()
+    return jsonify({
+        'authorized': creds is not None,
+        'message': 'Autorización válida' if creds else 'Se requiere autorización'
+    })
 
 
 # =====================
@@ -2779,6 +2903,9 @@ def exportar_resultados_grupo_excel(sesion_id):
         
         if drive_result['success']:
             flash(f'✅ Resultados guardados en Google Drive', 'success')
+        elif drive_result.get('needs_auth'):
+            flash(f'⚠️ Para guardar en Drive, necesitas autorizar primero.', 'warning')
+            session['needs_drive_auth'] = True
         else:
             flash(f'⚠️ Descarga lista, pero hubo un error al guardar en Drive: {drive_result.get("error", "Error desconocido")}', 'warning')
         
@@ -2924,6 +3051,9 @@ def exportar_resultados_individual_excel(sesion_id):
         
         if drive_result['success']:
             flash(f'✅ Resultados guardados en Google Drive', 'success')
+        elif drive_result.get('needs_auth'):
+            flash(f'⚠️ Para guardar en Drive, necesitas autorizar primero.', 'warning')
+            session['needs_drive_auth'] = True
         else:
             flash(f'⚠️ Descarga lista, pero hubo un error al guardar en Drive: {drive_result.get("error", "Error desconocido")}', 'warning')
         

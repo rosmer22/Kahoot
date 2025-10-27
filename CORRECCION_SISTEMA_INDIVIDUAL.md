@@ -333,3 +333,4 @@ El sistema ahora funciona **idénticamente** al sistema de grupos:
 
 **¡Listo para usar!** 🎉
 
+
