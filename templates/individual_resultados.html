@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_resultados.css') }}">
     <style>
-        /* Estilos adicionales para flash messages sin base.css */
+        /* Estilos adicionales para flash messages */
         .flash-messages {
             position: fixed;
             top: 20px;
@@ -66,7 +66,7 @@
     <div class="results-header">
         <div class="trophy-icon">🏆</div>
         <h1>¡Juego Finalizado!</h1>
-        <p class="subtitle">{{ grupo_nombre }} - {{ cuestionario_titulo }}</p>
+        <p class="subtitle">{{ cuestionario_titulo }}</p>
     </div>
 
     <!-- Podio (Top 3) -->
@@ -154,12 +154,12 @@
 
     <!-- Acciones -->
     <div class="actions">
-        <button class="btn-primary" onclick="window.location.href='/'">
+        <button class="btn-primary" onclick="window.location.href='/my-quizzes'">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
-            Volver al Inicio
+            Volver a Mis Cuestionarios
         </button>
         <button class="btn-secondary" onclick="exportarExcel()">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -199,26 +199,16 @@ document.addEventListener('DOMContentLoaded', function() {
             row.style.opacity = '0';
         });
     }, 800);
-
-    // Confetti para el ganador
-    if (typeof confetti !== 'undefined') {
-        setTimeout(() => {
-            confetti({
-                particleCount: 100,
-                spread: 70,
-                origin: { y: 0.6 }
-            });
-        }, 1000);
-    }
 });
 
-// Función para compartir resultados
+// Función para exportar a Excel
 function exportarExcel() {
-    window.location.href = '/grupo/resultados/{{ sesion_id }}/exportar-excel';
+    window.location.href = '/individual/resultados/{{ sesion_id }}/exportar-excel';
 }
 
+// Función para compartir resultados
 function shareResults() {
-    const text = `¡Jugué {{ cuestionario_titulo }} en {{ grupo_nombre }}! Mira los resultados en RoBot.`;
+    const text = `¡Jugué {{ cuestionario_titulo }} en RoBot! Mira los resultados.`;
     
     if (navigator.share) {
         navigator.share({

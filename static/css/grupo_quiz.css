@@ -309,10 +309,19 @@
 }
 
 /* --- Responsividad --- */
-@media (max-width: 768px) {
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+    .grupo-quiz-container {
+        max-width: 100%;
+        padding: 1.5rem;
+    }
+    
     .quiz-header {
         grid-template-columns: 1fr;
+        gap: 1.5rem;
     }
+    
     .group-members {
         border-left: none;
         padding-left: 0;
@@ -321,18 +330,209 @@
     }
 }
 
-@media (max-width: 600px) {
+/* Móvil Grande (600px - 768px) */
+@media (max-width: 768px) {
+    .grupo-quiz-container {
+        margin: 1rem auto;
+        padding: 1rem;
+        gap: 1.5rem;
+    }
+    
+    .group-info h1 {
+        font-size: 1.75rem;
+    }
+    
+    .quiz-title {
+        font-size: 1.1rem;
+    }
+    
+    .quiz-meta {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .session-code-display {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+    
+    .code-value {
+        font-size: 1.8rem;
+    }
+    
+    .members-list {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+    
     .answers-container {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
-    .grupo-quiz-container, .quiz-header, .quiz-status, .question-card {
+    
+    .answer-option {
+        padding: 1.25rem;
+        min-height: 60px;
+        font-size: 1rem;
+    }
+    
+    .countdown {
+        font-size: 4.5rem;
+    }
+    
+    .btn-ready {
+        width: 100%;
+        justify-content: center;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+    }
+}
+
+/* Móvil Pequeño (< 600px) */
+@media (max-width: 600px) {
+    .grupo-quiz-container {
+        margin: 0.5rem;
+        padding: 0.75rem;
+        gap: 1rem;
+    }
+    
+    .quiz-header, .quiz-status, .question-card {
         padding: 1rem;
+        border-radius: 0.75rem;
     }
+    
     .group-info h1 {
         font-size: 1.5rem;
     }
+    
+    .quiz-title {
+        font-size: 1rem;
+    }
+    
+    .quiz-meta .pin, .quiz-meta .questions-count {
+        font-size: 0.85rem;
+        padding: 0.2rem 0.6rem;
+    }
+    
+    .code-value {
+        font-size: 1.5rem;
+        letter-spacing: 0.15em;
+    }
+    
+    .btn-copy-code {
+        padding: 0.75rem;
+    }
+    
+    .session-info {
+        font-size: 0.8rem;
+    }
+    
+    .member-avatar img {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .member-name {
+        font-size: 0.95rem;
+    }
+    
+    .status-waiting h2, .status-starting h2 {
+        font-size: 1.5rem;
+    }
+    
+    .status-waiting p, .status-starting p {
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .status-waiting svg {
+        width: 48px;
+        height: 48px;
+    }
+    
     .countdown {
-        font-size: 4rem; /* Reducir tamaño del contador en móviles */
+        font-size: 4rem;
+    }
+    
+    .btn-ready {
+        font-size: 1rem;
+        padding: 0.85rem 1.5rem;
+    }
+    
+    .answer-option {
+        padding: 1rem;
+        font-size: 0.95rem;
+        min-height: 56px;
+    }
+    
+    #questionText {
+        font-size: 1.25rem;
+    }
+    
+    .question-timer {
+        font-size: 1rem;
+    }
+    
+    /* Resultados en móvil */
+    .results-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .result-item {
+        grid-template-columns: 40px 1fr 80px;
+        gap: 0.75rem;
+        padding: 0.65rem;
+        font-size: 0.9rem;
+    }
+    
+    .result-rank {
+        font-size: 1rem;
+    }
+    
+    .user-avatar img {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .result-score {
+        font-size: 1rem;
+    }
+    
+    .result-score small {
+        font-size: 0.75rem;
+    }
+    
+    .results-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .results-actions .btn-primary,
+    .results-actions .btn-secondary {
+        width: 100%;
+        justify-content: center;
+        padding: 0.85rem 1.25rem;
+        font-size: 0.95rem;
+    }
+}
+
+/* Móvil Extra Pequeño (< 375px) */
+@media (max-width: 375px) {
+    .group-info h1 {
+        font-size: 1.25rem;
+    }
+    
+    .code-value {
+        font-size: 1.3rem;
+    }
+    
+    .countdown {
+        font-size: 3.5rem;
+    }
+    
+    .status-waiting h2, .status-starting h2 {
+        font-size: 1.3rem;
     }
 }
 

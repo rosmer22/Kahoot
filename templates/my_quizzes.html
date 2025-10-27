@@ -33,10 +33,9 @@
         </div>
         <div class="card-actions">
           <!-- 🚀 Individual -->
-          <a href="{{ url_for('lobby', cuestionario_id=q.id) }}" 
-             class="btn-action btn-play">🚀 Empezar</a>
+          <button class="btn-action btn-play" onclick="startIndividualQuiz({{ q.id }})">🚀 Empezar</button>
 
-          <!-- 👥 Modo grupal -->
+          <!-- 👥 Modo grupal (mantener el anterior) -->
           <a href="{{ url_for('lobby', cuestionario_id=q.id, modo='grupal') }}" 
              class="btn-action btn-group">👥 Grupo</a>
 

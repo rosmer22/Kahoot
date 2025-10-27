@@ -222,3 +222,308 @@
 }
 
 /* --- Footer eliminado - ahora está en base.css --- */
+
+/* ==============================================
+   Responsive
+   ============================================== */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+    .hero-title {
+        font-size: 3rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.15rem;
+        max-width: 550px;
+    }
+
+    .card {
+        width: 260px;
+    }
+
+    .features-section {
+        padding: 5rem 3rem;
+        gap: 5rem;
+    }
+
+    .feature-row {
+        gap: 3rem;
+    }
+
+    .feature-image,
+    .feature-image-placeholder {
+        width: 400px;
+        height: 270px;
+    }
+
+    .feature-text h2 {
+        font-size: 2.2rem;
+    }
+
+    .feature-text p {
+        font-size: 1.05rem;
+    }
+
+    .cta-title {
+        font-size: 2.5rem;
+    }
+}
+
+/* Móvil Grande (600px - 768px) */
+@media (max-width: 768px) {
+    .hero-section {
+        padding: 3.5rem 1.5rem 8rem;
+    }
+
+    .hero-title {
+        font-size: 2.5rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.1rem;
+        max-width: 500px;
+    }
+
+    .carousel-container {
+        gap: 1.5rem;
+    }
+
+    .carousel-arrow {
+        font-size: 2rem;
+    }
+
+    .carousel-cards {
+        gap: 1.5rem;
+    }
+
+    .card {
+        width: 240px;
+    }
+
+    .card-image-placeholder {
+        height: 140px;
+    }
+
+    .card-name {
+        font-size: 1rem;
+        padding: 0.85rem;
+    }
+
+    .curve svg {
+        height: 140px;
+    }
+
+    .features-section {
+        padding: 4rem 2rem;
+        gap: 4rem;
+    }
+
+    .feature-row {
+        flex-direction: column !important;
+        gap: 2.5rem;
+    }
+
+    .feature-image,
+    .feature-image-placeholder {
+        width: 100%;
+        max-width: 500px;
+        height: 250px;
+    }
+
+    .feature-text {
+        max-width: 100%;
+        text-align: center;
+    }
+
+    .feature-text h2 {
+        font-size: 2rem;
+    }
+
+    .feature-text p {
+        font-size: 1rem;
+        max-width: 550px;
+        margin: 0 auto;
+    }
+
+    .cta-section {
+        padding: 6rem 1.5rem;
+    }
+
+    .cta-title {
+        font-size: 2.2rem;
+        margin: 0 0 1.75rem 0;
+    }
+
+    .cta-button {
+        padding: 0.9rem 2.5rem;
+        font-size: 1.1rem;
+    }
+}
+
+/* Móvil Pequeño (< 600px) */
+@media (max-width: 600px) {
+    .hero-section {
+        padding: 3rem 1rem 7rem;
+    }
+
+    .hero-title {
+        font-size: 2rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+        max-width: 100%;
+        margin: 0.85rem auto 2.5rem;
+    }
+
+    .carousel-container {
+        gap: 1rem;
+    }
+
+    .carousel-arrow {
+        font-size: 1.75rem;
+    }
+
+    .carousel-cards {
+        gap: 1.25rem;
+    }
+
+    .card {
+        width: 220px;
+        padding: 0.85rem;
+    }
+
+    .card-image-placeholder {
+        height: 130px;
+    }
+
+    .card-name {
+        font-size: 0.95rem;
+        padding: 0.75rem;
+    }
+
+    .curve svg {
+        height: 120px;
+    }
+
+    .features-section {
+        padding: 3.5rem 1.25rem;
+        gap: 3.5rem;
+    }
+
+    .feature-row {
+        gap: 2rem;
+    }
+
+    .feature-image,
+    .feature-image-placeholder {
+        height: 220px;
+    }
+
+    .feature-text h2 {
+        font-size: 1.75rem;
+    }
+
+    .feature-text p {
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    .cta-section {
+        padding: 5rem 1.25rem;
+    }
+
+    .cta-title {
+        font-size: 1.9rem;
+        margin: 0 0 1.5rem 0;
+    }
+
+    .cta-button {
+        padding: 0.85rem 2.25rem;
+        font-size: 1rem;
+    }
+
+    .cta-curve svg {
+        height: 80px;
+    }
+}
+
+/* Móvil Extra Pequeño (< 375px) */
+@media (max-width: 375px) {
+    .hero-title {
+        font-size: 1.75rem;
+    }
+
+    .hero-subtitle {
+        font-size: 0.95rem;
+    }
+
+    .carousel-arrow {
+        font-size: 1.5rem;
+    }
+
+    .card {
+        width: 200px;
+    }
+
+    .card-image-placeholder {
+        height: 120px;
+    }
+
+    .features-section {
+        padding: 3rem 1rem;
+        gap: 3rem;
+    }
+
+    .feature-image,
+    .feature-image-placeholder {
+        height: 200px;
+    }
+
+    .feature-text h2 {
+        font-size: 1.6rem;
+    }
+
+    .feature-text p {
+        font-size: 0.9rem;
+    }
+
+    .cta-section {
+        padding: 4.5rem 1rem;
+    }
+
+    .cta-title {
+        font-size: 1.75rem;
+    }
+
+    .cta-button {
+        padding: 0.75rem 2rem;
+        font-size: 0.95rem;
+    }
+}
+
+/* Mejoras táctiles para móviles */
+@media (hover: none) and (pointer: coarse) {
+    .cta-button {
+        /* Área táctil más grande */
+        min-height: 52px;
+        touch-action: manipulation;
+    }
+
+    .cta-button:active {
+        transform: scale(0.98);
+    }
+
+    .carousel-arrow {
+        min-width: 44px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .card {
+        touch-action: pan-x;
+    }
+}

@@ -241,32 +241,163 @@
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+    .join-section {
+        padding: 3rem 1.5rem;
+    }
+    
     .join-card {
-        padding: 2rem 1.5rem;
+        max-width: 520px;
+    }
+}
+
+/* Móvil Grande (600px - 768px) */
+@media (max-width: 768px) {
+    .join-section {
+        padding: 2.5rem 1.5rem;
+    }
+
+    .join-card {
+        padding: 2rem 2rem;
+        max-width: 480px;
     }
 
     .join-card h2 {
-        font-size: 1.8rem;
+        font-size: 2rem;
+    }
+
+    .join-subtitle {
+        font-size: 0.95rem;
+    }
+
+    .join-icon {
+        width: 70px;
+        height: 70px;
     }
 
     .pin-code-input {
         font-size: 0.95rem;
-        padding: 0.9rem 1.2rem;
+        padding: 0.95rem 1.3rem;
     }
 
     .btn-unir {
-        padding: 0.75rem 1.75rem;
-        font-size: 1rem;
+        padding: 0.8rem 2rem;
+        font-size: 1.05rem;
+    }
+}
+
+/* Móvil Pequeño (< 600px) */
+@media (max-width: 600px) {
+    .join-section {
+        padding: 2rem 1rem;
+    }
+
+    .join-card {
+        padding: 2rem 1.5rem;
+        border-radius: 16px;
     }
 
     .join-icon {
         width: 64px;
         height: 64px;
+        margin-bottom: 1.25rem;
     }
 
     .join-icon svg {
         width: 40px;
         height: 40px;
+    }
+
+    .join-card h2 {
+        font-size: 1.8rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .join-subtitle {
+        font-size: 0.9rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .pin-input-group {
+        flex-direction: column;
+        border-radius: 12px;
+    }
+
+    .pin-code-input {
+        font-size: 0.95rem;
+        padding: 0.9rem 1.2rem;
+        text-align: center;
+    }
+
+    .btn-unir {
+        width: 100%;
+        padding: 0.75rem 1.75rem;
+        font-size: 1rem;
+        margin: 0.5rem;
+        border-radius: 10px;
+    }
+
+    .join-footer {
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+    }
+
+    .join-footer p {
+        font-size: 0.9rem;
+    }
+
+    .error-message {
+        font-size: 0.85rem;
+        padding: 0.85rem 1.25rem;
+    }
+}
+
+/* Móvil Extra Pequeño (< 375px) */
+@media (max-width: 375px) {
+    .join-card {
+        padding: 1.75rem 1.25rem;
+    }
+
+    .join-icon {
+        width: 56px;
+        height: 56px;
+    }
+
+    .join-icon svg {
+        width: 36px;
+        height: 36px;
+    }
+
+    .join-card h2 {
+        font-size: 1.6rem;
+    }
+
+    .join-subtitle {
+        font-size: 0.85rem;
+    }
+
+    .pin-code-input {
+        font-size: 0.9rem;
+        padding: 0.85rem 1rem;
+    }
+
+    .btn-unir {
+        font-size: 0.95rem;
+        padding: 0.7rem 1.5rem;
+    }
+}
+
+/* Mejoras táctiles para móviles */
+@media (hover: none) and (pointer: coarse) {
+    .btn-unir {
+        /* Área táctil más grande */
+        min-height: 48px;
+        touch-action: manipulation;
+    }
+    
+    .pin-code-input {
+        min-height: 48px;
     }
 }

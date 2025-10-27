@@ -298,7 +298,18 @@
 }
 
 /* --- Responsive --- */
+
+/* Tablet (768px - 1024px) */
 @media (max-width: 1024px) {
+  .quiz-details-hero {
+    padding: 3.5rem 2rem 23rem;
+    margin-bottom: -18rem;
+  }
+
+  .quiz-details-container {
+    padding: 0 1.5rem 2.5rem;
+  }
+
   .quiz-main-info {
     grid-template-columns: 160px 1fr;
     gap: 1.5rem;
@@ -318,17 +329,32 @@
     width: 100%;
     justify-content: center;
   }
+
+  .questions-grid {
+    gap: 1.25rem;
+  }
 }
 
+/* Móvil Grande (600px - 768px) */
 @media (max-width: 768px) {
-  .questions-grid {
-    grid-template-columns: 1fr;
+  .quiz-details-hero {
+    padding: 3rem 1.5rem 21rem;
+    margin-bottom: -16rem;
   }
-  
+
+  .quiz-details-hero .curve svg {
+    height: 140px;
+  }
+
+  .quiz-details-container {
+    padding: 0 1.25rem 2rem;
+  }
+
   .quiz-header-card {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
+    padding: 1.25rem;
   }
   
   .quiz-actions {
@@ -339,34 +365,248 @@
   .quiz-main-info {
     grid-template-columns: 1fr;
     text-align: center;
+    padding: 1.75rem;
   }
   
   .quiz-thumbnail {
     width: 100%;
     height: 200px;
+    margin: 0 auto;
+  }
+
+  .quiz-info-text {
+    align-items: center;
   }
   
   .quiz-title {
-    font-size: 1.5rem;
+    font-size: 1.65rem;
+  }
+
+  .quiz-description {
+    font-size: 0.95rem;
+  }
+
+  .btn-start-quiz {
+    width: 100%;
+    padding: 0.9rem 1.75rem;
+    font-size: 1.05rem;
+  }
+
+  .questions-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
   }
 }
 
-@media (max-width: 520px) {
+/* Móvil Pequeño (< 600px) */
+@media (max-width: 600px) {
+  .quiz-details-hero {
+    padding: 2.5rem 1rem 19rem;
+    margin-bottom: -14rem;
+  }
+
+  .quiz-details-hero .curve svg {
+    height: 120px;
+  }
+
   .quiz-details-container {
     padding: 0 1rem 2rem;
   }
   
-  .quiz-header-card,
-  .quiz-main-info {
+  .quiz-header-card {
     padding: 1rem;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .user-info {
+    gap: 0.65rem;
+  }
+
+  .avatar-circle {
+    width: 36px;
+    height: 36px;
+  }
+
+  .username {
+    font-size: 0.95rem;
+  }
+
+  .quiz-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
   
   .btn-action {
     font-size: 0.85rem;
     padding: 0.4rem 0.75rem;
   }
+
+  .quiz-main-info {
+    padding: 1.5rem 1rem;
+    border-radius: 0 0 10px 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .quiz-thumbnail {
+    height: 180px;
+  }
+  
+  .quiz-title {
+    font-size: 1.5rem;
+  }
+
+  .quiz-description {
+    font-size: 0.9rem;
+  }
+
+  .btn-start-quiz {
+    padding: 0.85rem 1.5rem;
+    font-size: 1rem;
+  }
+
+  .btn-start-quiz i {
+    font-size: 1.1rem;
+  }
   
   .section-title {
+    font-size: 1.2rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .questions-grid {
+    gap: 1rem;
+  }
+
+  .question-card {
+    padding: 0.85rem;
+  }
+
+  .question-preview {
+    padding: 0.85rem;
+    min-height: 70px;
+  }
+
+  .question-number {
+    font-size: 0.8rem;
+  }
+
+  .question-text-preview {
+    font-size: 0.9rem;
+  }
+
+  .answers-preview {
+    gap: 0.4rem;
+  }
+
+  .answer-box {
+    padding: 0.65rem;
+    font-size: 0.8rem;
+    min-height: 45px;
+  }
+}
+
+/* Móvil Extra Pequeño (< 375px) */
+@media (max-width: 375px) {
+  .quiz-details-hero {
+    padding: 2rem 0.75rem 17rem;
+    margin-bottom: -12rem;
+  }
+
+  .quiz-details-container {
+    padding: 0 0.75rem 1.5rem;
+  }
+
+  .quiz-header-card {
+    padding: 0.85rem;
+  }
+
+  .avatar-circle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .username {
+    font-size: 0.9rem;
+  }
+
+  .btn-action {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.65rem;
+    gap: 0.35rem;
+  }
+
+  .quiz-main-info {
+    padding: 1.25rem 0.85rem;
+  }
+
+  .quiz-thumbnail {
+    height: 160px;
+  }
+
+  .quiz-title {
+    font-size: 1.35rem;
+  }
+
+  .quiz-description {
+    font-size: 0.85rem;
+  }
+
+  .btn-start-quiz {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.95rem;
+    gap: 0.6rem;
+  }
+
+  .section-title {
     font-size: 1.1rem;
+  }
+
+  .question-card {
+    padding: 0.75rem;
+  }
+
+  .question-preview {
+    padding: 0.75rem;
+    min-height: 65px;
+  }
+
+  .question-text-preview {
+    font-size: 0.85rem;
+  }
+
+  .answer-box {
+    padding: 0.55rem;
+    font-size: 0.75rem;
+    min-height: 42px;
+  }
+}
+
+/* Mejoras táctiles para móviles */
+@media (hover: none) and (pointer: coarse) {
+  .btn-action {
+    /* Área táctil más grande */
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .btn-start-quiz {
+    min-height: 52px;
+    touch-action: manipulation;
+  }
+
+  .question-card {
+    touch-action: manipulation;
+  }
+
+  .btn-action:active {
+    transform: scale(0.98);
+  }
+
+  .btn-start-quiz:active {
+    transform: translateY(0) scale(0.98);
   }
 }

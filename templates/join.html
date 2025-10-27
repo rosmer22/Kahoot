@@ -139,7 +139,7 @@
       </svg>
     </div>
     <h2>Unirse a un Cuestionario o Sala</h2>
-    <p class="join-subtitle">Ingresa el código PIN de cuestionario o código de sala grupal</p>
+    <p class="join-subtitle">Ingresa el código PIN de cuestionario o código de sala (6 caracteres)</p>
     
     <form id="joinForm" class="join-form" onsubmit="return joinGame(event)">
       <div class="pin-input-group">
@@ -195,19 +195,36 @@ function joinGame(event) {
 
 async function joinGroupSession(sessionCode, errorBox) {
   try {
-    const response = await fetch('/api/grupo/unirse-sesion', {
+    // Primero intentar unirse a sesión de grupo
+    const groupResponse = await fetch('/api/grupo/unirse-sesion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_code: sessionCode })
     });
 
-    const result = await response.json();
+    const groupResult = await groupResponse.json();
 
-    if (result.success) {
+    if (groupResult.success) {
       // Redirigir a la página de la sesión del grupo
-      window.location.href = `/grupo/quiz/${result.sesion_id}`;
+      window.location.href = `/grupo/quiz/${groupResult.sesion_id}`;
+      return;
+    }
+
+    // Si falla con grupo, intentar con sesión individual
+    const individualResponse = await fetch('/api/individual/unirse-sesion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_code: sessionCode })
+    });
+
+    const individualResult = await individualResponse.json();
+
+    if (individualResult.success) {
+      // Redirigir a la página de la sesión individual
+      window.location.href = `/individual/quiz/${individualResult.sesion_id}`;
     } else {
-      errorBox.textContent = result.message || 'Código de sala inválido o no tienes acceso';
+      // Si ambos fallan, mostrar error
+      errorBox.textContent = 'Código de sala inválido o no tienes acceso';
       errorBox.classList.remove("hidden");
     }
   } catch (error) {

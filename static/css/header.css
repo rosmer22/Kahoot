@@ -317,8 +317,248 @@
 }
 
 /* --- Responsividad --- */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+    .header-inner {
+        padding: 0 1.5rem;
+    }
+
+    .search-container {
+        max-width: 380px;
+    }
+
+    .editor-input-container {
+        max-width: 380px;
+    }
+
+    .brand-title {
+        font-size: 1.6rem;
+    }
+}
+
+/* Móvil Grande (600px - 768px) */
 @media (max-width: 768px) {
+    .main-header {
+        padding: 0.75rem 0;
+    }
+
     .header-inner {
         flex-direction: column;
+        padding: 0 1.25rem;
+        gap: 0.85rem;
+    }
+
+    .cluster {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .center.cluster {
+        min-width: 100%;
+        order: 3;
+    }
+
+    .brand-title {
+        font-size: 1.5rem;
+    }
+
+    .avatar img {
+        width: 44px;
+        height: 44px;
+    }
+
+    .search-container,
+    .editor-input-container {
+        max-width: 100%;
+    }
+
+    .search-container input,
+    .title-input-editor {
+        font-size: 0.95rem;
+        padding: 0.7rem 1.15rem;
+    }
+
+    .title-input-editor {
+        padding-right: 160px;
+    }
+
+    .btn-config-inline {
+        padding: 0.55rem 1.1rem;
+        font-size: 0.95rem;
+    }
+
+    .main-header .btn,
+    .main-header .pill {
+        padding: 0.7rem 1.25rem;
+        font-size: 0.95rem;
+    }
+
+    .menu-list {
+        top: 55px;
+        min-width: 190px;
+    }
+
+    .menu-list a {
+        padding: 0.55rem 0.7rem;
+        font-size: 0.95rem;
+    }
+}
+
+/* Móvil Pequeño (< 600px) */
+@media (max-width: 600px) {
+    .main-header {
+        padding: 0.65rem 0;
+    }
+
+    .header-inner {
+        padding: 0 1rem;
+        gap: 0.75rem;
+    }
+
+    .brand-title {
+        font-size: 1.35rem;
+    }
+
+    .avatar img {
+        width: 40px;
+        height: 40px;
+    }
+
+    .icon-button.profile-button {
+        width: 44px;
+        height: 44px;
+    }
+
+    .search-container input {
+        font-size: 0.9rem;
+        padding: 0.65rem 3rem 0.65rem 1rem;
+    }
+
+    .title-input-editor {
+        font-size: 0.9rem;
+        padding: 0.65rem 150px 0.65rem 1rem;
+    }
+
+    .btn-config-inline {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .main-header .btn,
+    .main-header .pill {
+        padding: 0.65rem 1.15rem;
+        font-size: 0.9rem;
+    }
+
+    .pin-input-container .pin-input {
+        width: 100px;
+        font-size: 0.9rem;
+        padding: 0.65rem 2.25rem 0.65rem 0.85rem;
+    }
+
+    .pin-input-container .refresh-button {
+        width: 28px;
+        height: 28px;
+        padding: 0.35rem;
+    }
+
+    .menu-list {
+        top: 50px;
+        min-width: 170px;
+    }
+
+    .menu-list a {
+        padding: 0.5rem 0.65rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* Móvil Extra Pequeño (< 375px) */
+@media (max-width: 375px) {
+    .header-inner {
+        padding: 0 0.75rem;
+        gap: 0.65rem;
+    }
+
+    .brand-title {
+        font-size: 1.2rem;
+    }
+
+    .avatar img {
+        width: 36px;
+        height: 36px;
+    }
+
+    .icon-button.profile-button {
+        width: 40px;
+        height: 40px;
+    }
+
+    .search-container input {
+        font-size: 0.85rem;
+        padding: 0.6rem 2.75rem 0.6rem 0.85rem;
+    }
+
+    .title-input-editor {
+        font-size: 0.85rem;
+        padding: 0.6rem 135px 0.6rem 0.85rem;
+    }
+
+    .btn-config-inline {
+        padding: 0.45rem 0.85rem;
+        font-size: 0.85rem;
+    }
+
+    .main-header .btn,
+    .main-header .pill {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+        gap: 0.35rem;
+    }
+
+    .pin-input-container .pin-input {
+        width: 90px;
+        font-size: 0.85rem;
+    }
+
+    .menu-list {
+        min-width: 160px;
+    }
+
+    .menu-list a {
+        font-size: 0.85rem;
+    }
+}
+
+/* Mejoras táctiles para móviles */
+@media (hover: none) and (pointer: coarse) {
+    .main-header .btn,
+    .main-header .pill,
+    .icon-button {
+        /* Área táctil más grande */
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+
+    .search-container input,
+    .title-input-editor {
+        min-height: 44px;
+    }
+
+    .avatar img {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .menu-list a {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+    }
+
+    .main-header .btn:active,
+    .main-header .pill:active {
+        transform: scale(0.98);
     }
 }

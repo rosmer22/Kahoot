@@ -79,3 +79,30 @@
     card.style.cursor = 'pointer';
   });
 })();
+
+// Función para iniciar cuestionario individual con sistema de sala
+async function startIndividualQuiz(quizId) {
+  try {
+    const response = await fetch('/api/individual/iniciar-cuestionario', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        cuestionario_id: quizId
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // Redirigir a la sala de espera con el sesion_id
+      window.location.href = `/individual/quiz/${result.sesion_id}`;
+    } else {
+      alert('Error al iniciar el cuestionario: ' + (result.message || 'Error desconocido'));
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al iniciar el cuestionario. Por favor, intenta de nuevo.');
+  }
+}

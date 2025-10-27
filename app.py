@@ -1,11 +1,17 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g, send_file
 from controllers import user_controller, quiz_controller
 from werkzeug.security import check_password_hash
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from io import BytesIO
+from datetime import datetime
 from werkzeug.exceptions import HTTPException
 from flask_mail import Mail, Message
 import random
-import datetime
 import bd
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 import logging
 import os
 import re
@@ -22,6 +28,62 @@ UPLOAD_DIR = STATIC_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)            # crea si no existe (funciona en WSGI)
 
 app.config['UPLOAD_FOLDER'] = str(UPLOAD_DIR)            # ruta ABSOLUTA para guardar archivos
+
+# === Config Google Drive ===
+GOOGLE_DRIVE_CREDENTIALS_FILE = str(BASE_DIR / 'robot-cuestionarios-0c0d91bed8ea.json')
+GOOGLE_DRIVE_FOLDER_ID = '1v1lgL9bQQMNPcfFFmvkHHo0KDpk5MOiV'
+
+# === Helper: Subir archivo a Google Drive ===
+def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
+    """
+    Sube un archivo a Google Drive
+    
+    Args:
+        file_stream: BytesIO con el contenido del archivo
+        filename: Nombre del archivo
+        mimetype: Tipo MIME del archivo
+        
+    Returns:
+        dict: {'success': bool, 'file_id': str, 'file_url': str} o error
+    """
+    try:
+        # Autenticación con Service Account
+        credentials = service_account.Credentials.from_service_account_file(
+            GOOGLE_DRIVE_CREDENTIALS_FILE,
+            scopes=['https://www.googleapis.com/auth/drive.file']
+        )
+        
+        # Crear servicio de Drive
+        service = build('drive', 'v3', credentials=credentials)
+        
+        # Metadata del archivo
+        file_metadata = {
+            'name': filename,
+            'parents': [GOOGLE_DRIVE_FOLDER_ID]
+        }
+        
+        # Subir archivo
+        media = MediaIoBaseUpload(file_stream, mimetype=mimetype, resumable=True)
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink',
+            supportsAllDrives=True  # Permite guardar en carpetas compartidas
+        ).execute()
+        
+        return {
+            'success': True,
+            'file_id': file.get('id'),
+            'file_url': file.get('webViewLink'),
+            'message': 'Archivo subido exitosamente a Google Drive'
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e),
+            'message': f'Error al subir a Google Drive: {str(e)}'
+        }
 
 # === Config de correo (Gmail SMTP) ===
 # Sugerencia: usar variables de entorno para no exponer credenciales en código
@@ -2020,6 +2082,864 @@ def resultados_quiz(pin):
     except Exception as e:
         flash(f'Error al cargar los resultados: {str(e)}', 'error')
         return redirect(url_for('home'))
+
+# =====================
+#  Sesiones Individuales (Sistema similar a grupos)
+# =====================
+
+@app.route('/api/individual/iniciar-cuestionario', methods=['POST'])
+def api_iniciar_cuestionario_individual():
+    """API para iniciar un cuestionario individual con sistema de sala"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    cuestionario_id = data.get('cuestionario_id')
+    
+    if not cuestionario_id:
+        return jsonify({'success': False, 'message': 'ID de cuestionario requerido'}), 400
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Verificar que el cuestionario existe
+        cursor.execute("SELECT id, titulo FROM cuestionarios WHERE id = %s", (cuestionario_id,))
+        cuestionario = cursor.fetchone()
+        
+        if not cuestionario:
+            return jsonify({'success': False, 'message': 'Cuestionario no encontrado'})
+        
+        # Generar un session_code único de 6 caracteres
+        import string
+        import random
+        while True:
+            session_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            # Verificar que no exista en sesiones_grupo ni sesiones_individual
+            cursor.execute("SELECT id FROM sesiones_grupo WHERE session_code = %s", (session_code,))
+            if cursor.fetchone():
+                continue
+            cursor.execute("SELECT id FROM sesiones_individual WHERE session_code = %s", (session_code,))
+            if not cursor.fetchone():
+                break
+
+        # Crear sesión individual
+        cursor.execute("""
+            INSERT INTO sesiones_individual (cuestionario_id, iniciado_por, session_code, created_at)
+            VALUES (%s, %s, %s, NOW())
+        """, (cuestionario_id, g.user['id'], session_code))
+        
+        sesion_id = cursor.lastrowid
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'sesion_id': sesion_id,
+            'session_code': session_code,
+            'message': 'Sesión creada exitosamente'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al iniciar cuestionario: {str(e)}'})
+
+@app.route('/individual/quiz/<int:sesion_id>')
+def individual_quiz(sesion_id):
+    """Página de sala de espera para cuestionario individual"""
+    if not g.user:
+        flash('Debes iniciar sesión para participar', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT si.id, si.cuestionario_id, si.estado, si.session_code,
+                   c.titulo, c.pin, c.descripcion
+            FROM sesiones_individual si
+            JOIN cuestionarios c ON si.cuestionario_id = c.id
+            WHERE si.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('my_quizzes'))
+        
+        # Si la sesión ya finalizó, redirigir
+        if sesion['estado'] == 'finalizado':
+            flash('Esta sesión ya ha finalizado', 'info')
+            return redirect(url_for('my_quizzes'))
+        
+        # Registrar automáticamente al usuario en la sesión si no está ya
+        cursor.execute("""
+            INSERT INTO usuario_estado_individual (sesion_id, user_id, esta_listo)
+            VALUES (%s, %s, 0)
+            ON DUPLICATE KEY UPDATE user_id = user_id
+        """, (sesion_id, g.user['id']))
+        
+        db.commit()
+        
+        # Obtener todos los usuarios en la sala
+        cursor.execute("""
+            SELECT u.id, u.username, uei.esta_listo
+            FROM usuario_estado_individual uei
+            JOIN users u ON uei.user_id = u.id
+            WHERE uei.sesion_id = %s
+            ORDER BY uei.created_at ASC
+        """, (sesion_id,))
+        
+        participantes = cursor.fetchall()
+        
+        # Obtener el número de preguntas
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM preguntas WHERE cuestionario_id = %s
+        """, (sesion['cuestionario_id'],))
+        
+        preguntas_count = cursor.fetchone()['count']
+        
+        cursor.close()
+        db.close()
+        
+        cuestionario_info = {
+            'titulo': sesion['titulo'],
+            'pin': sesion['pin'],
+            'descripcion': sesion['descripcion'],
+            'preguntas_count': preguntas_count
+        }
+        
+        return render_template('individual_quiz.html',
+                             sesion_id=sesion_id,
+                             session_code=sesion['session_code'],
+                             cuestionario=cuestionario_info,
+                             participantes=participantes,
+                             user_id=g.user['id'])
+        
+    except Exception as e:
+        flash(f'Error al cargar la sala: {str(e)}', 'error')
+        return redirect(url_for('my_quizzes'))
+
+@app.route('/api/individual/unirse-sesion', methods=['POST'])
+def api_unirse_sesion_individual():
+    """API para unirse a una sesión individual usando el código de sala"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    session_code = data.get('session_code', '').strip().upper()
+    
+    if len(session_code) != 6:
+        return jsonify({'success': False, 'message': 'El código debe tener 6 caracteres'})
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Buscar sesión por código
+        cursor.execute("""
+            SELECT id, estado FROM sesiones_individual 
+            WHERE session_code = %s
+        """, (session_code,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            return jsonify({'success': False, 'message': 'Código de sala inválido'})
+        
+        if sesion['estado'] == 'finalizado':
+            return jsonify({'success': False, 'message': 'Esta sesión ya ha finalizado'})
+        
+        # Registrar al usuario en la sesión
+        cursor.execute("""
+            INSERT INTO usuario_estado_individual (sesion_id, user_id, esta_listo)
+            VALUES (%s, %s, 0)
+            ON DUPLICATE KEY UPDATE user_id = user_id
+        """, (sesion['id'], g.user['id']))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'sesion_id': sesion['id'],
+            'message': 'Te has unido a la sesión'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al unirse: {str(e)}'})
+
+@app.route('/api/individual/ready', methods=['POST'])
+def api_individual_ready():
+    """API para marcar al usuario como listo en sesión individual"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Verificar que el usuario está en la sesión
+        cursor.execute("""
+            SELECT id FROM usuario_estado_individual
+            WHERE sesion_id = %s AND user_id = %s
+        """, (sesion_id, g.user['id']))
+        
+        if not cursor.fetchone():
+            return jsonify({'success': False, 'message': 'No estás en esta sesión'})
+        
+        # Marcar como listo
+        cursor.execute("""
+            UPDATE usuario_estado_individual
+            SET esta_listo = 1
+            WHERE sesion_id = %s AND user_id = %s
+        """, (sesion_id, g.user['id']))
+        
+        db.commit()
+        
+        # Verificar si todos están listos
+        cursor.execute("""
+            SELECT COUNT(*) AS total_en_sala
+            FROM usuario_estado_individual
+            WHERE sesion_id = %s
+        """, (sesion_id,))
+        
+        total_en_sala = cursor.fetchone()['total_en_sala']
+        
+        cursor.execute("""
+            SELECT COUNT(*) AS listos
+            FROM usuario_estado_individual
+            WHERE sesion_id = %s AND esta_listo = 1
+        """, (sesion_id,))
+        
+        listos = cursor.fetchone()['listos']
+        
+        all_ready = (total_en_sala > 0 and listos == total_en_sala)
+        
+        if all_ready:
+            # Actualizar estado de la sesión a 'en_progreso'
+            cursor.execute("""
+                UPDATE sesiones_individual
+                SET estado = 'en_progreso', started_at = NOW()
+                WHERE id = %s
+            """, (sesion_id,))
+            db.commit()
+        
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'all_ready': all_ready,
+            'ready_count': listos,
+            'total_count': total_en_sala,
+            'message': 'Marcado como listo' if not all_ready else '¡Todos listos! Iniciando...'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/individual/juego/<int:sesion_id>')
+def individual_juego(sesion_id):
+    """Página para jugar el cuestionario individual (solo cuando está en progreso)"""
+    if not g.user:
+        flash('Debes iniciar sesión para participar', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT si.id, si.cuestionario_id, si.estado, si.session_code,
+                   c.titulo, c.pin
+            FROM sesiones_individual si
+            JOIN cuestionarios c ON si.cuestionario_id = c.id
+            WHERE si.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('my_quizzes'))
+        
+        # Verificar que el usuario está en la sesión
+        cursor.execute("""
+            SELECT id FROM usuario_estado_individual
+            WHERE sesion_id = %s AND user_id = %s
+        """, (sesion_id, g.user['id']))
+        
+        if not cursor.fetchone():
+            flash('No estás registrado en esta sesión', 'error')
+            return redirect(url_for('individual_quiz', sesion_id=sesion_id))
+        
+        # Verificar estado de la sesión
+        if sesion['estado'] != 'en_progreso':
+            flash('El juego aún no ha comenzado o ya finalizó', 'info')
+            return redirect(url_for('individual_quiz', sesion_id=sesion_id))
+        
+        # Obtener preguntas del cuestionario
+        cursor.execute("""
+            SELECT id, texto_pregunta, tiempo_limite, puntos, orden
+            FROM preguntas
+            WHERE cuestionario_id = %s
+            ORDER BY orden ASC
+        """, (sesion['cuestionario_id'],))
+        
+        preguntas = cursor.fetchall()
+        
+        # Obtener opciones para cada pregunta
+        preguntas_con_opciones = []
+        for pregunta in preguntas:
+            cursor.execute("""
+                SELECT id, texto_opcion, es_correcta
+                FROM opciones_respuesta
+                WHERE pregunta_id = %s
+                ORDER BY orden ASC
+            """, (pregunta['id'],))
+            
+            opciones = cursor.fetchall()
+            
+            pregunta_dict = dict(pregunta)
+            pregunta_dict['opciones'] = opciones
+            preguntas_con_opciones.append(pregunta_dict)
+        
+        # Obtener participantes en la sala
+        cursor.execute("""
+            SELECT u.id, u.username
+            FROM usuario_estado_individual uei
+            JOIN users u ON uei.user_id = u.id
+            WHERE uei.sesion_id = %s
+        """, (sesion_id,))
+        
+        participantes = cursor.fetchall()
+        
+        cursor.close()
+        db.close()
+        
+        return render_template('juego_individual.html', 
+                             sesion_id=sesion_id,
+                             cuestionario={'titulo': sesion['titulo']},
+                             preguntas_json=json.dumps(preguntas_con_opciones),
+                             total_preguntas=len(preguntas),
+                             participantes=participantes)
+        
+    except Exception as e:
+        flash(f'Error al cargar el juego: {str(e)}', 'error')
+        return redirect(url_for('my_quizzes'))
+
+@app.route('/api/individual/participantes/<int:sesion_id>')
+def api_individual_participantes(sesion_id):
+    """API para obtener la lista actualizada de participantes en una sesión"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        cursor.execute("""
+            SELECT u.id, u.username, uei.esta_listo as ready
+            FROM usuario_estado_individual uei
+            JOIN users u ON uei.user_id = u.id
+            WHERE uei.sesion_id = %s
+            ORDER BY uei.created_at ASC
+        """, (sesion_id,))
+        
+        participantes = cursor.fetchall()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'participants': participantes
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/api/individual/status/<int:sesion_id>')
+def api_individual_status(sesion_id):
+    """API para obtener el estado de la sesión"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT estado FROM sesiones_individual WHERE id = %s", (sesion_id,))
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            return jsonify({'success': False, 'message': 'Sesión no encontrada'})
+        
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'status': sesion['estado']
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/api/individual/answer', methods=['POST'])
+def api_individual_answer():
+    """API para enviar respuesta en sesión individual (igual que grupos)"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+    question_id = data.get('question_id')
+    answer_id = data.get('answer_id')
+    tiempo_respuesta = data.get('tiempo_respuesta', 0)
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la opción y la pregunta
+        cursor.execute("""
+            SELECT o.es_correcta, p.puntos, p.tiempo_limite
+            FROM opciones_respuesta o
+            JOIN preguntas p ON o.pregunta_id = p.id
+            WHERE o.id = %s AND o.pregunta_id = %s
+        """, (answer_id, question_id))
+        
+        resultado = cursor.fetchone()
+        if not resultado:
+            return jsonify({'success': False, 'message': 'Opción no encontrada'})
+        
+        # Calcular puntos (fórmula igual que grupos)
+        es_correcta = resultado['es_correcta']
+        puntos = 0
+        if es_correcta:
+            puntos_base = resultado['puntos'] or 1000
+            tiempo_limite = resultado['tiempo_limite'] or 30
+            # Más rápido = más puntos
+            tiempo_restante = max(0, tiempo_limite - tiempo_respuesta)
+            factor_tiempo = tiempo_restante / tiempo_limite
+            puntos = int(puntos_base * factor_tiempo)
+        
+        # Guardar respuesta en la tabla correcta
+        cursor.execute("""
+            INSERT INTO respuestas_individual (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE opcion_id = %s, es_correcta = %s, puntos = %s, tiempo_respuesta = %s
+        """, (sesion_id, g.user['id'], question_id, answer_id, es_correcta, puntos, tiempo_respuesta,
+              answer_id, es_correcta, puntos, tiempo_respuesta))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'correct': bool(es_correcta),
+            'points': puntos
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/api/individual/finalizar-sesion', methods=['POST'])
+def api_finalizar_sesion_individual():
+    """API para marcar sesión individual como finalizada"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        cursor.execute("""
+            UPDATE sesiones_individual
+            SET estado = 'finalizado', finished_at = NOW()
+            WHERE id = %s
+        """, (sesion_id,))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/individual/resultados/<int:sesion_id>')
+def individual_resultados(sesion_id):
+    """Página de resultados finales de la sesión individual"""
+    if not g.user:
+        flash('Debes iniciar sesión para ver los resultados', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT si.id, si.cuestionario_id, c.titulo as cuestionario_titulo
+            FROM sesiones_individual si
+            JOIN cuestionarios c ON si.cuestionario_id = c.id
+            WHERE si.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('my_quizzes'))
+        
+        # Obtener el total de preguntas
+        cursor.execute("""
+            SELECT COUNT(p.id) as total_preguntas
+            FROM preguntas p
+            WHERE p.cuestionario_id = %s
+        """, (sesion['cuestionario_id'],))
+        total_preguntas = cursor.fetchone()['total_preguntas']
+
+        # Obtener resultados de todos los participantes
+        cursor.execute("""
+            SELECT 
+                u.id,
+                u.username, 
+                COALESCE(SUM(ri.puntos), 0) as score,
+                COALESCE(SUM(ri.es_correcta), 0) as correct_answers,
+                COUNT(DISTINCT ri.pregunta_id) as preguntas_respondidas
+            FROM usuario_estado_individual uei
+            JOIN users u ON uei.user_id = u.id
+            LEFT JOIN respuestas_individual ri ON ri.user_id = u.id AND ri.sesion_id = %s
+            WHERE uei.sesion_id = %s
+            GROUP BY u.id, u.username
+            ORDER BY score DESC, correct_answers DESC
+        """, (sesion_id, sesion_id))
+        resultados = cursor.fetchall()
+        
+        cursor.close()
+        db.close()
+        
+        return render_template('individual_resultados.html',
+                             sesion_id=sesion_id,
+                             cuestionario_titulo=sesion['cuestionario_titulo'],
+                             total_preguntas=total_preguntas,
+                             resultados=resultados)
+        
+    except Exception as e:
+        flash(f'Error al cargar resultados: {str(e)}', 'error')
+        return redirect(url_for('my_quizzes'))
+
+# =====================
+#  Exportar Resultados a Excel
+# =====================
+
+@app.route('/grupo/resultados/<int:sesion_id>/exportar-excel')
+def exportar_resultados_grupo_excel(sesion_id):
+    """Exportar resultados de grupo a Excel"""
+    if not g.user:
+        flash('Debes iniciar sesión', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id,
+                   g.nombre as grupo_nombre, c.titulo as cuestionario_titulo
+            FROM sesiones_grupo sg
+            JOIN grupos g ON sg.grupo_id = g.id
+            JOIN cuestionarios c ON sg.cuestionario_id = c.id
+            WHERE sg.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('grupos'))
+        
+        # Obtener el total de preguntas
+        cursor.execute("""
+            SELECT COUNT(p.id) as total_preguntas
+            FROM preguntas p
+            WHERE p.cuestionario_id = %s
+        """, (sesion['cuestionario_id'],))
+        total_preguntas = cursor.fetchone()['total_preguntas']
+
+        # Obtener resultados de todos los participantes
+        cursor.execute("""
+            SELECT 
+                u.username, 
+                COALESCE(SUM(rg.puntos), 0) as score,
+                COALESCE(SUM(rg.es_correcta), 0) as correct_answers,
+                COUNT(DISTINCT rg.pregunta_id) as preguntas_respondidas
+            FROM usuario_estado_grupo ues
+            JOIN users u ON ues.user_id = u.id
+            LEFT JOIN respuestas_grupo rg ON rg.user_id = u.id AND rg.sesion_id = %s
+            WHERE ues.sesion_id = %s
+            GROUP BY u.id, u.username
+            ORDER BY score DESC, correct_answers DESC
+        """, (sesion_id, sesion_id))
+        resultados = cursor.fetchall()
+
+        cursor.close()
+        db.close()
+        
+        # Crear libro de Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Resultados"
+        
+        # Estilos
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Título
+        ws.merge_cells('A1:E1')
+        title_cell = ws['A1']
+        title_cell.value = f"Resultados - {sesion['cuestionario_titulo']}"
+        title_cell.font = Font(bold=True, size=16)
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        ws.merge_cells('A2:E2')
+        subtitle_cell = ws['A2']
+        subtitle_cell.value = f"Grupo: {sesion['grupo_nombre']}"
+        subtitle_cell.font = Font(size=12)
+        subtitle_cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        ws.merge_cells('A3:E3')
+        date_cell = ws['A3']
+        date_cell.value = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        date_cell.alignment = Alignment(horizontal='center')
+        
+        # Headers
+        headers = ['Posición', 'Jugador', 'Puntaje', 'Respuestas Correctas', 'Preguntas Respondidas']
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=5, column=col)
+            cell.value = header
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = border
+        
+        # Datos
+        for idx, resultado in enumerate(resultados, start=1):
+            row = idx + 5
+            ws.cell(row=row, column=1, value=idx).border = border
+            ws.cell(row=row, column=2, value=resultado['username']).border = border
+            ws.cell(row=row, column=3, value=resultado['score']).border = border
+            ws.cell(row=row, column=4, value=f"{resultado['correct_answers']}/{total_preguntas}").border = border
+            ws.cell(row=row, column=5, value=resultado['preguntas_respondidas']).border = border
+            
+            # Alineación
+            for col in range(1, 6):
+                ws.cell(row=row, column=col).alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Ajustar anchos de columna
+        ws.column_dimensions['A'].width = 12
+        ws.column_dimensions['B'].width = 25
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 22
+        ws.column_dimensions['E'].width = 25
+        
+        # Guardar en memoria
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        filename = f"Resultados_{sesion['grupo_nombre']}_{sesion['cuestionario_titulo']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        # ✅ SUBIR AUTOMÁTICAMENTE A GOOGLE DRIVE
+        output_copy = BytesIO(output.getvalue())  # Copia para Drive
+        drive_result = subir_a_google_drive(output_copy, filename)
+        
+        if drive_result['success']:
+            flash(f'✅ Resultados guardados en Google Drive', 'success')
+        else:
+            flash(f'⚠️ Descarga lista, pero hubo un error al guardar en Drive: {drive_result.get("error", "Error desconocido")}', 'warning')
+        
+        # Resetear el puntero para la descarga
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        flash(f'Error al exportar resultados: {str(e)}', 'error')
+        return redirect(url_for('grupo_resultados', sesion_id=sesion_id))
+
+@app.route('/individual/resultados/<int:sesion_id>/exportar-excel')
+def exportar_resultados_individual_excel(sesion_id):
+    """Exportar resultados individuales a Excel"""
+    if not g.user:
+        flash('Debes iniciar sesión', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información de la sesión
+        cursor.execute("""
+            SELECT si.id, si.cuestionario_id, c.titulo as cuestionario_titulo
+            FROM sesiones_individual si
+            JOIN cuestionarios c ON si.cuestionario_id = c.id
+            WHERE si.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        
+        if not sesion:
+            flash('Sesión no encontrada', 'error')
+            return redirect(url_for('my_quizzes'))
+        
+        # Obtener el total de preguntas
+        cursor.execute("""
+            SELECT COUNT(p.id) as total_preguntas
+            FROM preguntas p
+            WHERE p.cuestionario_id = %s
+        """, (sesion['cuestionario_id'],))
+        total_preguntas = cursor.fetchone()['total_preguntas']
+
+        # Obtener resultados de todos los participantes
+        cursor.execute("""
+            SELECT 
+                u.username, 
+                COALESCE(SUM(ri.puntos), 0) as score,
+                COALESCE(SUM(ri.es_correcta), 0) as correct_answers,
+                COUNT(DISTINCT ri.pregunta_id) as preguntas_respondidas
+            FROM usuario_estado_individual uei
+            JOIN users u ON uei.user_id = u.id
+            LEFT JOIN respuestas_individual ri ON ri.user_id = u.id AND ri.sesion_id = %s
+            WHERE uei.sesion_id = %s
+            GROUP BY u.id, u.username
+            ORDER BY score DESC, correct_answers DESC
+        """, (sesion_id, sesion_id))
+        resultados = cursor.fetchall()
+        
+        cursor.close()
+        db.close()
+        
+        # Crear libro de Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Resultados"
+        
+        # Estilos
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Título
+        ws.merge_cells('A1:E1')
+        title_cell = ws['A1']
+        title_cell.value = f"Resultados - {sesion['cuestionario_titulo']}"
+        title_cell.font = Font(bold=True, size=16)
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        ws.merge_cells('A2:E2')
+        subtitle_cell = ws['A2']
+        subtitle_cell.value = "Sesión Individual"
+        subtitle_cell.font = Font(size=12)
+        subtitle_cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        ws.merge_cells('A3:E3')
+        date_cell = ws['A3']
+        date_cell.value = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        date_cell.alignment = Alignment(horizontal='center')
+        
+        # Headers
+        headers = ['Posición', 'Jugador', 'Puntaje', 'Respuestas Correctas', 'Preguntas Respondidas']
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=5, column=col)
+            cell.value = header
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = border
+        
+        # Datos
+        for idx, resultado in enumerate(resultados, start=1):
+            row = idx + 5
+            ws.cell(row=row, column=1, value=idx).border = border
+            ws.cell(row=row, column=2, value=resultado['username']).border = border
+            ws.cell(row=row, column=3, value=resultado['score']).border = border
+            ws.cell(row=row, column=4, value=f"{resultado['correct_answers']}/{total_preguntas}").border = border
+            ws.cell(row=row, column=5, value=resultado['preguntas_respondidas']).border = border
+            
+            # Alineación
+            for col in range(1, 6):
+                ws.cell(row=row, column=col).alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Ajustar anchos de columna
+        ws.column_dimensions['A'].width = 12
+        ws.column_dimensions['B'].width = 25
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 22
+        ws.column_dimensions['E'].width = 25
+        
+        # Guardar en memoria
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        filename = f"Resultados_{sesion['cuestionario_titulo']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        # ✅ SUBIR AUTOMÁTICAMENTE A GOOGLE DRIVE
+        output_copy = BytesIO(output.getvalue())  # Copia para Drive
+        drive_result = subir_a_google_drive(output_copy, filename)
+        
+        if drive_result['success']:
+            flash(f'✅ Resultados guardados en Google Drive', 'success')
+        else:
+            flash(f'⚠️ Descarga lista, pero hubo un error al guardar en Drive: {drive_result.get("error", "Error desconocido")}', 'warning')
+        
+        # Resetear el puntero para la descarga
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        flash(f'Error al exportar resultados: {str(e)}', 'error')
+        return redirect(url_for('individual_resultados', sesion_id=sesion_id))
 
 if __name__ == '__main__':
     # Ya no es necesario crear la carpeta aquí; se crea arriba en tiempo de carga.

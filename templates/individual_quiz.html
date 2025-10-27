@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_quiz.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="grupo-quiz-container">
+    <!-- Header del Cuestionario -->
+    <div class="quiz-header">
+        <div class="group-info">
+            <h1>{{ cuestionario.titulo }}</h1>
+            <p class="quiz-title">Cuestionario Individual</p>
+            <div class="quiz-meta">
+                <span class="pin">PIN: {{ cuestionario.pin }}</span>
+                <span class="questions-count">{{ cuestionario.preguntas_count }} preguntas</span>
+            </div>
+            <div class="session-code-display">
+                <div class="code-label">Código de Sala:</div>
+                <div class="code-value">{{ session_code }}</div>
+                <button class="btn-copy-code" onclick="copySessionCode('{{ session_code }}', event)" title="Copiar código">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+            <p class="session-info">Comparte este código con otros para que se unan al cuestionario</p>
+        </div>
+        <div class="group-members">
+            <h3>Participantes en la Sala</h3>
+            <div class="members-list" id="membersList">
+                {% for participante in participantes %}
+                <div class="member-item" data-user-id="{{ participante.id }}">
+                    <div class="member-avatar">
+                        <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
+                    </div>
+                    <span class="member-name">{{ participante.username }}</span>
+                    <div class="member-status">
+                        <span class="status-indicator {% if participante.esta_listo %}ready{% else %}waiting{% endif %}"></span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado del Cuestionario -->
+    <div class="quiz-status" id="quizStatus">
+        <div class="status-waiting" id="statusWaiting">
+            <div class="waiting-content">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <h2>Esperando a que todos estén listos</h2>
+                <p>El cuestionario comenzará cuando todos los participantes estén preparados</p>
+                <div class="ready-button">
+                    <button class="btn-ready" id="readyBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Estoy Listo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-starting" id="statusStarting" style="display: none;">
+            <div class="starting-content">
+                <div class="countdown" id="countdown">3</div>
+                <h2>¡El cuestionario está a punto de comenzar!</h2>
+                <p>Prepárate para responder las preguntas</p>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}
+
+{% block page_js %}
+<script>
+/* =========================
+   Variables globales
+   ========================= */
+const sesionId = {{ sesion_id }};
+const userId = {{ user_id }};
+let isReady = false;
+let gameStarted = false;
+
+// Elementos del DOM
+const statusWaiting = document.getElementById('statusWaiting');
+const statusStarting = document.getElementById('statusStarting');
+const readyBtn = document.getElementById('readyBtn');
+const membersList = document.getElementById('membersList');
+
+/* =========================
+   Inicialización
+   ========================= */
+document.addEventListener('DOMContentLoaded', function () {
+  setupEventListeners();
+  startPolling();
+});
+
+/* =========================
+   Eventos
+   ========================= */
+function setupEventListeners() {
+  if (readyBtn) readyBtn.addEventListener('click', toggleReady);
+}
+
+/* =========================
+   Estado "Listo" (Ready)
+   ========================= */
+function toggleReady() {
+  isReady = !isReady;
+  toggleReadyVisuals();
+
+  sendReadyStatus(isReady);
+}
+
+function sendReadyStatus(ready) {
+  fetch('/api/individual/ready', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sesion_id: sesionId
+    })
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      if (!data.success) {
+        // Si falla, revertir el estado visual del botón
+        isReady = !isReady;
+        toggleReadyVisuals();
+        return;
+      }
+
+      // Si el servidor detectó que TODOS están listos, arrancamos ya
+      if (data.all_ready && !gameStarted) {
+        gameStarted = true;
+        startQuiz();
+      }
+    })
+    .catch(() => {});
+}
+
+/* =========================
+   Inicio del Quiz
+   ========================= */
+function startQuiz() {
+    // Cambiar secciones de estado
+    if (statusWaiting) statusWaiting.style.display = 'none';
+    if (statusStarting) statusStarting.style.display = 'block';
+
+    let countdown = 3;
+    const countdownElement = document.getElementById('countdown');
+    if (countdownElement) countdownElement.textContent = countdown;
+
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdownElement) countdownElement.textContent = countdown;
+
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            startQuestions();
+        }
+    }, 1000);
+}
+
+function startQuestions() {
+  // Redirigir a la página de juego
+  window.location.href = `/individual/juego/${sesionId}`;
+}
+
+/* =========================
+   Polling de Estado (Servidor -> Cliente)
+   ========================= */
+let membersPollingInterval = null;
+
+function startPolling() {
+  // Polling para el estado del juego
+  const gameStatusInterval = setInterval(() => {
+    fetch(`/api/individual/status/${sesionId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          if (updateQuizStatus(data.status)) {
+            clearInterval(gameStatusInterval);
+            if (membersPollingInterval) {
+              clearInterval(membersPollingInterval);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, 3000);
+
+  // Polling para actualizar la lista de participantes en tiempo real
+  membersPollingInterval = setInterval(() => {
+    fetch(`/api/individual/participantes/${sesionId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.participants) {
+          updateMembersList(data.participants);
+        }
+      })
+      .catch(() => {});
+  }, 2000);
+}
+
+function updateMembersList(members) {
+  if (!membersList) return;
+  
+  // Guardar el HTML actual para comparar
+  const currentMemberIds = Array.from(membersList.querySelectorAll('.member-item'))
+    .map(item => item.dataset.userId);
+  
+  const newMemberIds = members.map(m => String(m.id));
+  
+  // Si hay cambios, actualizar la lista completa
+  if (JSON.stringify(currentMemberIds.sort()) !== JSON.stringify(newMemberIds.sort())) {
+    membersList.innerHTML = '';
+    
+    members.forEach((member) => {
+      const memberItem = document.createElement('div');
+      memberItem.className = 'member-item';
+      memberItem.dataset.userId = member.id;
+      
+      const statusClass = member.ready ? 'ready' : 'waiting';
+      
+      memberItem.innerHTML = `
+        <div class="member-avatar">
+          <img src="/static/img/robot_ico.png" alt="Avatar">
+        </div>
+        <span class="member-name">${member.username}</span>
+        <div class="member-status">
+          <span class="status-indicator ${statusClass}"></span>
+        </div>
+      `;
+      
+      membersList.appendChild(memberItem);
+    });
+  } else {
+    // Solo actualizar el estado de los miembros existentes
+    members.forEach((member) => {
+      const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
+      if (memberEl) {
+        const indicator = memberEl.querySelector('.status-indicator');
+        indicator.classList.remove('ready', 'waiting');
+        indicator.classList.add(member.ready ? 'ready' : 'waiting');
+      }
+    });
+  }
+}
+
+function updateQuizStatus(status) {
+  if (status === 'esperando') {
+    return false;
+  }
+  if (status === 'en_progreso') {
+    if (!gameStarted) {
+      gameStarted = true;
+      window.location.href = `/individual/juego/${sesionId}`;
+    }
+    return true;
+  }
+  if (status === 'finalizado') {
+    // Redirigir a resultados (por ahora a mis cuestionarios)
+    window.location.href = '/my-quizzes';
+    return true;
+  }
+  return false;
+}
+
+function toggleReadyVisuals() {
+    const indicator = membersList.querySelector(`.member-item[data-user-id="${userId}"] .status-indicator`);
+    if (isReady) {
+        readyBtn.classList.add('ready');
+        readyBtn.querySelector('svg').style.display = 'inline';
+        if (indicator) indicator.classList.replace('waiting', 'ready');
+    } else {
+        readyBtn.classList.remove('ready');
+        if (indicator) indicator.classList.replace('ready', 'waiting');
+    }
+}
+
+// Función para copiar el código de sesión
+function copySessionCode(code, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    navigator.clipboard.writeText(code).then(() => {
+        const btn = event.target.closest('.btn-copy-code');
+        if (!btn) return;
+        
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        `;
+        btn.style.background = '#4caf50';
+        btn.disabled = true;
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = '';
+            btn.disabled = false;
+        }, 2000);
+    }).catch((err) => {
+        console.error('Error al copiar:', err);
+        alert('Error al copiar el código. Copia manualmente: ' + code);
+    });
+}
+
+console.log('✅ Cuestionario individual inicializado');
+</script>
+
+{% endblock %}
+

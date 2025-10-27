@@ -385,50 +385,375 @@ body {
 /* ==============================================
    Responsivo
    ============================================== */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+    .resultados-container {
+        max-width: 100%;
+        padding: 1.5rem;
+    }
+    
+    .results-header h1 {
+        font-size: 2.5rem;
+    }
+    
+    .podium {
+        gap: 1.5rem;
+    }
+}
+
+/* Móvil Grande (600px - 768px) */
 @media (max-width: 768px) {
+    .resultados-container {
+        padding: 1rem;
+    }
+
+    .results-header {
+        margin-bottom: 2rem;
+    }
+
+    .trophy-icon {
+        font-size: 4rem;
+    }
+
     .results-header h1 {
         font-size: 2rem;
+    }
+
+    .subtitle {
+        font-size: 1.1rem;
     }
 
     .podium {
         flex-direction: column;
         align-items: center;
-        gap: 1rem;
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+        padding: 0 1rem;
     }
 
-    .podium .second,
-    .podium .first,
+    /* Ordenar podio para móvil: 1°, 2°, 3° */
+    .podium .second {
+        order: 2;
+    }
+
+    .podium .first {
+        order: 1;
+    }
+
     .podium .third {
-        order: initial;
+        order: 3;
     }
 
     .podium-bar {
         display: none;
     }
 
+    .crown {
+        font-size: 2.5rem;
+        top: -40px;
+    }
+
+    .podium-medal {
+        font-size: 2rem;
+    }
+
+    .podium-avatar {
+        width: 70px;
+        height: 70px;
+        border-width: 3px;
+    }
+
+    .podium-avatar.winner {
+        width: 90px;
+        height: 90px;
+        border-width: 4px;
+    }
+
+    .podium-place h3 {
+        font-size: 1.2rem;
+    }
+
+    .podium-score {
+        font-size: 1.3rem;
+    }
+
+    .podium-accuracy {
+        font-size: 0.85rem;
+    }
+
+    .results-table-container {
+        padding: 1.5rem;
+        border-radius: 1.25rem;
+    }
+
+    .results-table-container h2 {
+        font-size: 1.75rem;
+        margin-bottom: 1.5rem;
+    }
+
     .table-header,
     .table-row {
-        grid-template-columns: 60px 1fr 80px 80px;
-        gap: 0.5rem;
-        padding: 0.75rem;
-        font-size: 0.9rem;
+        grid-template-columns: 60px 1fr 100px 100px;
+        gap: 0.75rem;
+        padding: 0.85rem;
+        font-size: 0.95rem;
+    }
+
+    .player-avatar-small {
+        width: 36px;
+        height: 36px;
     }
 
     .player-name {
         font-size: 1rem;
     }
 
+    .rank-badge {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+
+    .rank-number {
+        font-size: 1.1rem;
+    }
+
+    .correct-badge {
+        padding: 0.4rem 0.85rem;
+        font-size: 0.9rem;
+    }
+
     .score-value {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
     }
 
     .actions {
         flex-direction: column;
+        gap: 0.85rem;
     }
 
     .btn-primary, .btn-secondary {
         width: 100%;
         justify-content: center;
+        padding: 0.9rem 1.75rem;
+        font-size: 1rem;
+    }
+}
+
+/* Móvil Pequeño (< 600px) */
+@media (max-width: 600px) {
+    .resultados-container {
+        padding: 0.75rem;
+    }
+
+    .results-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .trophy-icon {
+        font-size: 3.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .results-header h1 {
+        font-size: 1.75rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .podium {
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .crown {
+        font-size: 2rem;
+        top: -35px;
+    }
+
+    .podium-medal {
+        font-size: 1.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .podium-avatar {
+        width: 60px;
+        height: 60px;
+        border-width: 3px;
+    }
+
+    .podium-avatar.winner {
+        width: 80px;
+        height: 80px;
+    }
+
+    .podium-place h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .podium-score {
+        font-size: 1.2rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .podium-accuracy {
+        font-size: 0.8rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .results-table-container {
+        padding: 1.25rem;
+        border-radius: 1rem;
+    }
+
+    .results-table-container h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .table-header,
+    .table-row {
+        grid-template-columns: 50px 1fr 75px 90px;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        font-size: 0.85rem;
+        border-radius: 0.65rem;
+    }
+
+    .col-rank {
+        text-align: center;
+    }
+
+    .rank-badge {
+        width: 32px;
+        height: 32px;
+        font-size: 0.85rem;
+    }
+
+    .rank-number {
+        font-size: 1rem;
+    }
+
+    .player-avatar-small {
+        width: 32px;
+        height: 32px;
+    }
+
+    .player-name {
+        font-size: 0.9rem;
+    }
+
+    .correct-badge {
+        padding: 0.35rem 0.7rem;
+        font-size: 0.8rem;
+    }
+
+    .score-value {
+        font-size: 1.15rem;
+    }
+
+    .actions {
+        gap: 0.75rem;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 0.85rem 1.5rem;
+        font-size: 0.95rem;
+    }
+}
+
+/* Móvil Extra Pequeño (< 375px) */
+@media (max-width: 375px) {
+    .trophy-icon {
+        font-size: 3rem;
+    }
+
+    .results-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .subtitle {
+        font-size: 0.95rem;
+    }
+
+    .podium-avatar {
+        width: 55px;
+        height: 55px;
+    }
+
+    .podium-avatar.winner {
+        width: 70px;
+        height: 70px;
+    }
+
+    .podium-place h3 {
+        font-size: 1rem;
+    }
+
+    .podium-score {
+        font-size: 1.1rem;
+    }
+
+    .table-header,
+    .table-row {
+        grid-template-columns: 45px 1fr 70px 80px;
+        gap: 0.4rem;
+        padding: 0.65rem;
+        font-size: 0.8rem;
+    }
+
+    .rank-badge {
+        width: 28px;
+        height: 28px;
+        font-size: 0.75rem;
+    }
+
+    .player-avatar-small {
+        width: 28px;
+        height: 28px;
+    }
+
+    .player-name {
+        font-size: 0.85rem;
+    }
+
+    .correct-badge {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
+    .score-value {
+        font-size: 1rem;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* Mejoras táctiles para móviles */
+@media (hover: none) and (pointer: coarse) {
+    .btn-primary, .btn-secondary {
+        /* Área táctil más grande */
+        min-height: 48px;
+        touch-action: manipulation;
+    }
+    
+    .btn-primary:active {
+        transform: translateY(0) scale(0.98);
+    }
+    
+    .btn-secondary:active {
+        transform: translateY(0) scale(0.98);
+    }
+    
+    .table-row {
+        touch-action: manipulation;
     }
 }
 
