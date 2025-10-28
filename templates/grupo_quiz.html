@@ -5,461 +5,509 @@
 
 {% block content %}
 <main class="grupo-quiz-container">
-    <!-- Header del Grupo -->
-    <div class="quiz-header">
-        <div class="group-info">
-            <h1>{{ grupo.nombre }}</h1>
-            <p class="quiz-title">{{ cuestionario.titulo }}</p>
-            <div class="quiz-meta">
-                <span class="pin">PIN: {{ cuestionario.pin }}</span>
-                <span class="questions-count">{{ cuestionario.preguntas_count }} preguntas</span>
-            </div>
-            <div class="session-code-display">
-                <div class="code-label">Código de Sala:</div>
-                <div class="code-value">{{ session_code }}</div>
-                <button class="btn-copy-code" onclick="copySessionCode('{{ session_code }}', event)" title="Copiar código">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                </button>
-            </div>
-            <p class="session-info">Comparte este código con los miembros del grupo para que se unan</p>
+  <!-- Header del Grupo -->
+  <div class="quiz-header">
+    <div class="group-info">
+      <h1>{{ grupo.nombre }}</h1>
+      <p class="quiz-title">{{ cuestionario.titulo }}</p>
+      <div class="quiz-meta">
+        <span class="pin">PIN: {{ cuestionario.pin }}</span>
+        <span class="questions-count">{{ cuestionario.preguntas_count }} preguntas</span>
+      </div>
+      <div class="session-code-display">
+        <div class="code-label">Código de Sala:</div>
+        <div class="code-value">{{ session_code }}</div>
+        <button class="btn-copy-code" onclick="copySessionCode('{{ session_code }}', event)" title="Copiar código">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+      </div>
+      <p class="session-info">Comparte este código con los miembros del grupo para que se unan</p>
+    </div>
+    <div class="group-members">
+      <h3>Miembros en la Sala</h3>
+      <div class="members-list" id="membersList">
+        {% for miembro in miembros %}
+        <div class="member-item" data-user-id="{{ miembro.id }}">
+          <div class="member-avatar">
+            <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
+          </div>
+          <span class="member-name">{{ miembro.username }}</span>
+          <div class="member-status">
+            <span class="status-indicator ready"></span>
+          </div>
         </div>
-        <div class="group-members">
-            <h3>Miembros en la Sala</h3>
-            <div class="members-list" id="membersList">
-                {% for miembro in miembros %}
-                <div class="member-item" data-user-id="{{ miembro.id }}">
-                    <div class="member-avatar">
-                        <img src="{{ url_for('static', filename='img/robot_ico.png') }}" alt="Avatar">
-                    </div>
-                    <span class="member-name">{{ miembro.username }}</span>
-                    <div class="member-status">
-                        <span class="status-indicator ready"></span>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado del Cuestionario -->
+  <div class="quiz-status" id="quizStatus">
+    <div class="status-waiting" id="statusWaiting">
+      <div class="waiting-content">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <h2 id="waitingTitle">Esperando a que el creador inicie el juego</h2>
+        <p id="waitingSubtitle">El cuestionario comenzará pronto</p>
+
+        <!-- Mensaje del creador -->
+        <div class="creator-message" id="creatorMessage" style="display: none;">
+          <div class="creator-icon">👑</div>
+          <p>Eres el creador de la sala</p>
+          <p class="creator-subtitle">Haz clic en "Empezar Juego" cuando estés listo</p>
         </div>
+
+        <div class="ready-button">
+          <!-- Botón de Empezar Juego solo para el creador -->
+          <button class="btn-start-game" id="startGameBtn" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Empezar Juego
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- Estado del Cuestionario -->
-    <div class="quiz-status" id="quizStatus">
-        <div class="status-waiting" id="statusWaiting">
-            <div class="waiting-content">
-                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                <h2 id="waitingTitle">Esperando a que el creador inicie el juego</h2>
-                <p id="waitingSubtitle">El cuestionario comenzará pronto</p>
-                
-                <!-- Mensaje del creador -->
-                <div class="creator-message" id="creatorMessage" style="display: none;">
-                    <div class="creator-icon">👑</div>
-                    <p>Eres el creador de la sala</p>
-                    <p class="creator-subtitle">Haz clic en "Empezar Juego" cuando estés listo</p>
-                </div>
-                
-                <div class="ready-button">
-                    <!-- Botón de Empezar Juego solo para el creador -->
-                    <button class="btn-start-game" id="startGameBtn" style="display: none;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                        Empezar Juego
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="status-starting" id="statusStarting" style="display: none;">
-            <div class="starting-content">
-                <div class="countdown" id="countdown">3</div>
-                <h2>¡El cuestionario está a punto de comenzar!</h2>
-                <p>Prepárate para responder las preguntas</p>
-            </div>
-        </div>
-
-        <div class="status-active" id="statusActive" style="display: none;">
-            <div class="quiz-progress">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <span class="progress-text" id="progressText">Pregunta 1 de {{ cuestionario.preguntas_count }}</span>
-            </div>
-        </div>
+    <div class="status-starting" id="statusStarting" style="display: none;">
+      <div class="starting-content">
+        <div class="countdown" id="countdown">3</div>
+        <h2>¡El cuestionario está a punto de comenzar!</h2>
+        <p>Prepárate para responder las preguntas</p>
+      </div>
     </div>
 
-    <!-- Pregunta Actual -->
-    <div class="question-container" id="questionContainer" style="display: none;">
-        <div class="question-card">
-            <div class="question-header">
-                <h3 id="questionText">¿Cuál es la capital de Francia?</h3>
-                <div class="question-timer" id="questionTimer">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <span id="timerValue">30</span>s
-                </div>
-            </div>
-            
-            <div class="answers-container" id="answersContainer">
-                <!-- Las opciones se cargarán dinámicamente -->
-            </div>
+    <div class="status-active" id="statusActive" style="display: none;">
+      <div class="quiz-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
         </div>
+        <span class="progress-text" id="progressText">Pregunta 1 de {{ cuestionario.preguntas_count }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pregunta Actual -->
+  <div class="question-container" id="questionContainer" style="display: none;">
+    <div class="question-card">
+      <div class="question-header">
+        <h3 id="questionText">¿Cuál es la capital de Francia?</h3>
+        <div class="question-timer" id="questionTimer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span id="timerValue">30</span>s
+        </div>
+      </div>
+
+      <div class="answers-container" id="answersContainer">
+        <!-- Las opciones se cargarán dinámicamente -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Resultados del Grupo -->
+  <div class="results-container" id="resultsContainer" style="display: none;">
+    <div class="results-header">
+      <h2>Resultados del Grupo</h2>
+      <p>Puntuación total: <span id="groupScore">0</span> puntos</p>
     </div>
 
-    <!-- Resultados del Grupo -->
-    <div class="results-container" id="resultsContainer" style="display: none;">
-        <div class="results-header">
-            <h2>Resultados del Grupo</h2>
-            <p>Puntuación total: <span id="groupScore">0</span> puntos</p>
-        </div>
-        
-        <div class="leaderboard" id="leaderboard">
-            <!-- Los resultados se cargarán dinámicamente -->
-        </div>
-        
-        <div class="results-actions">
-            <button class="btn-primary" onclick="window.location.href='/grupos'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
-                Volver a Grupos
-            </button>
-            <button class="btn-secondary" onclick="restartQuiz()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <polyline points="1 20 1 14 7 14"></polyline>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L20.49 9"></path>
-                    <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3.51 15"></path>
-                </svg>
-                Repetir Cuestionario
-            </button>
-        </div>
+    <div class="leaderboard" id="leaderboard">
+      <!-- Los resultados se cargarán dinámicamente -->
     </div>
+
+    <div class="results-actions">
+      <button class="btn-primary" onclick="window.location.href='/grupos'">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        Volver a Grupos
+      </button>
+      <button class="btn-secondary" onclick="restartQuiz()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L20.49 9"></path>
+          <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3.51 15"></path>
+        </svg>
+        Repetir Cuestionario
+      </button>
+    </div>
+  </div>
 </main>
 {% endblock %}
 
 {% block page_js %}
 <script>
-/* =========================
-   Variables globales
-   ========================= */
-const sesionId = {{ sesion_id }};
-const userId = {{ g.user.id if g.user else 0 }};
-const esCreador = {{ es_creador | tojson }};
-let currentQuestion = 0;
-let questions = [];
-let userAnswers = [];
-let questionTimer = null;
-let gameStarted = false; // evita iniciar dos veces
+  /* =========================
+     Variables globales
+     ========================= */
+  const sesionId = {{ sesion_id }};
+  const userId = {{ g.user.id if g.user else 0 }};
+  const esCreador = {{ es_creador | tojson }};
+  let currentQuestion = 0;
+  let questions = [];
+  let userAnswers = [];
+  let questionTimer = null;
+  let gameStarted = false; // evita iniciar dos veces
 
-// Elementos del DOM
-const statusWaiting = document.getElementById('statusWaiting');
-const statusStarting = document.getElementById('statusStarting');
-const statusActive   = document.getElementById('statusActive');
-const questionContainer = document.getElementById('questionContainer');
-const startGameBtn = document.getElementById('startGameBtn');
-const membersList  = document.getElementById('membersList');
-const confirmModal = document.getElementById('confirmModal');
-const creatorMessage = document.getElementById('creatorMessage');
+  // Elementos del DOM
+  const statusWaiting = document.getElementById('statusWaiting');
+  const statusStarting = document.getElementById('statusStarting');
+  const statusActive = document.getElementById('statusActive');
+  const questionContainer = document.getElementById('questionContainer');
+  const startGameBtn = document.getElementById('startGameBtn');
+  const membersList = document.getElementById('membersList');
+  const confirmModal = document.getElementById('confirmModal');
+  const creatorMessage = document.getElementById('creatorMessage');
 
-/* =========================
-   Inicialización
-   ========================= */
-document.addEventListener('DOMContentLoaded', function () {
-  initializeQuiz();
-  setupEventListeners();
-  startPolling();
-  setupCreatorInterface();
-});
-
-function initializeQuiz() {
-  // Cargar preguntas (ya vienen del backend en JSON)
-  questions = JSON.parse({{ preguntas_json | tojson }});
-}
-
-function setupCreatorInterface() {
-  const waitingTitle = document.getElementById('waitingTitle');
-  const waitingSubtitle = document.getElementById('waitingSubtitle');
-  
-  if (esCreador) {
-    // Si es el creador, mostrar botón de empezar juego y mensaje
-    if (startGameBtn) startGameBtn.style.display = 'block';
-    if (creatorMessage) creatorMessage.style.display = 'block';
-    if (waitingTitle) waitingTitle.textContent = 'Sala creada exitosamente';
-    if (waitingSubtitle) waitingSubtitle.textContent = 'Cuando estés listo, haz clic en "Empezar Juego"';
-  } else {
-    // Si no es el creador, solo mostrar mensaje de espera
-    if (startGameBtn) startGameBtn.style.display = 'none';
-    if (creatorMessage) creatorMessage.style.display = 'none';
-    if (waitingTitle) waitingTitle.textContent = 'Esperando a que el creador inicie el juego';
-    if (waitingSubtitle) waitingSubtitle.textContent = 'El cuestionario comenzará pronto';
-  }
-}
-
-/* =========================
-   Eventos
-   ========================= */
-function setupEventListeners() {
-  if (startGameBtn) startGameBtn.addEventListener('click', startGame);
-
-  // Selección de respuesta (delegado)
-  document.addEventListener('click', function (e) {
-    if (e.target.classList.contains('answer-option') || e.target.closest('.answer-option')) {
-      const target = e.target.classList.contains('answer-option') ? e.target : e.target.closest('.answer-option');
-      handleAnswerSelection(target); // Cambiado a handleAnswerSelection
-    }
+  /* =========================
+     Inicialización
+     ========================= */
+  document.addEventListener('DOMContentLoaded', function () {
+    initializeQuiz();
+    setupEventListeners();
+    startPolling();
+    setupCreatorInterface();
   });
+
+  function initializeQuiz() {
+    // Cargar preguntas (ya vienen del backend en JSON)
+    questions = JSON.parse({{ preguntas_json | tojson }});
 }
 
-/* =========================
-   Función para el Creador
-   ========================= */
-function startGame() {
-  if (!esCreador) return;
-  
-  // El creador puede iniciar el juego con los que estén listos
-  fetch('/api/grupo/start-game', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sesion_id: sesionId
-    })
-  })
-  .then((r) => r.json())
-  .then((data) => {
-    if (data.success) {
-      if (!gameStarted) {
-        gameStarted = true;
-        startQuiz();
+  function setupCreatorInterface() {
+    const waitingTitle = document.getElementById('waitingTitle');
+    const waitingSubtitle = document.getElementById('waitingSubtitle');
+
+    if (esCreador) {
+      // Si es el creador, mostrar botón de empezar juego y mensaje
+      if (startGameBtn) {
+        startGameBtn.style.display = 'block';
+        // Deshabilitar el botón por defecto hasta que llegue otro miembro
+        disableStartButton();
       }
+      if (creatorMessage) creatorMessage.style.display = 'block';
+      if (waitingTitle) waitingTitle.textContent = 'Sala creada exitosamente';
+      if (waitingSubtitle) waitingSubtitle.textContent = 'Esperando a que se unan más jugadores...';
     } else {
-      alert(data.message || 'Error al iniciar el juego');
+      // Si no es el creador, solo mostrar mensaje de espera
+      if (startGameBtn) startGameBtn.style.display = 'none';
+      if (creatorMessage) creatorMessage.style.display = 'none';
+      if (waitingTitle) waitingTitle.textContent = 'Esperando a que el creador inicie el juego';
+      if (waitingSubtitle) waitingSubtitle.textContent = 'El cuestionario comenzará pronto';
     }
-  })
-  .catch(() => {
-    alert('Error de conexión al iniciar el juego');
-  });
-}
+  }
 
-/* =========================
-   Actualizar Lista de Miembros
-   ========================= */
-function updateMembersStatus(members) {
-  members.forEach((member) => {
-    const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
-    if (memberEl) {
-      const indicator = memberEl.querySelector('.status-indicator');
-      // Ya no se usa el estado "listo", solo mostrar como conectados
-      indicator.classList.remove('waiting');
-      indicator.classList.add('ready');
+  /* =========================
+     Control del Botón de Inicio
+     ========================= */
+  function disableStartButton() {
+    if (!startGameBtn) return;
+
+    startGameBtn.disabled = true;
+    startGameBtn.style.opacity = '0.5';
+    startGameBtn.style.cursor = 'not-allowed';
+    startGameBtn.style.pointerEvents = 'none';
+
+    // Actualizar texto del subtítulo si existe
+    const waitingSubtitle = document.getElementById('waitingSubtitle');
+    if (waitingSubtitle && esCreador) {
+      waitingSubtitle.textContent = 'Esperando a que se unan más jugadores...';
     }
-  });
-}
+  }
 
-/* =========================
-   Inicio del Quiz
-   ========================= */
-function startQuiz() {
+  function enableStartButton() {
+    if (!startGameBtn) return;
+
+    startGameBtn.disabled = false;
+    startGameBtn.style.opacity = '1';
+    startGameBtn.style.cursor = 'pointer';
+    startGameBtn.style.pointerEvents = 'auto';
+
+    // Actualizar texto del subtítulo si existe
+    const waitingSubtitle = document.getElementById('waitingSubtitle');
+    if (waitingSubtitle && esCreador) {
+      waitingSubtitle.textContent = 'Cuando estés listo, haz clic en "Empezar Juego"';
+    }
+  }
+
+  /* =========================
+     Eventos
+     ========================= */
+  function setupEventListeners() {
+    if (startGameBtn) startGameBtn.addEventListener('click', startGame);
+
+    // Selección de respuesta (delegado)
+    document.addEventListener('click', function (e) {
+      if (e.target.classList.contains('answer-option') || e.target.closest('.answer-option')) {
+        const target = e.target.classList.contains('answer-option') ? e.target : e.target.closest('.answer-option');
+        handleAnswerSelection(target);
+      }
+    });
+  }
+
+  /* =========================
+     Función para el Creador
+     ========================= */
+  function startGame() {
+    if (!esCreador) return;
+
+    // Verificar que el botón esté habilitado antes de proceder
+    if (startGameBtn && startGameBtn.disabled) {
+      return;
+    }
+
+    // El creador puede iniciar el juego con los que estén listos
+    fetch('/api/grupo/start-game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sesion_id: sesionId
+      })
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          if (!gameStarted) {
+            gameStarted = true;
+            startQuiz();
+          }
+        } else {
+          alert(data.message || 'Error al iniciar el juego');
+        }
+      })
+      .catch(() => {
+        alert('Error de conexión al iniciar el juego');
+      });
+  }
+
+  /* =========================
+     Actualizar Lista de Miembros
+     ========================= */
+  function updateMembersStatus(members) {
+    members.forEach((member) => {
+      const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
+      if (memberEl) {
+        const indicator = memberEl.querySelector('.status-indicator');
+        // Ya no se usa el estado "listo", solo mostrar como conectados
+        indicator.classList.remove('waiting');
+        indicator.classList.add('ready');
+      }
+    });
+  }
+
+  /* =========================
+     Inicio del Quiz
+     ========================= */
+  function startQuiz() {
     // Cambiar secciones de estado
     if (statusWaiting) statusWaiting.style.display = 'none';
     if (statusStarting) statusStarting.style.display = 'block';
 
-    let countdown = 3; // Inicia en 3, pero puedes cambiarlo a 5
+    let countdown = 3;
     const countdownElement = document.getElementById('countdown');
     if (countdownElement) countdownElement.textContent = countdown;
 
     const countdownInterval = setInterval(() => {
-        countdown--;
-        if (countdownElement) countdownElement.textContent = countdown;
+      countdown--;
+      if (countdownElement) countdownElement.textContent = countdown;
 
-        if (countdown <= 0) {
-            clearInterval(countdownInterval);
-            startQuestions();
-        }
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        startQuestions();
+      }
     }, 1000);
-}
-
-function startQuestions() {
-  // Redirigir a la página de juego en lugar de mostrar aquí
-  window.location.href = `/grupo/juego/${sesionId}`;
-}
-
-/* =========================
-   Render de Pregunta
-   ========================= */
-function showQuestion(questionIndex) {
-  if (questionIndex >= questions.length) {
-    endQuiz();
-    return;
   }
 
-  // Limpiar timer previo
-  if (questionTimer) {
-    clearInterval(questionTimer);
-    questionTimer = null;
+  function startQuestions() {
+    // Redirigir a la página de juego en lugar de mostrar aquí
+    window.location.href = `/grupo/juego/${sesionId}`;
   }
 
-  currentQuestion = questionIndex;
-  const question = questions[questionIndex];
+  /* =========================
+     Render de Pregunta
+     ========================= */
+  function showQuestion(questionIndex) {
+    if (questionIndex >= questions.length) {
+      endQuiz();
+      return;
+    }
 
-  // Texto de pregunta
-  const qText = document.getElementById('questionText');
-  if (qText) qText.textContent = question.text;
+    // Limpiar timer previo
+    if (questionTimer) {
+      clearInterval(questionTimer);
+      questionTimer = null;
+    }
 
-  // Opciones
-  const answersContainer = document.getElementById('answersContainer');
-  if (answersContainer) {
-    answersContainer.innerHTML = '';
-    question.options.forEach((option) => {
-      const optionElement = document.createElement('div');
-      optionElement.className = 'answer-option';
-      optionElement.dataset.optionId = option.id;
-      optionElement.innerHTML = `
+    currentQuestion = questionIndex;
+    const question = questions[questionIndex];
+
+    // Texto de pregunta
+    const qText = document.getElementById('questionText');
+    if (qText) qText.textContent = question.text;
+
+    // Opciones
+    const answersContainer = document.getElementById('answersContainer');
+    if (answersContainer) {
+      answersContainer.innerHTML = '';
+      question.options.forEach((option) => {
+        const optionElement = document.createElement('div');
+        optionElement.className = 'answer-option';
+        optionElement.dataset.optionId = option.id;
+        optionElement.innerHTML = `
         <div class="option-content">
           <span class="option-text">${option.text}</span>
         </div>
       `;
-      answersContainer.appendChild(optionElement);
-    });
+        answersContainer.appendChild(optionElement);
+      });
+    }
+
+    // Progreso
+    updateProgress(questionIndex + 1, questions.length);
+
+    // Temporizador
+    startQuestionTimer(question.time_limit || 30);
   }
 
-  // Progreso
-  updateProgress(questionIndex + 1, questions.length);
+  function handleAnswerSelection(optionElement) {
+    // Quitar selección previa
+    document.querySelectorAll('.answer-option').forEach((opt) => {
+      opt.classList.remove('selected');
+    });
 
-  // Temporizador
-  startQuestionTimer(question.time_limit || 30);
-}
+    // Seleccionar
+    optionElement.classList.add('selected');
+    const selectedOptionId = parseInt(optionElement.dataset.optionId, 10);
 
-function handleAnswerSelection(optionElement) {
-  // Quitar selección previa
-  document.querySelectorAll('.answer-option').forEach((opt) => {
-    opt.classList.remove('selected');
-  });
+    userAnswers.push({
+      question_id: questions[currentQuestion].id,
+      answer_id: selectedOptionId,
+      time_taken: questions[currentQuestion].time_limit - getRemainingTime()
+    });
 
-  // Seleccionar
-  optionElement.classList.add('selected');
-  const selectedOptionId = parseInt(optionElement.dataset.optionId, 10);
+    // Enviar al backend inmediatamente
+    sendAnswer(questions[currentQuestion].id, selectedOptionId);
 
-  userAnswers.push({
-    question_id: questions[currentQuestion].id,
-    answer_id: selectedOptionId,
-    time_taken: questions[currentQuestion].time_limit - getRemainingTime()
-  });
+    setTimeout(() => {
+      showQuestion(currentQuestion + 1);
+    }, 600);
+  }
 
-  // Enviar al backend inmediatamente
-  sendAnswer(questions[currentQuestion].id, selectedOptionId);
+  function sendAnswer(questionId, answerId) {
+    fetch('/api/grupo/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sesion_id: sesionId,
+        user_id: userId,
+        question_id: questionId,
+        answer_id: answerId
+      })
+    }).catch(() => { });
+  }
 
-  setTimeout(() => {
-    showQuestion(currentQuestion + 1);
-  }, 600);
-}
+  /* =========================
+     Timer de Pregunta
+     ========================= */
+  function startQuestionTimer(seconds) {
+    const timerElement = document.getElementById('timerValue');
+    let timeLeft = seconds;
 
-function sendAnswer(questionId, answerId) {
-  fetch('/api/grupo/answer', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sesion_id: sesionId,
-      user_id: userId,
-      question_id: questionId,
-      answer_id: answerId
-    })
-  }).catch(() => {});
-}
-
-/* =========================
-   Timer de Pregunta
-   ========================= */
-function startQuestionTimer(seconds) {
-  const timerElement = document.getElementById('timerValue');
-  let timeLeft = seconds;
-
-  if (timerElement) timerElement.textContent = timeLeft;
-
-  questionTimer = setInterval(() => {
-    timeLeft--;
     if (timerElement) timerElement.textContent = timeLeft;
 
-    if (timeLeft < 0) {
-      clearInterval(questionTimer);
-      questionTimer = null;
-      // Pasar a la siguiente al vencer el tiempo
-      showQuestion(currentQuestion + 1);
-    }
-  }, 1000);
-}
+    questionTimer = setInterval(() => {
+      timeLeft--;
+      if (timerElement) timerElement.textContent = timeLeft;
 
-function getRemainingTime() {
-  const el = document.getElementById('timerValue');
-  if (!el) return 0;
-  const val = parseInt(el.textContent, 10);
-  return Number.isNaN(val) ? 0 : val;
-}
+      if (timeLeft < 0) {
+        clearInterval(questionTimer);
+        questionTimer = null;
+        // Pasar a la siguiente al vencer el tiempo
+        showQuestion(currentQuestion + 1);
+      }
+    }, 1000);
+  }
 
-/* =========================
-   Progreso y Fin
-   ========================= */
-function updateProgress(current, total) {
-  const progressFill = document.getElementById('progressFill');
-  const progressText = document.getElementById('progressText');
+  function getRemainingTime() {
+    const el = document.getElementById('timerValue');
+    if (!el) return 0;
+    const val = parseInt(el.textContent, 10);
+    return Number.isNaN(val) ? 0 : val;
+  }
 
-  const percentage = (current / total) * 100;
-  if (progressFill) progressFill.style.width = percentage + '%';
-  if (progressText) progressText.textContent = `Pregunta ${current} de ${total}`;
-}
+  /* =========================
+     Progreso y Fin
+     ========================= */
+  function updateProgress(current, total) {
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
 
-function endQuiz() {
-  if (statusActive) statusActive.style.display = 'none';
-  if (questionContainer) questionContainer.style.display = 'none';
-  if (resultsContainer) resultsContainer.style.display = 'block';
-  loadResults();
-}
+    const percentage = (current / total) * 100;
+    if (progressFill) progressFill.style.width = percentage + '%';
+    if (progressText) progressText.textContent = `Pregunta ${current} de ${total}`;
+  }
 
-function loadResults() {
-  fetch(`/api/grupo/results/${sesionId}`)
-    .then((r) => r.json())
-    .then((data) => {
-      if (data.success) displayResults(data.results || []);
-    })
-    .catch(() => {});
-}
+  function endQuiz() {
+    if (statusActive) statusActive.style.display = 'none';
+    if (questionContainer) questionContainer.style.display = 'none';
+    if (resultsContainer) resultsContainer.style.display = 'block';
+    loadResults();
+  }
 
-function displayResults(results) {
-  const leaderboard = document.getElementById('leaderboard');
-  const groupScore  = document.getElementById('groupScore');
+  function loadResults() {
+    fetch(`/api/grupo/results/${sesionId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) displayResults(data.results || []);
+      })
+      .catch(() => { });
+  }
 
-  if (!leaderboard || !groupScore) return;
+  function displayResults(results) {
+    const leaderboard = document.getElementById('leaderboard');
+    const groupScore = document.getElementById('groupScore');
 
-  let totalScore = 0;
-  leaderboard.innerHTML = '';
+    if (!leaderboard || !groupScore) return;
 
-  results.forEach((result, index) => {
-    totalScore += (result.score || 0);
+    let totalScore = 0;
+    leaderboard.innerHTML = '';
 
-    const el = document.createElement('div');
-    const rank = index + 1;
-    el.className = 'result-item';
+    results.forEach((result, index) => {
+      totalScore += (result.score || 0);
 
-    let rankDisplay = rank;
-    if (rank === 1) {
+      const el = document.createElement('div');
+      const rank = index + 1;
+      el.className = 'result-item';
+
+      let rankDisplay = rank;
+      if (rank === 1) {
         el.classList.add('rank-1');
         rankDisplay = '🥇';
-    } else if (rank === 2) {
+      } else if (rank === 2) {
         el.classList.add('rank-2');
         rankDisplay = '🥈';
-    } else if (rank === 3) {
+      } else if (rank === 3) {
         el.classList.add('rank-3');
         rankDisplay = '🥉';
-    }
+      }
 
-    el.innerHTML = `
+      el.innerHTML = `
       <div class="result-rank">${rankDisplay}</div>
       <div class="result-user">
         <div class="user-avatar">
@@ -472,76 +520,76 @@ function displayResults(results) {
         <small>${result.correct_answers || 0} / ${result.total_questions} aciertos</small>
       </div>
     `;
-    leaderboard.appendChild(el);
-  });
+      leaderboard.appendChild(el);
+    });
 
-  groupScore.textContent = totalScore;
-}
-
-function restartQuiz() {
-  if (confirm('¿Estás seguro de que quieres reiniciar el cuestionario?')) {
-    window.location.reload();
+    groupScore.textContent = totalScore;
   }
-}
 
-/* =========================
-   Polling de Estado (Servidor -> Cliente)
-   El backend devuelve: 'esperando' | 'en_progreso' | 'finalizado'
-   ========================= */
-let membersPollingInterval = null;
+  function restartQuiz() {
+    if (confirm('¿Estás seguro de que quieres reiniciar el cuestionario?')) {
+      window.location.reload();
+    }
+  }
 
-function startPolling() {
-  // Polling para el estado del juego
-  const gameStatusInterval = setInterval(() => {
-    fetch(`/api/grupo/status/${sesionId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) {
-          if (updateQuizStatus(data.status)) {
-            clearInterval(gameStatusInterval); // Detener polling si el juego empieza o termina
-            if (membersPollingInterval) {
-              clearInterval(membersPollingInterval);
+  /* =========================
+     Polling de Estado (Servidor -> Cliente)
+     El backend devuelve: 'esperando' | 'en_progreso' | 'finalizado'
+     ========================= */
+  let membersPollingInterval = null;
+
+  function startPolling() {
+    // Polling para el estado del juego
+    const gameStatusInterval = setInterval(() => {
+      fetch(`/api/grupo/status/${sesionId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) {
+            if (updateQuizStatus(data.status)) {
+              clearInterval(gameStatusInterval); // Detener polling si el juego empieza o termina
+              if (membersPollingInterval) {
+                clearInterval(membersPollingInterval);
+              }
             }
           }
-        }
-      })
-      .catch(() => {});
-  }, 3000); // Cada 3 segundos
+        })
+        .catch(() => { });
+    }, 3000); // Cada 3 segundos
 
-  // Polling para actualizar la lista de miembros en tiempo real
-  membersPollingInterval = setInterval(() => {
-    fetch(`/api/grupo/miembros/${sesionId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && data.members) {
-          updateMembersList(data.members);
-        }
-      })
-      .catch(() => {});
-  }, 2000); // Cada 2 segundos
-}
+    // Polling para actualizar la lista de miembros en tiempo real
+    membersPollingInterval = setInterval(() => {
+      fetch(`/api/grupo/miembros/${sesionId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.members) {
+            updateMembersList(data.members);
+          }
+        })
+        .catch(() => { });
+    }, 2000); // Cada 2 segundos
+  }
 
-function updateMembersList(members) {
-  if (!membersList) return;
-  
-  // Guardar el HTML actual para comparar
-  const currentMemberIds = Array.from(membersList.querySelectorAll('.member-item'))
-    .map(item => item.dataset.userId);
-  
-  const newMemberIds = members.map(m => String(m.id));
-  
-  // Si hay cambios, actualizar la lista completa
-  if (JSON.stringify(currentMemberIds.sort()) !== JSON.stringify(newMemberIds.sort())) {
-    membersList.innerHTML = '';
-    
-    members.forEach((member) => {
-      const memberItem = document.createElement('div');
-      memberItem.className = 'member-item';
-      memberItem.dataset.userId = member.id;
-      
-      const statusClass = member.ready ? 'ready' : 'waiting';
-      
-      memberItem.innerHTML = `
+  function updateMembersList(members) {
+    if (!membersList) return;
+
+    // Guardar el HTML actual para comparar
+    const currentMemberIds = Array.from(membersList.querySelectorAll('.member-item'))
+      .map(item => item.dataset.userId);
+
+    const newMemberIds = members.map(m => String(m.id));
+
+    // Si hay cambios, actualizar la lista completa
+    if (JSON.stringify(currentMemberIds.sort()) !== JSON.stringify(newMemberIds.sort())) {
+      membersList.innerHTML = '';
+
+      members.forEach((member) => {
+        const memberItem = document.createElement('div');
+        memberItem.className = 'member-item';
+        memberItem.dataset.userId = member.id;
+
+        const statusClass = member.ready ? 'ready' : 'waiting';
+
+        memberItem.innerHTML = `
         <div class="member-avatar">
           <img src="/static/img/robot_ico.png" alt="Avatar">
         </div>
@@ -550,75 +598,85 @@ function updateMembersList(members) {
           <span class="status-indicator ${statusClass}"></span>
         </div>
       `;
-      
-      membersList.appendChild(memberItem);
-    });
-  } else {
-    // Solo actualizar el estado de los miembros existentes
-    members.forEach((member) => {
-      const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
-      if (memberEl) {
-        const indicator = memberEl.querySelector('.status-indicator');
-        indicator.classList.remove('ready', 'waiting');
-        indicator.classList.add(member.ready ? 'ready' : 'waiting');
-      }
-    });
-  }
-}
 
-function updateQuizStatus(status) {
-  // Mapea exactamente los estados que devuelve tu BD/servidor
-  if (status === 'esperando') {
-    // seguimos en lobby
+        membersList.appendChild(memberItem);
+      });
+    } else {
+      // Solo actualizar el estado de los miembros existentes
+      members.forEach((member) => {
+        const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
+        if (memberEl) {
+          const indicator = memberEl.querySelector('.status-indicator');
+          indicator.classList.remove('ready', 'waiting');
+          indicator.classList.add(member.ready ? 'ready' : 'waiting');
+        }
+      });
+    }
+
+    // NUEVA LÓGICA: Habilitar/deshabilitar botón según cantidad de miembros
+    // Contar miembros excluyendo al creador
+    if (esCreador) {
+      const otherMembers = members.filter(m => m.id !== userId);
+      if (otherMembers.length > 0) {
+        enableStartButton();
+      } else {
+        disableStartButton();
+      }
+    }
+  }
+
+  function updateQuizStatus(status) {
+    // Mapea exactamente los estados que devuelve tu BD/servidor
+    if (status === 'esperando') {
+      // seguimos en lobby
+      return false;
+    }
+    if (status === 'en_progreso') {
+      if (!gameStarted) {
+        gameStarted = true;
+        // Redirigir directamente al juego
+        window.location.href = `/grupo/juego/${sesionId}`;
+      }
+      return true; // El juego ha comenzado, detener polling de estado
+    }
+    if (status === 'finalizado') {
+      // Redirigir a resultados
+      window.location.href = `/grupo/resultados/${sesionId}`;
+      return true; // El juego ha finalizado, detener polling
+    }
     return false;
   }
-  if (status === 'en_progreso') {
-    if (!gameStarted) {
-      gameStarted = true;
-      // Redirigir directamente al juego
-      window.location.href = `/grupo/juego/${sesionId}`;
-    }
-    return true; // El juego ha comenzado, detener polling de estado
-  }
-  if (status === 'finalizado') {
-    // Redirigir a resultados
-    window.location.href = `/grupo/resultados/${sesionId}`;
-    return true; // El juego ha finalizado, detener polling
-  }
-  return false;
-}
 
-// Función para copiar el código de sesión
-function copySessionCode(code, event) {
+  // Función para copiar el código de sesión
+  function copySessionCode(code, event) {
     event.preventDefault();
     event.stopPropagation();
-    
+
     navigator.clipboard.writeText(code).then(() => {
-        // Mostrar feedback visual
-        const btn = event.target.closest('.btn-copy-code');
-        if (!btn) return;
-        
-        const originalHTML = btn.innerHTML;
-        btn.innerHTML = `
+      // Mostrar feedback visual
+      const btn = event.target.closest('.btn-copy-code');
+      if (!btn) return;
+
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
         `;
-        btn.style.background = '#4caf50';
-        btn.disabled = true;
-        
-        setTimeout(() => {
-            btn.innerHTML = originalHTML;
-            btn.style.background = '';
-            btn.disabled = false;
-        }, 2000);
+      btn.style.background = '#4caf50';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.style.background = '';
+        btn.disabled = false;
+      }, 2000);
     }).catch((err) => {
-        console.error('Error al copiar:', err);
-        alert('Error al copiar el código. Copia manualmente: ' + code);
+      console.error('Error al copiar:', err);
+      alert('Error al copiar el código. Copia manualmente: ' + code);
     });
-}
+  }
 
-console.log('✅ Cuestionario en grupo inicializado');
+  console.log('✅ Cuestionario en grupo inicializado');
 </script>
-
 {% endblock %}
