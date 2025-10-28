@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_quiz.css') }}">
+<style>
+.join-sala-container {
+    max-width: 500px;
+    margin: 3rem auto;
+    padding: 2rem;
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.join-sala-header {
+    margin-bottom: 2rem;
+}
+
+.join-sala-header h1 {
+    color: var(--color-primary);
+    margin-bottom: 0.5rem;
+}
+
+.join-sala-header p {
+    color: var(--color-text-secondary);
+}
+
+.code-input-container {
+    margin-bottom: 2rem;
+}
+
+.code-input {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.5rem;
+    text-align: center;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    letter-spacing: 0.3rem;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+
+.code-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.btn-join {
+    background-color: var(--color-primary);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    width: 100%;
+}
+
+.btn-join:hover {
+    background-color: #1d4ed8;
+}
+
+.btn-join:disabled {
+    background-color: var(--color-waiting);
+    cursor: not-allowed;
+}
+
+.error-message {
+    color: #ef4444;
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background-color: #fef2f2;
+    border-radius: var(--radius-lg);
+    display: none;
+}
+
+.success-message {
+    color: var(--color-success);
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background-color: #f0fdf4;
+    border-radius: var(--radius-lg);
+    display: none;
+}
+
+.loading {
+    display: none;
+    margin-top: 1rem;
+}
+
+.spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--color-primary);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="join-sala-container">
+    <div class="join-sala-header">
+        <h1>🚀 Unirse a Sala</h1>
+        <p>Ingresa el código de 6 caracteres que te compartió el creador de la sala</p>
+    </div>
+
+    <form id="joinSalaForm">
+        <div class="code-input-container">
+            <input 
+                type="text" 
+                id="sessionCode" 
+                class="code-input" 
+                placeholder="ABC123" 
+                maxlength="6"
+                autocomplete="off"
+                required
+            >
+        </div>
+        
+        <button type="submit" class="btn-join" id="joinBtn">
+            Unirse a la Sala
+        </button>
+    </form>
+
+    <div class="error-message" id="errorMessage"></div>
+    <div class="success-message" id="successMessage"></div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Uniéndose a la sala...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('joinSalaForm');
+    const codeInput = document.getElementById('sessionCode');
+    const joinBtn = document.getElementById('joinBtn');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const loading = document.getElementById('loading');
+
+    // Auto-formatear el input para que sea en mayúsculas
+    codeInput.addEventListener('input', function(e) {
+        e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+
+    // Manejar el envío del formulario
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const sessionCode = codeInput.value.trim();
+        
+        if (sessionCode.length !== 6) {
+            showError('El código debe tener exactamente 6 caracteres');
+            return;
+        }
+
+        // Mostrar loading
+        setLoading(true);
+        hideMessages();
+
+        try {
+            const response = await fetch('/api/grupo/unirse-sesion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    session_code: sessionCode
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showSuccess(`¡Te has unido exitosamente a "${result.grupo_nombre}"!`);
+                // Redirigir a la sala después de 1 segundo
+                setTimeout(() => {
+                    window.location.href = `/grupo/quiz/${result.sesion_id}`;
+                }, 1000);
+            } else {
+                showError(result.message || 'Error al unirse a la sala');
+            }
+        } catch (error) {
+            showError('Error de conexión. Inténtalo de nuevo.');
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    function setLoading(isLoading) {
+        if (isLoading) {
+            joinBtn.disabled = true;
+            loading.style.display = 'block';
+        } else {
+            joinBtn.disabled = false;
+            loading.style.display = 'none';
+        }
+    }
+
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+        successMessage.style.display = 'none';
+    }
+
+    function showSuccess(message) {
+        successMessage.textContent = message;
+        successMessage.style.display = 'block';
+        errorMessage.style.display = 'none';
+    }
+
+    function hideMessages() {
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+    }
+
+    // Focus en el input al cargar la página
+    codeInput.focus();
+});
+</script>
+{% endblock %}

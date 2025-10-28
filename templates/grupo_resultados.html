@@ -161,14 +161,8 @@
             </svg>
             Volver al Inicio
         </button>
-        <button class="btn-secondary" onclick="exportarExcel()">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            Exportar a Excel
-        </button>
+        
+        <!-- Botón compartir disponible para todos -->
         <button class="btn-secondary" onclick="shareResults()">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="18" cy="5" r="3"></circle>
@@ -179,6 +173,24 @@
             </svg>
             Compartir Resultados
         </button>
+        
+        <!-- Botones exclusivos del creador/anfitrión -->
+        {% if es_creador %}
+        <button class="btn-secondary" onclick="exportarExcel()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Exportar a Excel
+        </button>
+        <button class="btn-secondary" onclick="shareWithCreator()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            Compartir con Creador
+        </button>
+        {% endif %}
     </div>
 </main>
 
@@ -231,6 +243,30 @@ function shareResults() {
         navigator.clipboard.writeText(text + ' ' + window.location.href).then(() => {
             alert('¡Enlace copiado al portapapeles!');
         });
+    }
+}
+
+async function shareWithCreator() {
+    try {
+        const resp = await fetch('/api/grupo/resultados/{{ sesion_id }}/compartir-creador', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        if (data.success) {
+            if (data.emailed) {
+                alert('Listo. Se envió el enlace de la carpeta al creador.');
+            } else if (data.folder_url) {
+                await navigator.clipboard.writeText(data.folder_url);
+                alert('No se pudo enviar correo automáticamente. Enlace copiado al portapapeles.');
+            } else {
+                alert('Operación completada.');
+            }
+        } else {
+            alert(data.message || 'No se pudo enviar el correo.');
+        }
+    } catch (e) {
+        alert('Error de red al enviar el correo.');
     }
 }
 

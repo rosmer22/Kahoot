@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from werkzeug.exceptions import HTTPException
 from flask_mail import Mail, Message
 import random
+import math
 import bd
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -159,7 +160,190 @@ def is_auth():
 
 @app.context_processor
 def inject_globals():
-    return dict(is_auth=is_auth(), user=g.user)
+    return dict(is_auth=is_auth(), user=getattr(g, 'user', None))
+
+
+# =====================
+#  Sistema de Recompensas (Puntosmoneda)
+# =====================
+def asignar_puntosmoneda_grupo(sesion_id):
+    """
+    Calcula el ranking final de una sesión de grupo y asigna puntosmoneda:
+    - 1er lugar: 300 puntosmoneda
+    - 2do lugar: 150 puntosmoneda
+    - 3er lugar: 75 puntosmoneda
+    """
+    db = None
+    cursor = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # ⚠️ IMPORTANTE: Verificar si ya se asignaron recompensas para esta sesión
+        cursor.execute("""
+            SELECT COUNT(*) as total
+            FROM historial_recompensas
+            WHERE sesion_id = %s AND tipo_sesion = 'grupo'
+        """, (sesion_id,))
+        
+        ya_asignadas = cursor.fetchone()['total']
+        
+        if ya_asignadas > 0:
+            app.logger.info(f"Recompensas ya asignadas para sesión grupo {sesion_id}, saltando...")
+            return  # Ya se asignaron, no hacer nada
+        
+        # Obtener el ranking de jugadores (excluyendo al creador)
+        cursor.execute("""
+            SELECT 
+                rg.user_id,
+                u.username,
+                SUM(rg.puntos) as puntos_totales,
+                sg.iniciado_por
+            FROM respuestas_grupo rg
+            JOIN users u ON rg.user_id = u.id
+            JOIN sesiones_grupo sg ON rg.sesion_id = sg.id
+            WHERE rg.sesion_id = %s
+            GROUP BY rg.user_id, u.username, sg.iniciado_por
+            HAVING rg.user_id != sg.iniciado_por
+            ORDER BY puntos_totales DESC
+            LIMIT 3
+        """, (sesion_id,))
+        
+        ranking = cursor.fetchall()
+        
+        if not ranking:
+            return
+        
+        # Asignar recompensas según posición
+        recompensas = {
+            0: 300,  # 1er lugar
+            1: 150,   # 2do lugar
+            2: 75    # 3er lugar
+        }
+        
+        for posicion, jugador in enumerate(ranking):
+            if posicion < 3:  # Solo primeros 3 lugares
+                puntosmoneda = recompensas.get(posicion, 0)
+                user_id = jugador['user_id']
+                puntos_totales = jugador['puntos_totales']
+                
+                # Actualizar puntosmoneda del usuario
+                cursor.execute("""
+                    UPDATE users 
+                    SET puntosmoneda = puntosmoneda + %s 
+                    WHERE id = %s
+                """, (puntosmoneda, user_id))
+                
+                # Registrar en historial de recompensas
+                cursor.execute("""
+                    INSERT INTO historial_recompensas 
+                    (user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales)
+                    VALUES (%s, %s, 'grupo', %s, %s, %s)
+                """, (user_id, sesion_id, posicion + 1, puntosmoneda, puntos_totales))
+        
+        db.commit()
+        app.logger.info(f"✅ Recompensas asignadas correctamente para sesión grupo {sesion_id}")
+        
+    except Exception as e:
+        if db:
+            db.rollback()
+        app.logger.error(f"Error al asignar puntosmoneda en sesión {sesion_id}: {str(e)}")
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+def asignar_puntosmoneda_individual(sesion_id):
+    """
+    Calcula el ranking final de una sesión individual y asigna puntosmoneda:
+    - 1er lugar: 300 puntosmoneda
+    - 2do lugar: 150 puntosmoneda
+    - 3er lugar: 75 puntosmoneda
+    """
+    db = None
+    cursor = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # ⚠️ IMPORTANTE: Verificar si ya se asignaron recompensas para esta sesión
+        cursor.execute("""
+            SELECT COUNT(*) as total
+            FROM historial_recompensas
+            WHERE sesion_id = %s AND tipo_sesion = 'individual'
+        """, (sesion_id,))
+        
+        ya_asignadas = cursor.fetchone()['total']
+        
+        if ya_asignadas > 0:
+            app.logger.info(f"Recompensas ya asignadas para sesión individual {sesion_id}, saltando...")
+            return  # Ya se asignaron, no hacer nada
+        
+        # Obtener el ranking de jugadores (excluyendo al creador)
+        cursor.execute("""
+            SELECT 
+                ri.user_id,
+                u.username,
+                SUM(ri.puntos) as puntos_totales,
+                si.iniciado_por
+            FROM respuestas_individual ri
+            JOIN users u ON ri.user_id = u.id
+            JOIN sesiones_individual si ON ri.sesion_id = si.id
+            WHERE ri.sesion_id = %s
+            GROUP BY ri.user_id, u.username, si.iniciado_por
+            HAVING ri.user_id != si.iniciado_por
+            ORDER BY puntos_totales DESC
+            LIMIT 3
+        """, (sesion_id,))
+        
+        ranking = cursor.fetchall()
+        
+        if not ranking:
+            return
+        
+        # Asignar recompensas según posición
+        recompensas = {
+            0: 300,  # 1er lugar
+            1: 150,   # 2do lugar
+            2: 75    # 3er lugar
+        }
+        
+        for posicion, jugador in enumerate(ranking):
+            if posicion < 3:  # Solo primeros 3 lugares
+                puntosmoneda = recompensas.get(posicion, 0)
+                user_id = jugador['user_id']
+                puntos_totales = jugador['puntos_totales']
+                
+                # Actualizar puntosmoneda del usuario
+                cursor.execute("""
+                    UPDATE users 
+                    SET puntosmoneda = puntosmoneda + %s 
+                    WHERE id = %s
+                """, (puntosmoneda, user_id))
+                
+                # Registrar en historial de recompensas
+                cursor.execute("""
+                    INSERT INTO historial_recompensas 
+                    (user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales)
+                    VALUES (%s, %s, 'individual', %s, %s, %s)
+                """, (user_id, sesion_id, posicion + 1, puntosmoneda, puntos_totales))
+        
+        db.commit()
+        app.logger.info(f"✅ Recompensas asignadas correctamente para sesión individual {sesion_id}")
+        
+    except Exception as e:
+        if db:
+            db.rollback()
+        app.logger.error(f"Error al asignar puntosmoneda en sesión individual {sesion_id}: {str(e)}")
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
 
 # =====================
@@ -282,15 +466,24 @@ def page_not_found(e):
     return render_template('error.html', title='Página no encontrada'), 404
 
 @app.errorhandler(Exception)
-
 def handle_exception(e):
     """Maneja excepciones no capturadas para evitar que la aplicación se caiga."""
     # Si es una excepción HTTP estándar (como 404, 401, etc.), deja que Flask la maneje.
     if isinstance(e, HTTPException):
         return e
 
-    # Para cualquier otra excepción (errores 500), regístrala y muestra la página de error.
+    # Para cualquier otra excepción (errores 500), regístrala
     app.logger.error(f"Error no manejado: {e}", exc_info=True)
+    
+    # Si es una ruta API, devolver JSON en lugar de HTML
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor',
+            'message': str(e) if app.debug else 'Ha ocurrido un error inesperado'
+        }), 500
+    
+    # Para rutas normales, mostrar la página de error
     flash("Ha ocurrido un error inesperado en el servidor. Nuestro equipo ha sido notificado.", "error")
     return render_template('error.html', title='Error del Sistema'), 500
 
@@ -357,7 +550,7 @@ def register():
             flash('El correo debe pertenecer al dominio usat.edu.pe o usat.pe', 'error')
             return redirect(url_for('register'))
         # validación de minuscula, mayuscula, numero y caracter
-        pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&._-])[A-Za-z\d@$!%*?&._-]{8,}$'
+        pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#._-])[A-Za-z\d@$!%*?&#._-]{8,}$'
 
         if not re.match(pattern, password):
             flash('La contraseña debe tener al menos 8 caracteres, incluir una mayúscula, una minúscula, un número y un carácter especial.', 'error')
@@ -536,6 +729,123 @@ def settings():
         return redirect(url_for('login'))
     return render_template('settings.html', title='Configuración', user=g.user)
 
+@app.route('/mis-puntos')
+def mis_puntos():
+    """Página para ver los puntosmoneda y rango del usuario"""
+    if g.user is None:
+        flash('Debes iniciar sesión para ver tus puntos', 'warning')
+        return redirect(url_for('login'))
+    
+    db = None
+    cursor = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información del usuario con su rango
+        cursor.execute("""
+            SELECT 
+                u.id,
+                u.username,
+                u.email,
+                u.puntosmoneda,
+                r.nombre as rango_nombre,
+                r.icono as rango_icono,
+                r.color as rango_color,
+                r.orden as rango_orden,
+                r.puntos_minimos,
+                r.puntos_maximos,
+                CASE 
+                    WHEN r.puntos_maximos >= 99999999 THEN 0
+                    ELSE (r.puntos_maximos + 1 - u.puntosmoneda)
+                END as puntos_para_siguiente_rango,
+                (SELECT nombre 
+                 FROM rangos r2 
+                 WHERE r2.orden = r.orden + 1 
+                 LIMIT 1) as siguiente_rango,
+                (SELECT icono 
+                 FROM rangos r2 
+                 WHERE r2.orden = r.orden + 1 
+                 LIMIT 1) as siguiente_rango_icono
+            FROM users u
+            LEFT JOIN rangos r ON u.puntosmoneda >= r.puntos_minimos 
+                               AND u.puntosmoneda <= r.puntos_maximos
+            WHERE u.id = %s
+        """, (g.user['id'],))
+        
+        usuario_info = cursor.fetchone()
+        
+        # Obtener todos los rangos para mostrar el progreso
+        cursor.execute("""
+            SELECT nombre, puntos_minimos, puntos_maximos, icono, color, orden
+            FROM rangos
+            ORDER BY orden
+        """)
+        
+        todos_rangos = cursor.fetchall()
+        
+        # Obtener historial de recompensas del usuario
+        cursor.execute("""
+            SELECT 
+                hr.created_at,
+                hr.tipo_sesion,
+                hr.posicion,
+                hr.puntosmoneda_ganados,
+                hr.puntos_totales,
+                CASE hr.posicion
+                    WHEN 1 THEN '🥇'
+                    WHEN 2 THEN '🥈'
+                    WHEN 3 THEN '🥉'
+                END as medalla
+            FROM historial_recompensas hr
+            WHERE hr.user_id = %s
+            ORDER BY hr.created_at DESC
+            LIMIT 10
+        """, (g.user['id'],))
+        
+        historial = cursor.fetchall()
+        
+        # Obtener estadísticas
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_juegos_premiados,
+                SUM(CASE WHEN posicion = 1 THEN 1 ELSE 0 END) as primeros_lugares,
+                SUM(CASE WHEN posicion = 2 THEN 1 ELSE 0 END) as segundos_lugares,
+                SUM(CASE WHEN posicion = 3 THEN 1 ELSE 0 END) as terceros_lugares,
+                SUM(puntosmoneda_ganados) as total_ganado
+            FROM historial_recompensas
+            WHERE user_id = %s
+        """, (g.user['id'],))
+        
+        estadisticas = cursor.fetchone()
+        
+        # Calcular porcentaje de progreso
+        if usuario_info and usuario_info['puntos_maximos'] < 99999999:
+            rango_size = usuario_info['puntos_maximos'] - usuario_info['puntos_minimos']
+            progreso_actual = usuario_info['puntosmoneda'] - usuario_info['puntos_minimos']
+            porcentaje_progreso = (progreso_actual / rango_size * 100) if rango_size > 0 else 0
+        else:
+            porcentaje_progreso = 100  # Rango máximo
+        
+        return render_template('mis_puntos.html', 
+                             title='Mis Puntos',
+                             usuario_info=usuario_info,
+                             todos_rangos=todos_rangos,
+                             historial=historial,
+                             estadisticas=estadisticas,
+                             porcentaje_progreso=porcentaje_progreso)
+    
+    except Exception as e:
+        app.logger.error(f"Error al cargar mis puntos: {str(e)}")
+        flash('Error al cargar la información de puntos', 'error')
+        return redirect(url_for('home'))
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
 
 @app.route('/update_profile', methods=['POST'])
 def update_profile():
@@ -633,11 +943,38 @@ def lobby(cuestionario_id):
                 if not cursor.fetchone():
                     break
 
-            # Crear sesión (COPIA EXACTA de api_iniciar_cuestionario_grupo)
+            # Crear grupo temporal público para esta sala
+            import string
+            import random
+            # Generar código único de grupo
+            while True:
+                codigo_grupo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                cursor.execute("SELECT id FROM grupos WHERE codigo = %s", (codigo_grupo,))
+                if not cursor.fetchone():
+                    break
+
+            nombre_grupo = 'Sala Temporal'
+            descripcion = 'Sala temporal creada desde el quiz'
+            es_publico = 1
+
+            cursor.execute("""
+                INSERT INTO grupos (nombre, descripcion, codigo, es_publico, admin_id, created_at)
+                VALUES (%s, %s, %s, %s, %s, NOW())
+            """, (nombre_grupo, descripcion, codigo_grupo, es_publico, g.user['id']))
+
+            grupo_id_nuevo = cursor.lastrowid
+
+            # Registrar al creador como miembro del grupo temporal
+            cursor.execute("""
+                INSERT INTO grupo_miembros (grupo_id, user_id, joined_at)
+                VALUES (%s, %s, NOW())
+            """, (grupo_id_nuevo, g.user['id']))
+
+            # Crear sesión usando el grupo temporal
             cursor.execute("""
                 INSERT INTO sesiones_grupo (grupo_id, cuestionario_id, iniciado_por, created_at, session_code)
-                VALUES (NULL, %s, %s, NOW(), %s)
-            """, (None, cuestionario_id, g.user['id'], session_code))
+                VALUES (%s, %s, %s, NOW(), %s)
+            """, (grupo_id_nuevo, cuestionario_id, g.user['id'], session_code))
 
             sesion_id = cursor.lastrowid
             db.commit()
@@ -1127,6 +1464,137 @@ def eliminar_cuestionario(cuestionario_id):
     db.close()
     return response
 
+
+@app.route('/api/importar-preguntas-excel', methods=['POST'])
+def importar_preguntas_excel():
+    """Importar preguntas desde un archivo Excel"""
+    if g.user is None:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        # Verificar que se haya enviado un archivo
+        if 'excel_file' not in request.files:
+            return jsonify({'success': False, 'error': 'No se encontró el archivo Excel'}), 400
+
+        file = request.files['excel_file']
+        
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No se seleccionó ningún archivo'}), 400
+
+        # Validar extensión
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            return jsonify({'success': False, 'error': 'El archivo debe ser un archivo Excel (.xlsx o .xls)'}), 400
+
+        # Leer el archivo Excel
+        from openpyxl import load_workbook
+        
+        try:
+            # Cargar el workbook
+            wb = load_workbook(file, data_only=True)
+            ws = wb.active
+            
+            preguntas = []
+            
+            # Saltar la fila de encabezados (fila 1)
+            for row_num in range(2, ws.max_row + 1):
+                # Leer datos de la fila
+                pregunta_texto = ws.cell(row=row_num, column=1).value
+                tipo_pregunta = ws.cell(row=row_num, column=2).value
+                puntos = ws.cell(row=row_num, column=3).value
+                tiempo = ws.cell(row=row_num, column=4).value
+                
+                # Leer respuestas (columnas 5-9: respuesta 1-5)
+                respuestas_texto = []
+                for col in range(5, 10):
+                    resp = ws.cell(row=row_num, column=col).value
+                    if resp:
+                        respuestas_texto.append(str(resp).strip())
+                
+                # Leer respuestas correctas (columnas 10-14: correcta 1-5)
+                respuestas_correctas = []
+                for col in range(10, 15):
+                    correcta = ws.cell(row=row_num, column=col).value
+                    # Considerar como correcta si es TRUE, 1, "SI", "X", etc.
+                    if correcta:
+                        correcta_str = str(correcta).strip().upper()
+                        es_correcta = correcta_str in ['TRUE', '1', 'SI', 'SÍ', 'SÍ', 'X', 'YES', 'V', 'VERDADERO']
+                        respuestas_correctas.append(es_correcta)
+                    else:
+                        respuestas_correctas.append(False)
+                
+                # Validaciones básicas
+                if not pregunta_texto or str(pregunta_texto).strip() == '':
+                    continue  # Saltar filas vacías
+                
+                # Validar tipo de pregunta
+                tipo_pregunta_str = str(tipo_pregunta).strip().lower() if tipo_pregunta else 'multiple'
+                if tipo_pregunta_str not in ['multiple', 'simple', 'verdadero-falso']:
+                    tipo_pregunta_str = 'multiple'
+                
+                # Validar puntos
+                try:
+                    puntos = int(puntos) if puntos else 1
+                    if puntos < 1 or puntos > 5:
+                        puntos = 1
+                except:
+                    puntos = 1
+                
+                # Validar tiempo
+                try:
+                    tiempo = int(tiempo) if tiempo else 30
+                    if tiempo not in [10, 20, 30, 45, 60, 90]:
+                        tiempo = 30
+                except:
+                    tiempo = 30
+                
+                # Construir las respuestas
+                respuestas = []
+                for i, texto in enumerate(respuestas_texto):
+                    if texto:  # Solo agregar respuestas no vacías
+                        es_correcta = respuestas_correctas[i] if i < len(respuestas_correctas) else False
+                        respuestas.append({
+                            'text': texto,
+                            'isCorrect': es_correcta
+                        })
+                
+                # Validar que haya al menos 2 respuestas
+                if len(respuestas) < 2:
+                    continue
+                
+                # Validar que haya al menos una respuesta correcta
+                if not any(r['isCorrect'] for r in respuestas):
+                    continue
+                
+                # Agregar la pregunta
+                preguntas.append({
+                    'text': str(pregunta_texto).strip(),
+                    'type': tipo_pregunta_str,
+                    'points': puntos,
+                    'time': tiempo,
+                    'answers': respuestas
+                })
+            
+            if len(preguntas) == 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'No se encontraron preguntas válidas en el archivo. Verifica el formato.'
+                }), 400
+            
+            return jsonify({
+                'success': True,
+                'preguntas': preguntas,
+                'message': f'Se importaron {len(preguntas)} pregunta(s) correctamente'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Error al procesar el archivo Excel: {str(e)}'
+            }), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/Contactanos')
 def Contactanos():
     return render_template('contact.html')
@@ -1490,7 +1958,8 @@ def grupo_quiz(sesion_id):
         # Obtener información de la sesión (COPIA EXACTA de grupos)
         cursor.execute("""
             SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code, sg.iniciado_por,
-                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, c.titulo, c.pin, c.descripcion
+                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, COALESCE(g.es_publico, 1) as es_publico,
+                   c.titulo, c.pin, c.descripcion
             FROM sesiones_grupo sg
             LEFT JOIN grupos g ON sg.grupo_id = g.id
             JOIN cuestionarios c ON sg.cuestionario_id = c.id
@@ -1503,8 +1972,8 @@ def grupo_quiz(sesion_id):
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('grupos'))
 
-        # Verificar membresía SOLO si hay grupo específico (COPIA EXACTA de grupos)
-        if sesion['grupo_id']:
+        # Verificar membresía SOLO si hay grupo específico y NO es público
+        if sesion['grupo_id'] and not sesion['es_publico']:
             cursor.execute("""
                 SELECT id FROM grupo_miembros
                 WHERE grupo_id = %s AND user_id = %s
@@ -1563,8 +2032,8 @@ def grupo_quiz(sesion_id):
         cursor.close()
         db.close()
 
-        # Verificar si es creador (COPIA EXACTA de grupos)
-        es_creador = (g.user['id'] == sesion['iniciado_por'])
+        # Verificar si es creador (normaliza tipos a int)
+        es_creador = (int(g.user['id']) == int(sesion['iniciado_por']))
 
         return render_template('grupo_quiz.html',
                              sesion_id=sesion_id,
@@ -1612,7 +2081,9 @@ def api_unirse_sesion_grupo():
         # 1. Buscar la sesión por código (puede ser con o sin grupo específico)
         cursor.execute("""
             SELECT sg.id, sg.grupo_id, sg.estado, sg.session_code,
-                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, c.titulo
+                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre,
+                   COALESCE(g.es_publico, 1) as es_publico,
+                   c.titulo
             FROM sesiones_grupo sg
             LEFT JOIN grupos g ON sg.grupo_id = g.id
             JOIN cuestionarios c ON sg.cuestionario_id = c.id
@@ -1625,8 +2096,8 @@ def api_unirse_sesion_grupo():
             cursor.close(); db.close()
             return jsonify({'success': False, 'message': 'Código de sala no encontrado'}), 404
 
-        # 2. Verificar que el usuario es miembro del grupo (solo si hay grupo específico)
-        if sesion['grupo_id']:
+        # 2. Verificar membresía solo si el grupo existe y NO es público (salas temporales públicas permiten acceso libre)
+        if sesion['grupo_id'] and not sesion['es_publico']:
             cursor.execute("""
                 SELECT id FROM grupo_miembros
                 WHERE grupo_id = %s AND user_id = %s
@@ -1635,9 +2106,7 @@ def api_unirse_sesion_grupo():
             if not cursor.fetchone():
                 cursor.close(); db.close()
                 return jsonify({'success': False, 'message': 'No eres miembro de este grupo'}), 403
-        else:
-            # Para sesiones sin grupo específico, cualquier usuario puede unirse
-            pass
+        # Para sesiones sin grupo específico o grupos públicos, cualquier usuario puede unirse
 
         # 3. Verificar el estado de la sesión
         if sesion['estado'] == 'finalizado':
@@ -1758,7 +2227,8 @@ def grupo_juego(sesion_id):
         # Obtener información de la sesión
         cursor.execute("""
             SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.estado, sg.session_code, sg.iniciado_por,
-                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, c.titulo, c.pin
+                   COALESCE(g.nombre, 'Sala Temporal') as grupo_nombre, COALESCE(g.es_publico, 1) as es_publico,
+                   c.titulo, c.pin
             FROM sesiones_grupo sg
             LEFT JOIN grupos g ON sg.grupo_id = g.id
             JOIN cuestionarios c ON sg.cuestionario_id = c.id
@@ -1771,8 +2241,8 @@ def grupo_juego(sesion_id):
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('grupos'))
 
-        # Verificar que el usuario es miembro del grupo (solo si hay grupo específico)
-        if sesion['grupo_id']:
+        # Verificar que el usuario es miembro del grupo (solo si NO es público)
+        if sesion['grupo_id'] and not sesion['es_publico']:
             cursor.execute("""
                 SELECT id FROM grupo_miembros
                 WHERE grupo_id = %s AND user_id = %s
@@ -1785,28 +2255,26 @@ def grupo_juego(sesion_id):
             # Para salas temporales, cualquier usuario puede acceder
             pass
 
-        # Verificar que el usuario está en la sesión Y está listo (si no es el creador)
+        # Verificar estado de registro del usuario en la sesión
+        cursor.execute("SELECT iniciado_por FROM sesiones_grupo WHERE id = %s", (sesion_id,))
+        fila = cursor.fetchone()
+        iniciado_por = fila['iniciado_por'] if fila else None
+
         cursor.execute("""
-            SELECT ues.esta_listo, sg.iniciado_por
-            FROM usuario_estado_grupo ues
-            JOIN sesiones_grupo sg ON ues.sesion_id = sg.id
-            WHERE ues.sesion_id = %s AND ues.user_id = %s
+            SELECT esta_listo
+            FROM usuario_estado_grupo
+            WHERE sesion_id = %s AND user_id = %s
         """, (sesion_id, g.user['id']))
-        
-        usuario_sesion = cursor.fetchone()
-        
-        if not usuario_sesion:
-            flash('No estás registrado en esta sesión', 'error')
-            cursor.close()
-            db.close()
-            return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
-        
-        # Si no es el creador y no está listo, no puede jugar
-        if g.user['id'] != usuario_sesion['iniciado_por'] and not usuario_sesion['esta_listo']:
-            flash('Debes estar listo para participar en el juego', 'error')
-            cursor.close()
-            db.close()
-            return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
+        registro = cursor.fetchone()
+
+        # Si es el creador, permitir el acceso aunque no esté registrado
+        if int(g.user['id']) != int(iniciado_por):
+            # No es creador: debe estar registrado
+            if not registro:
+                flash('No estás registrado en esta sesión', 'error')
+                cursor.close(); db.close()
+                return redirect(url_for('grupo_quiz', sesion_id=sesion_id))
+            # Ya no se requiere estar "listo" - solo estar registrado
 
         # Verificar estado de la sesión
         if sesion['estado'] != 'en_progreso':
@@ -1858,8 +2326,8 @@ def grupo_juego(sesion_id):
         cursor.close()
         db.close()
 
-        # Verificar si es creador (COPIA EXACTA de grupos)
-        es_creador = (g.user['id'] == sesion['iniciado_por'])
+        # Verificar si es creador (normaliza tipos a int)
+        es_creador = (int(g.user['id']) == int(sesion['iniciado_por']))
 
         return render_template('juego_grupo.html',
                              sesion_id=sesion_id,
@@ -1941,12 +2409,41 @@ def api_grupo_answer():
     data = request.get_json()
     sesion_id = data.get('sesion_id')
     question_id = data.get('question_id')
-    answer_id = data.get('answer_id')
+    answer_id = data.get('answer_id')  # Puede ser None para timeout
     tiempo_respuesta = data.get('tiempo_respuesta', 0)
 
+    db = None
+    cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
+
+        # Si answer_id es None, es un timeout (sin respuesta)
+        if answer_id is None or answer_id == 'null':
+            # Timeout: registrar sin respuesta
+            cursor.execute("""
+                INSERT INTO respuestas_grupo (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
+                VALUES (%s, %s, %s, NULL, 0, 0, %s)
+                ON DUPLICATE KEY UPDATE opcion_id = NULL, es_correcta = 0, puntos = 0, tiempo_respuesta = %s
+            """, (sesion_id, g.user['id'], question_id, tiempo_respuesta, tiempo_respuesta))
+            
+            db.commit()
+            
+            # Actualizar pregunta actual del usuario
+            cursor.execute("""
+                UPDATE usuario_estado_grupo 
+                SET pregunta_actual = %s 
+                WHERE sesion_id = %s AND user_id = %s
+            """, (question_id, sesion_id, g.user['id']))
+            
+            db.commit()
+            
+            return jsonify({
+                'success': True,
+                'correct': False,
+                'points': 0,
+                'timeout': True
+            })
 
         # Obtener información de la opción y la pregunta
         cursor.execute("""
@@ -1969,7 +2466,8 @@ def api_grupo_answer():
             # Fórmula: puntaje = puntaje_base * (tiempo_restante / tiempo_total)
             tiempo_restante = max(0, tiempo_limite - tiempo_respuesta)
             factor_tiempo = tiempo_restante / tiempo_limite
-            puntos = int(puntos_base * factor_tiempo)
+            # Redondear hacia arriba para que siempre se otorgue al menos 1 punto
+            puntos = max(1, math.ceil(puntos_base * factor_tiempo))
 
         # Guardar respuesta
         cursor.execute("""
@@ -1980,8 +2478,15 @@ def api_grupo_answer():
               answer_id, es_correcta, puntos, tiempo_respuesta))
 
         db.commit()
-        cursor.close()
-        db.close()
+        
+        # Actualizar pregunta actual del usuario
+        cursor.execute("""
+            UPDATE usuario_estado_grupo 
+            SET pregunta_actual = %s 
+            WHERE sesion_id = %s AND user_id = %s
+        """, (question_id, sesion_id, g.user['id']))
+        
+        db.commit()
 
         return jsonify({
             'success': True,
@@ -1990,7 +2495,15 @@ def api_grupo_answer():
         })
 
     except Exception as e:
+        if db:
+            db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
 @app.route('/api/grupo/pregunta-estado/<int:sesion_id>/<int:pregunta_id>')
 def api_grupo_pregunta_estado(sesion_id, pregunta_id):
@@ -1998,6 +2511,8 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
+    db = None
+    cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
@@ -2019,9 +2534,6 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
         """, (sesion_id, pregunta_id))
         respondidos = cursor.fetchone()['respondidos']
 
-        cursor.close()
-        db.close()
-
         todos_respondieron = (total_usuarios > 0 and respondidos >= total_usuarios)
 
         return jsonify({
@@ -2033,10 +2545,121 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
 
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+@app.route('/api/grupo/obtener-pregunta-actual/<int:sesion_id>')
+def api_grupo_obtener_pregunta_actual(sesion_id):
+    """API para obtener el índice de la pregunta actual del usuario"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+
+    db = None
+    cursor = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+
+        # Verificar si el usuario está en la sesión
+        cursor.execute("""
+            SELECT pregunta_actual 
+            FROM usuario_estado_grupo 
+            WHERE sesion_id = %s AND user_id = %s
+        """, (sesion_id, g.user['id']))
+        
+        resultado = cursor.fetchone()
+        
+        if not resultado:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado en la sesión',
+                'pregunta_id': None,
+                'pregunta_index': 0
+            })
+        
+        # Si no tiene pregunta actual guardada, buscar la última pregunta respondida
+        if resultado['pregunta_actual'] is None:
+            # Buscar la última pregunta que respondió
+            cursor.execute("""
+                SELECT pregunta_id, MAX(created_at) as ultima_respuesta
+                FROM respuestas_grupo
+                WHERE sesion_id = %s AND user_id = %s
+                GROUP BY pregunta_id
+                ORDER BY ultima_respuesta DESC
+                LIMIT 1
+            """, (sesion_id, g.user['id']))
+            
+            ultima_respuesta = cursor.fetchone()
+            
+            if not ultima_respuesta:
+                # No ha respondido nada, empezar desde 0
+                return jsonify({
+                    'success': True,
+                    'pregunta_id': None,
+                    'pregunta_index': 0
+                })
+            
+            pregunta_id_actual = ultima_respuesta['pregunta_id']
+        else:
+            pregunta_id_actual = resultado['pregunta_actual']
+        
+        # Obtener el cuestionario de la sesión
+        cursor.execute("""
+            SELECT sg.cuestionario_id
+            FROM sesiones_grupo sg
+            WHERE sg.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        if not sesion:
+            return jsonify({'success': False, 'message': 'Sesión no encontrada'})
+        
+        # Obtener todas las preguntas ordenadas para encontrar el índice
+        cursor.execute("""
+            SELECT id
+            FROM preguntas
+            WHERE cuestionario_id = %s
+            ORDER BY orden ASC
+        """, (sesion['cuestionario_id'],))
+        
+        preguntas = cursor.fetchall()
+        pregunta_index = 0
+        encontrada = False
+        
+        for idx, pregunta in enumerate(preguntas):
+            if pregunta['id'] == pregunta_id_actual:
+                pregunta_index = idx
+                encontrada = True
+                break
+        
+        # Si la pregunta ya fue respondida, avanzar a la siguiente
+        if encontrada and resultado['pregunta_actual'] is not None:
+            pregunta_index = min(pregunta_index + 1, len(preguntas) - 1)
+        
+        return jsonify({
+            'success': True,
+            'pregunta_id': pregunta_id_actual,
+            'pregunta_index': pregunta_index,
+            'total_preguntas': len(preguntas)
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
 @app.route('/api/grupo/start-game', methods=['POST'])
 def api_start_game():
-    """API para que el creador inicie el juego con los que estén listos"""
+    """API para que el creador inicie el juego (sin necesidad de que estén listos)"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
@@ -2054,18 +2677,21 @@ def api_start_game():
         sesion_info = cursor.fetchone()
 
         if not sesion_info or g.user['id'] != sesion_info['iniciado_por']:
+            cursor.close()
+            db.close()
             return jsonify({'success': False, 'message': 'Solo el creador puede iniciar el juego'})
 
-        # Verificar que hay al menos un participante listo
+        # Contar participantes (sin importar si están listos o no)
         cursor.execute("""
-            SELECT COUNT(*) as listos
-            FROM usuario_estado_grupo
-            WHERE sesion_id = %s AND esta_listo = 1
+            SELECT COUNT(*) as total_participantes
+            FROM usuario_estado_grupo ues
+            JOIN sesiones_grupo sg ON ues.sesion_id = sg.id
+            WHERE ues.sesion_id = %s AND ues.user_id != sg.iniciado_por
         """, (sesion_id,))
-        listos = cursor.fetchone()['listos']
+        participantes = cursor.fetchone()['total_participantes']
 
-        if listos == 0:
-            return jsonify({'success': False, 'message': 'No hay participantes listos para jugar'})
+        # El creador puede iniciar aunque no haya participantes
+        # (útil para probar el juego solo)
 
         # Iniciar el juego
         cursor.execute("""
@@ -2078,9 +2704,12 @@ def api_start_game():
         cursor.close()
         db.close()
 
+        mensaje = f'Juego iniciado con {participantes} participante(s)' if participantes > 0 else 'Juego iniciado (modo prueba sin participantes)'
+        
         return jsonify({
             'success': True,
-            'message': f'Juego iniciado con {listos} participantes listos'
+            'message': mensaje,
+            'participantes': participantes
         })
 
     except Exception as e:
@@ -2088,13 +2717,15 @@ def api_start_game():
 
 @app.route('/api/grupo/finalizar-sesion', methods=['POST'])
 def api_finalizar_sesion():
-    """API para marcar la sesión como finalizada"""
+    """API para marcar la sesión como finalizada y asignar recompensas"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
     data = request.get_json()
     sesion_id = data.get('sesion_id')
 
+    db = None
+    cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
@@ -2107,13 +2738,22 @@ def api_finalizar_sesion():
         """, (sesion_id,))
 
         db.commit()
-        cursor.close()
-        db.close()
+        
+        # Asignar puntosmoneda a los ganadores
+        asignar_puntosmoneda_grupo(sesion_id)
 
         return jsonify({'success': True})
 
     except Exception as e:
+        if db:
+            db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
 @app.route('/grupo/resultados/<int:sesion_id>')
 def grupo_resultados(sesion_id):
@@ -2126,9 +2766,9 @@ def grupo_resultados(sesion_id):
         db = bd.obtener_conexion()
         cursor = db.cursor()
 
-        # Obtener información de la sesión
+        # Obtener información de la sesión incluyendo el iniciador
         cursor.execute("""
-            SELECT sg.id, sg.grupo_id, sg.cuestionario_id,
+            SELECT sg.id, sg.grupo_id, sg.cuestionario_id, sg.iniciado_por,
                    g.nombre as grupo_nombre, c.titulo as cuestionario_titulo
             FROM sesiones_grupo sg
             JOIN grupos g ON sg.grupo_id = g.id
@@ -2141,6 +2781,9 @@ def grupo_resultados(sesion_id):
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('grupos'))
+
+        # Verificar si el usuario actual es el creador/anfitrión
+        es_creador = (g.user['id'] == sesion['iniciado_por'])
 
         # Obtener el total de preguntas
         cursor.execute("""
@@ -2175,7 +2818,8 @@ def grupo_resultados(sesion_id):
                              grupo_nombre=sesion['grupo_nombre'],
                              cuestionario_titulo=sesion['cuestionario_titulo'],
                              resultados=resultados,
-                             total_preguntas=total_preguntas)
+                             total_preguntas=total_preguntas,
+                             es_creador=es_creador)
 
     except Exception as e:
         flash(f'Error al cargar resultados: {str(e)}', 'error')
@@ -2229,6 +2873,88 @@ def api_grupo_results(sesion_id):
 
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+
+@app.route('/api/grupo/resultados/<int:sesion_id>/compartir-creador', methods=['POST'])
+def api_grupo_resultados_compartir_creador(sesion_id):
+    """Envía un correo al creador de la sesión con el link de la carpeta de Drive donde se guardan los resultados."""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+
+        # Obtener datos del creador y contexto del quiz/grupo
+        cursor.execute(
+            """
+            SELECT sg.iniciado_por, u.email, u.username,
+                   c.titulo AS cuestionario_titulo, COALESCE(g.nombre, 'Sala Temporal') AS grupo_nombre
+            FROM sesiones_grupo sg
+            JOIN cuestionarios c ON sg.cuestionario_id = c.id
+            LEFT JOIN grupos g ON sg.grupo_id = g.id
+            JOIN users u ON u.id = sg.iniciado_por
+            WHERE sg.id = %s
+            """,
+            (sesion_id,)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            cursor.close(); db.close()
+            return jsonify({'success': False, 'message': 'Sesión no encontrada'}), 404
+
+        creator_email = row['email']
+        creator_username = row['username']
+        quiz_title = row['cuestionario_titulo']
+        group_name = row['grupo_nombre']
+
+        if not creator_email:
+            cursor.close(); db.close()
+            return jsonify({'success': False, 'message': 'El creador no tiene un correo configurado'}), 400
+
+        # Link a la carpeta de Google Drive donde se suben los resultados
+        folder_id = GOOGLE_DRIVE_FOLDER_ID
+        folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+
+        # Construir y enviar correo
+        try:
+            subject = f"Resultados disponibles - {quiz_title}"
+            body = (
+                f"Hola {creator_username},\n\n"
+                f"Los resultados del cuestionario '{quiz_title}' (grupo: '{group_name}') ya están disponibles.\n\n"
+                f"Puedes acceder a la carpeta donde se guardan los archivos de resultados en Google Drive aquí:\n"
+                f"{folder_url}\n\n"
+                f"Sugerencia: Verifica que tu cuenta tenga acceso a esa carpeta.\n\n"
+                f"Saludos,\nEquipo RoBot"
+            )
+
+            msg = Message(
+                subject,
+                sender=app.config['MAIL_USERNAME'],
+                recipients=[creator_email]
+            )
+            msg.body = body
+            mail.send(msg)
+        except Exception as e:
+            # Fallback: devolver éxito con enlace para copiar manualmente
+            cursor.close(); db.close()
+            return jsonify({
+                'success': True,
+                'emailed': False,
+                'folder_url': folder_url,
+                'message': f'No se pudo enviar el correo automáticamente. Comparte este enlace: {folder_url}'
+            })
+
+        cursor.close(); db.close()
+        return jsonify({'success': True, 'emailed': True, 'message': 'Correo enviado al creador con el enlace de la carpeta'})
+
+    except Exception as e:
+        try:
+            db.close()
+        except:
+            pass
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/resultados/<pin>')
 def resultados_quiz(pin):
@@ -2754,12 +3480,41 @@ def api_individual_answer():
     data = request.get_json()
     sesion_id = data.get('sesion_id')
     question_id = data.get('question_id')
-    answer_id = data.get('answer_id')
+    answer_id = data.get('answer_id')  # Puede ser None para timeout
     tiempo_respuesta = data.get('tiempo_respuesta', 0)
 
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
+
+        # Si answer_id es None, es un timeout (sin respuesta)
+        if answer_id is None or answer_id == 'null':
+            # Timeout: registrar sin respuesta
+            cursor.execute("""
+                INSERT INTO respuestas_individual (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
+                VALUES (%s, %s, %s, NULL, 0, 0, %s)
+                ON DUPLICATE KEY UPDATE opcion_id = NULL, es_correcta = 0, puntos = 0, tiempo_respuesta = %s
+            """, (sesion_id, g.user['id'], question_id, tiempo_respuesta, tiempo_respuesta))
+            
+            db.commit()
+            
+            # Actualizar pregunta actual del usuario
+            cursor.execute("""
+                UPDATE usuario_estado_individual 
+                SET pregunta_actual = %s 
+                WHERE sesion_id = %s AND user_id = %s
+            """, (question_id, sesion_id, g.user['id']))
+            
+            db.commit()
+            cursor.close()
+            db.close()
+            
+            return jsonify({
+                'success': True,
+                'correct': False,
+                'points': 0,
+                'timeout': True
+            })
 
         # Obtener información de la opción y la pregunta
         cursor.execute("""
@@ -2771,6 +3526,8 @@ def api_individual_answer():
 
         resultado = cursor.fetchone()
         if not resultado:
+            cursor.close()
+            db.close()
             return jsonify({'success': False, 'message': 'Opción no encontrada'})
 
         # Calcular puntos (fórmula igual que grupos)
@@ -2782,7 +3539,8 @@ def api_individual_answer():
             # Más rápido = más puntos
             tiempo_restante = max(0, tiempo_limite - tiempo_respuesta)
             factor_tiempo = tiempo_restante / tiempo_limite
-            puntos = int(puntos_base * factor_tiempo)
+            # Redondear hacia arriba para que siempre se otorgue al menos 1 punto
+            puntos = max(1, math.ceil(puntos_base * factor_tiempo))
 
         # Guardar respuesta en la tabla correcta
         cursor.execute("""
@@ -2792,6 +3550,15 @@ def api_individual_answer():
         """, (sesion_id, g.user['id'], question_id, answer_id, es_correcta, puntos, tiempo_respuesta,
               answer_id, es_correcta, puntos, tiempo_respuesta))
 
+        db.commit()
+        
+        # Actualizar pregunta actual del usuario
+        cursor.execute("""
+            UPDATE usuario_estado_individual 
+            SET pregunta_actual = %s 
+            WHERE sesion_id = %s AND user_id = %s
+        """, (question_id, sesion_id, g.user['id']))
+        
         db.commit()
         cursor.close()
         db.close()
@@ -2807,13 +3574,15 @@ def api_individual_answer():
 
 @app.route('/api/individual/finalizar-sesion', methods=['POST'])
 def api_finalizar_sesion_individual():
-    """API para marcar sesión individual como finalizada"""
+    """API para marcar sesión individual como finalizada y asignar recompensas"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
     data = request.get_json()
     sesion_id = data.get('sesion_id')
 
+    db = None
+    cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
@@ -2825,13 +3594,22 @@ def api_finalizar_sesion_individual():
         """, (sesion_id,))
 
         db.commit()
-        cursor.close()
-        db.close()
+        
+        # Asignar puntosmoneda a los ganadores
+        asignar_puntosmoneda_individual(sesion_id)
 
         return jsonify({'success': True})
 
     except Exception as e:
+        if db:
+            db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
 @app.route('/individual/resultados/<int:sesion_id>')
 def individual_resultados(sesion_id):
@@ -2844,9 +3622,9 @@ def individual_resultados(sesion_id):
         db = bd.obtener_conexion()
         cursor = db.cursor()
 
-        # Obtener información de la sesión
+        # Obtener información de la sesión incluyendo el iniciador
         cursor.execute("""
-            SELECT si.id, si.cuestionario_id, c.titulo as cuestionario_titulo
+            SELECT si.id, si.cuestionario_id, si.iniciado_por, c.titulo as cuestionario_titulo
             FROM sesiones_individual si
             JOIN cuestionarios c ON si.cuestionario_id = c.id
             WHERE si.id = %s
@@ -2857,6 +3635,9 @@ def individual_resultados(sesion_id):
         if not sesion:
             flash('Sesión no encontrada', 'error')
             return redirect(url_for('my_quizzes'))
+
+        # Verificar si el usuario actual es el creador/anfitrión
+        es_creador = (g.user['id'] == sesion['iniciado_por'])
 
         # Obtener el total de preguntas
         cursor.execute("""
@@ -2890,7 +3671,8 @@ def individual_resultados(sesion_id):
                              sesion_id=sesion_id,
                              cuestionario_titulo=sesion['cuestionario_titulo'],
                              total_preguntas=total_preguntas,
-                             resultados=resultados)
+                             resultados=resultados,
+                             es_creador=es_creador)
 
     except Exception as e:
         flash(f'Error al cargar resultados: {str(e)}', 'error')

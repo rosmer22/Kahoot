@@ -161,6 +161,9 @@
             </svg>
             Volver a Mis Cuestionarios
         </button>
+        
+        <!-- Botón exportar solo para el creador/anfitrión -->
+        {% if es_creador %}
         <button class="btn-secondary" onclick="exportarExcel()">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -169,6 +172,9 @@
             </svg>
             Exportar a Excel
         </button>
+        {% endif %}
+        
+        <!-- Botón compartir disponible para todos -->
         <button class="btn-secondary" onclick="shareResults()">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="18" cy="5" r="3"></circle>

@@ -1,4 +1,3 @@
-
 /* Top bars */
 .mainbar{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .title-input{flex:1;min-width:220px;padding:.6rem .8rem;border-radius:10px;border:1px solid #d1d5db;background:#fff}
@@ -107,10 +106,38 @@
 .subbar .spacer{flex:1}
 
 /* Panel container */
-.editor-wrap{padding:1.25rem 0 2rem}
+.editor-wrap{
+  padding:1.25rem 0 2rem;
+  max-width: 1500px;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 3rem;
+}
 .panel{background:#e9e9e9;border:2px solid #bfbfbf;border-radius:12px;padding:1rem}
 .shadow{box-shadow:0 6px 20px rgba(0,0,0,.15)}
 .pink{background:#f4cfcf}
+
+/* Question Card */
+.editor-wrap .panel .question-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.editor-wrap .panel .question-card:focus-within {
+  box-shadow: 0 4px 16px rgba(0, 123, 255, 0.2);
+  border-color: #a9cffc;
+}
+
+.editor-wrap .panel .question-card .question-text {
+  border: none;
+}
 
 /* Question */
 .question{border-radius:10px;padding:1rem;border:2px solid #e5b3b3;margin:1rem}
@@ -137,29 +164,7 @@
 /* Footer actions */
 .footer-actions{display:flex;gap:.6rem;justify-content:flex-start;margin:0 1rem 0}
 .btn.slim{border-radius:8px;background:#d3d3d3;border:1px solid #a3a3a3;padding:.45rem .9rem}
-@media(max-width:900px){.answers-row{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.answers-row{grid-template-columns:1fr}}
-@media (max-width: 768px) {
-  .editor-subbar {
-    overflow-x: auto;
-    padding: 0.5rem 1rem;
-  }
-  .subbar-inner {
-    padding: 0;
-    width: max-content;
-  }
-  .panel-grid { grid-template-columns: 1fr; }
-  /* --- Responsividad del Modal de Configuración --- */
-  .config-body {
-    grid-template-columns: 1fr; /* Apila el menú y el contenido */
-    min-height: 450px; /* Aumenta la altura mínima en móvil */
-  }
-  .cfg-nav {
-    flex-direction: row; /* Menú de navegación horizontal */
-    border-right: none;
-    border-bottom: 1px solid #bdbdbd;
-  }
-}
+
 /* ===== Modal Configuración ===== */
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:saturate(120%) blur(1px);z-index:80}
 .config-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1000px,94vw);background:#d9d9d9;border:2px solid #9e9e9e;border-radius:12px;z-index:90;box-shadow:0 24px 80px rgba(0,0,0,.35);}
@@ -275,7 +280,7 @@
   padding: 1rem;
 }
 
-.question-card {
+.sidebar-content .question-card {
   background: #f5f5f5;
   border: 2px solid #b0b0b0;
   border-radius: 12px;
@@ -286,13 +291,13 @@
   position: relative;
 }
 
-.question-card:hover {
+.sidebar-content .question-card:hover {
   border-color: #999;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
 }
 
-.question-card.active {
+.sidebar-content .question-card.active {
   border-color: #ff9e42;
   background: #fff8f0;
 }
@@ -376,7 +381,7 @@
   transition: all 0.2s ease;
 }
 
-.question-card:hover .delete-question-btn {
+.sidebar-content .question-card:hover .delete-question-btn {
   opacity: 1;
 }
 
@@ -414,3 +419,262 @@
 .curve{position:absolute;bottom:-1px;left:0;width:100%;overflow:hidden;line-height:0;z-index:0}
 .curve svg{position:relative;display:block;width:calc(100% + 1.3px);height:180px}
 .curve .shape-fill{fill:#f3f3f3}
+
+/* ===== MEDIA QUERIES ===== */
+@media(max-width:900px){
+  .answers-row{grid-template-columns:repeat(2,1fr)}
+}
+
+@media(max-width:560px){
+  .answers-row{grid-template-columns:1fr}
+}
+
+@media (max-width: 768px) {
+  .editor-subbar {
+    overflow-x: auto;
+    padding: 0.5rem 1rem;
+  }
+  .subbar-inner {
+    padding: 0;
+    width: max-content;
+  }
+  .panel-grid { 
+    grid-template-columns: 1fr; 
+  }
+  
+  /* Modal de Configuración */
+  .config-body {
+    grid-template-columns: 1fr;
+    min-height: 450px;
+    overflow-y: auto;
+    max-height: calc(100vh - 150px);
+  }
+  .cfg-nav {
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid #bdbdbd;
+  }
+  .cfg-content {
+    overflow-y: auto;
+    max-height: 100%;
+  }
+  .cfg-actions {
+    display: flex !important;
+  }
+  .config-modal {
+    top: 10rem;
+    transform: translateX(-50%);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  .modal-backdrop {
+    top: 16px;
+    height: calc(100vh - 16px);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: saturate(100%) blur(2px);
+  }
+  
+  /* Bloquear scroll del fondo */
+  body.modal-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* Efecto de Pilas */
+  .editor-wrap .panel .question-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.08);
+    position: relative;
+  }
+  .editor-wrap .panel .question-card::before,
+  .editor-wrap .panel .question-card::after {
+    content: '';
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    z-index: -1;
+  }
+  .editor-wrap .panel .question-card::before {
+    top: -4px;
+    left: 8px;
+    right: 8px;
+    height: 100%;
+    opacity: 0.6;
+  }
+  .editor-wrap .panel .question-card::after {
+    top: -8px;
+    left: 16px;
+    right: 16px;
+    height: 100%;
+    opacity: 0.3;
+  }
+  
+  /* Alternativas apiladas */
+  .answers-row {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+  }
+  .answer {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.08);
+    position: relative;
+  }
+  .answer::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 6px;
+    right: 6px;
+    height: 100%;
+    background: #f4cfcf;
+    border: 2px solid #e5b3b3;
+    border-radius: 10px;
+    z-index: -1;
+    opacity: 0.5;
+  }
+}
+
+@media(max-width:560px){
+  .answers-row{grid-template-columns:1fr}
+}
+
+@media (max-width: 768px) {
+  .editor-subbar {
+    overflow-x: auto;
+    padding: 0.5rem 1rem;
+  }
+  .subbar-inner {
+    padding: 0;
+    width: max-content;
+  }
+  .panel-grid { 
+    grid-template-columns: 1fr; 
+  }
+  
+  /* --- Responsividad del Modal de Configuración --- */
+  .config-body {
+    grid-template-columns: 1fr;
+    min-height: 450px;
+  }
+  .cfg-nav {
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid #bdbdbd;
+  }
+  
+  /* --- Efecto de Pilas en Móviles --- */
+  .editor-wrap .panel .question-card {
+    box-shadow: 
+      0 1px 3px rgba(0, 0, 0, 0.12),
+      0 4px 8px rgba(0, 0, 0, 0.1),
+      0 8px 16px rgba(0, 0, 0, 0.08);
+    position: relative;
+  }
+  
+  .editor-wrap .panel .question-card::before,
+  .editor-wrap .panel .question-card::after {
+    content: '';
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    z-index: -1;
+  }
+  
+  .editor-wrap .panel .question-card::before {
+    top: -4px;
+    left: 8px;
+    right: 8px;
+    height: 100%;
+    opacity: 0.6;
+  }
+  
+  .editor-wrap .panel .question-card::after {
+    top: -8px;
+    left: 16px;
+    right: 16px;
+    height: 100%;
+    opacity: 0.3;
+  }
+  
+  /* Alternativas con efecto de pila */
+  .answer {
+    box-shadow: 
+      0 2px 4px rgba(0, 0, 0, 0.1),
+      0 4px 8px rgba(0, 0, 0, 0.08);
+    position: relative;
+  }
+  
+  .answer::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 6px;
+    right: 6px;
+    height: 100%;
+    background: #f4cfcf;
+    border: 2px solid #e5b3b3;
+    border-radius: 10px;
+    z-index: -1;
+    opacity: 0.5;
+  }
+    .answers-row {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+  }
+    /* Mostrar botones de configuración en móviles */
+  .cfg-actions {
+    display: flex !important;
+  }
+  
+  /* Ajustar el backdrop del modal en móviles */
+  .modal-backdrop {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: saturate(100%) blur(2px);
+  }
+  
+  /* Bajar el modal de configuración en móviles */
+  .config-modal {
+    top: 55%;
+  }
+
+    .config-modal {
+    top: 50%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .config-body {
+    overflow-y: auto;
+    max-height: calc(90vh - 120px); /* Resta el alto del header */
+  }
+  
+  .cfg-content {
+    overflow-y: auto;
+    max-height: 100%;
+  }
+    .config-modal {
+    top: 10rem;
+    transform: translateX(-50%);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  
+  .config-body {
+    overflow-y: auto;
+    max-height: calc(100vh - 150px);
+  }
+    .modal-backdrop {
+    top: 16px;
+    height: calc(100vh - 16px);
+  }
+  body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+}

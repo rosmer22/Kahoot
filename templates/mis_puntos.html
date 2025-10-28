@@ -1,0 +1,437 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .puntos-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .puntos-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+    
+    .puntos-header h1 {
+        font-size: 2.5rem;
+        color: #1e293b;
+        margin-bottom: 0.5rem;
+    }
+    
+    .puntos-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 1.5rem;
+        padding: 2.5rem;
+        color: white;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .puntos-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        animation: pulse 3s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.5; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+    }
+    
+    .puntos-main {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .rango-actual {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .rango-icono {
+        font-size: 5rem;
+        display: block;
+        margin-bottom: 1rem;
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .rango-nombre {
+        font-size: 2rem;
+        font-weight: 700;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .puntos-display {
+        text-align: center;
+        margin: 2rem 0;
+    }
+    
+    .puntos-numero {
+        font-size: 4rem;
+        font-weight: 700;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .puntos-label {
+        font-size: 1.2rem;
+        opacity: 0.9;
+    }
+    
+    .progreso-section {
+        margin-top: 2rem;
+    }
+    
+    .progreso-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+    
+    .progreso-bar {
+        width: 100%;
+        height: 20px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .progreso-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #ffd700 0%, #ffed4e 100%);
+        border-radius: 10px;
+        transition: width 1s ease-out;
+        box-shadow: 0 2px 8px rgba(255, 215, 0, 0.5);
+    }
+    
+    .rangos-lista {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+    
+    .rango-item {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .rango-item:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+    
+    .rango-item.actual {
+        border: 3px solid #ffd700;
+        box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4);
+    }
+    
+    .rango-item.bloqueado {
+        opacity: 0.5;
+    }
+    
+    .rango-item-icono {
+        font-size: 3rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+    
+    .rango-item-nombre {
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+    }
+    
+    .rango-item-puntos {
+        font-size: 0.85rem;
+        color: #64748b;
+    }
+    
+    .estadisticas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
+    }
+    
+    .estadistica-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .estadistica-numero {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #667eea;
+        margin-bottom: 0.5rem;
+    }
+    
+    .estadistica-label {
+        color: #64748b;
+        font-size: 0.9rem;
+    }
+    
+    .historial-section {
+        margin-top: 3rem;
+    }
+    
+    .historial-section h2 {
+        font-size: 1.8rem;
+        color: #1e293b;
+        margin-bottom: 1.5rem;
+    }
+    
+    .historial-tabla {
+        background: white;
+        border-radius: 1rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .historial-tabla table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .historial-tabla th {
+        background: #f1f5f9;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .historial-tabla td {
+        padding: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        color: #64748b;
+    }
+    
+    .historial-tabla tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .historial-tabla tr:hover {
+        background: #f8fafc;
+    }
+    
+    .medalla {
+        font-size: 1.5rem;
+    }
+    
+    .tipo-sesion-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .tipo-grupo {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .tipo-individual {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .puntos-ganados {
+        font-weight: 700;
+        color: #10b981;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #94a3b8;
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    @media (max-width: 768px) {
+        .puntos-header h1 {
+            font-size: 2rem;
+        }
+        
+        .puntos-card {
+            padding: 1.5rem;
+        }
+        
+        .rango-icono {
+            font-size: 3.5rem;
+        }
+        
+        .rango-nombre {
+            font-size: 1.5rem;
+        }
+        
+        .puntos-numero {
+            font-size: 3rem;
+        }
+        
+        .rangos-lista {
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        }
+        
+        .estadisticas-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .historial-tabla {
+            overflow-x: auto;
+        }
+    }
+</style>
+
+<div class="puntos-container">
+    <div class="puntos-header">
+        <h1>🪙 Mis Puntos y Rango</h1>
+        <p>Sigue jugando para subir de rango y desbloquear logros</p>
+    </div>
+    
+    {% if usuario_info %}
+    <div class="puntos-card">
+        <div class="puntos-main">
+            <div class="rango-actual">
+                <span class="rango-icono">{{ usuario_info.rango_icono }}</span>
+                <div class="rango-nombre">{{ usuario_info.rango_nombre }}</div>
+            </div>
+            
+            <div class="puntos-display">
+                <div class="puntos-numero">{{ usuario_info.puntosmoneda }}</div>
+                <div class="puntos-label">Puntosmoneda</div>
+            </div>
+            
+            {% if usuario_info.siguiente_rango %}
+            <div class="progreso-section">
+                <div class="progreso-info">
+                    <span>Progreso hacia {{ usuario_info.siguiente_rango_icono }} {{ usuario_info.siguiente_rango }}</span>
+                    <span><strong>{{ usuario_info.puntos_para_siguiente_rango }}</strong> pts restantes</span>
+                </div>
+                <div class="progreso-bar">
+                    <div class="progreso-fill" style="width: {{ porcentaje_progreso }}%"></div>
+                </div>
+            </div>
+            {% else %}
+            <div class="progreso-section">
+                <div class="progreso-info">
+                    <span style="width: 100%; text-align: center;">🎉 ¡Rango máximo alcanzado!</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Todos los rangos -->
+    <div class="rangos-section">
+        <h2 style="text-align: center; margin-bottom: 1.5rem; color: #1e293b;">Sistema de Rangos</h2>
+        <div class="rangos-lista">
+            {% for rango in todos_rangos %}
+            <div class="rango-item {% if rango.nombre == usuario_info.rango_nombre %}actual{% elif usuario_info.puntosmoneda < rango.puntos_minimos %}bloqueado{% endif %}">
+                <span class="rango-item-icono">{{ rango.icono }}</span>
+                <div class="rango-item-nombre" style="color: {{ rango.color }}">{{ rango.nombre }}</div>
+                <div class="rango-item-puntos">
+                    {% if rango.puntos_maximos >= 99999999 %}
+                    {{ rango.puntos_minimos }}+ pts
+                    {% else %}
+                    {{ rango.puntos_minimos }} - {{ rango.puntos_maximos }} pts
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Estadísticas -->
+    {% if estadisticas %}
+    <div class="estadisticas-grid">
+        <div class="estadistica-card">
+            <div class="estadistica-numero">{{ estadisticas.total_juegos_premiados or 0 }}</div>
+            <div class="estadistica-label">Juegos en Top 3</div>
+        </div>
+        <div class="estadistica-card">
+            <div class="estadistica-numero">🥇 {{ estadisticas.primeros_lugares or 0 }}</div>
+            <div class="estadistica-label">Primeros Lugares</div>
+        </div>
+        <div class="estadistica-card">
+            <div class="estadistica-numero">🥈 {{ estadisticas.segundos_lugares or 0 }}</div>
+            <div class="estadistica-label">Segundos Lugares</div>
+        </div>
+        <div class="estadistica-card">
+            <div class="estadistica-numero">🥉 {{ estadisticas.terceros_lugares or 0 }}</div>
+            <div class="estadistica-label">Terceros Lugares</div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Historial -->
+    <div class="historial-section">
+        <h2>📜 Historial de Recompensas</h2>
+        {% if historial %}
+        <div class="historial-tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Posición</th>
+                        <th>Tipo</th>
+                        <th>Puntos Juego</th>
+                        <th>Puntosmoneda</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for recompensa in historial %}
+                    <tr>
+                        <td>{{ recompensa.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td><span class="medalla">{{ recompensa.medalla }}</span> {{ recompensa.posicion }}º</td>
+                        <td>
+                            <span class="tipo-sesion-badge tipo-{{ recompensa.tipo_sesion }}">
+                                {{ 'Grupo' if recompensa.tipo_sesion == 'grupo' else 'Individual' }}
+                            </span>
+                        </td>
+                        <td>{{ recompensa.puntos_totales }}</td>
+                        <td class="puntos-ganados">+{{ recompensa.puntosmoneda_ganados }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">🎮</div>
+            <p>Aún no has obtenido recompensas</p>
+            <p>¡Juega y queda en el top 3 para ganar puntosmoneda!</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

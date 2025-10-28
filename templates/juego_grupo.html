@@ -45,6 +45,29 @@
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
+        
+        /* Estilos para el mensaje del creador */
+        .creator-message {
+            text-align: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 1rem;
+            margin: 1rem 0;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        .creator-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .creator-message p {
+            margin: 0.5rem 0;
+            font-size: 1.1rem;
+        }
+        .creator-subtitle {
+            opacity: 0.8;
+            font-size: 0.9rem !important;
+        }
     </style>
 </head>
 <body>
@@ -100,6 +123,12 @@
                 <p>Esperando a que todos respondan...</p>
                 <p class="waiting-count" id="waitingCount">0/0 han respondido</p>
             </div>
+            
+            <div class="creator-message" id="creatorMessage" style="display: none;">
+                <div class="creator-icon">👑</div>
+                <p>Eres el creador de la sala</p>
+                <p class="creator-subtitle">Puedes ver el juego pero no participar</p>
+            </div>
         </div>
     </div>
 
@@ -131,6 +160,7 @@ const sesionId = {{ sesion_id }};
 const userId = {{ g.user.id if g.user else 0 }};
 const questions = JSON.parse({{ preguntas_json | tojson }});
 const totalQuestions = {{ total_preguntas }};
+const esCreador = {{ es_creador | tojson }};
 
 let currentQuestionIndex = 0;
 let currentQuestion = null;
@@ -150,6 +180,7 @@ const progressText = document.getElementById('progressText');
 const progressBar = document.getElementById('progressBar');
 const waitingMessage = document.getElementById('waitingMessage');
 const waitingCount = document.getElementById('waitingCount');
+const creatorMessage = document.getElementById('creatorMessage');
 const questionSection = document.getElementById('questionSection');
 const transitionScreen = document.getElementById('transitionScreen');
 const loadingScreen = document.getElementById('loadingScreen');
@@ -157,12 +188,46 @@ const loadingScreen = document.getElementById('loadingScreen');
 // ==========================================
 // Inicialización
 // ==========================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('🎮 Iniciando juego en grupo...');
     console.log(`Total de preguntas: ${totalQuestions}`);
+    console.log(`Usuario ID: ${userId}, Es creador: ${esCreador}`);
     
-    // Mostrar primera pregunta
-    showQuestion(0);
+    // Si es el creador, siempre empezar desde 0
+    if (esCreador) {
+        console.log('👑 Creador de la sala - iniciando desde pregunta 1');
+        showQuestion(0);
+        return;
+    }
+    
+    // Para jugadores: Obtener pregunta actual del servidor (por si hubo refresh)
+    try {
+        console.log('🔄 Sincronizando pregunta actual con el servidor...');
+        const response = await fetch(`/api/grupo/obtener-pregunta-actual/${sesionId}`);
+        const result = await response.json();
+        
+        console.log('📡 Respuesta del servidor:', result);
+        
+        if (result.success) {
+            if (result.pregunta_id !== null && result.pregunta_index !== undefined) {
+                // Tenemos una pregunta guardada, ir a esa pregunta
+                console.log(`📍 Sincronizando con pregunta ${result.pregunta_index + 1} (ID: ${result.pregunta_id})`);
+                showQuestion(result.pregunta_index);
+            } else {
+                // No hay pregunta guardada, empezar desde 0
+                console.log('🆕 No hay pregunta anterior, empezando desde pregunta 1');
+                showQuestion(0);
+            }
+        } else {
+            console.warn('⚠️ No se pudo obtener pregunta actual, empezando desde pregunta 1');
+            showQuestion(0);
+        }
+    } catch (error) {
+        console.error('❌ Error al sincronizar pregunta:', error);
+        // Si falla, empezar desde 0
+        console.log('🔄 Iniciando desde pregunta 1 por error de sincronización');
+        showQuestion(0);
+    }
 });
 
 // ==========================================
@@ -185,6 +250,12 @@ function showQuestion(index) {
     questionSection.style.display = 'block';
     transitionScreen.style.display = 'none';
     waitingMessage.style.display = 'none';
+    creatorMessage.style.display = 'none';
+    
+    // Si es el creador, mostrar mensaje especial
+    if (esCreador) {
+        creatorMessage.style.display = 'block';
+    }
 
     // Actualizar progreso
     const progress = ((index + 1) / totalQuestions) * 100;
@@ -201,13 +272,30 @@ function showQuestion(index) {
         answerBtn.className = 'answer-btn';
         answerBtn.dataset.optionId = option.id;
         answerBtn.textContent = option.text;
-        answerBtn.onclick = () => selectAnswer(option.id, answerBtn);
+        
+        // Si es el creador, deshabilitar el botón
+        if (esCreador) {
+            answerBtn.disabled = true;
+            answerBtn.classList.add('disabled');
+            answerBtn.title = 'El creador de la sala no puede participar';
+        } else {
+            answerBtn.onclick = () => selectAnswer(option.id, answerBtn);
+        }
+        
         answersGrid.appendChild(answerBtn);
     });
 
     // Iniciar temporizador
     timeLeft = currentQuestion.time_limit || 30;
     startTimer();
+
+    // Si es el creador, empezar a verificar inmediatamente si todos respondieron
+    // para avanzar aunque aún no termine el tiempo
+    if (esCreador) {
+        waitingMessage.style.display = 'block';
+        waitingCount.textContent = 'Esperando a los jugadores...';
+        startCheckingAnswers();
+    }
 
     console.log(`📝 Mostrando pregunta ${index + 1}: ${currentQuestion.text}`);
 }
@@ -244,6 +332,11 @@ function startTimer() {
             if (!hasAnswered) {
                 // Tiempo agotado sin responder
                 handleTimeOut();
+            } else {
+                // Tiempo agotado pero ya respondió, verificar si puede proceder
+                setTimeout(() => {
+                    checkIfCanProceed();
+                }, 1000);
             }
         }
     }, 1000);
@@ -261,6 +354,12 @@ function stopTimer() {
 // ==========================================
 function selectAnswer(optionId, btnElement) {
     if (hasAnswered) return; // Ya respondió
+    
+    // Si es el creador, no puede responder
+    if (esCreador) {
+        console.log('El creador de la sala no puede participar en el juego');
+        return;
+    }
 
     hasAnswered = true;
     selectedAnswer = optionId;
@@ -325,10 +424,18 @@ async function sendAnswer(questionId, answerId, timeToAnswer) {
 function handleTimeOut() {
     hasAnswered = true;
     
+    // Si es el creador, no hacer nada
+    if (esCreador) {
+        return;
+    }
+    
     // Deshabilitar botones
     document.querySelectorAll('.answer-btn').forEach(btn => {
         btn.disabled = true;
     });
+
+    // Enviar respuesta de timeout al servidor (con answer_id = null)
+    sendTimeoutAnswer(currentQuestion.id);
 
     // Mostrar mensaje de espera
     waitingMessage.style.display = 'block';
@@ -338,38 +445,79 @@ function handleTimeOut() {
     startCheckingAnswers();
 }
 
+// Enviar respuesta de timeout
+async function sendTimeoutAnswer(questionId) {
+    try {
+        const timeToAnswer = Math.floor((Date.now() - questionStartTime) / 1000);
+        
+        const response = await fetch('/api/grupo/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sesion_id: sesionId,
+                question_id: questionId,
+                answer_id: null,  // null indica timeout
+                tiempo_respuesta: timeToAnswer
+            })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log(`⏱ Timeout registrado para pregunta ${questionId}`);
+            // Guardar resultado para mostrar en transición
+            currentQuestion.userResult = {
+                correct: false,
+                points: 0,
+                timeout: true
+            };
+        } else {
+            console.error('❌ Error al registrar timeout:', result.message);
+        }
+    } catch (error) {
+        console.error('❌ Error de red al registrar timeout:', error);
+    }
+}
+
 // ==========================================
-// Polling: Verificar si todos respondieron
+// Polling: Verificar si todos respondieron O se agotó el tiempo
 // ==========================================
 function startCheckingAnswers() {
     if (checkAnswersInterval) clearInterval(checkAnswersInterval);
 
     checkAnswersInterval = setInterval(async () => {
-        try {
-            const response = await fetch(`/api/grupo/pregunta-estado/${sesionId}/${currentQuestion.id}`);
-            const result = await response.json();
-
-            if (result.success) {
-                // Actualizar contador
-                waitingCount.textContent = `${result.answered}/${result.total} han respondido`;
-
-                // Si todos respondieron, pasar a siguiente pregunta
-                if (result.all_answered) {
-                    clearInterval(checkAnswersInterval);
-                    stopTimer();
-                    showTransition();
-                }
-            }
-        } catch (error) {
-            console.error('Error al verificar estado:', error);
-        }
+        await checkIfCanProceed();
     }, 1000); // Cada segundo
+}
+
+// ==========================================
+// Verificar si puede proceder a la siguiente pregunta
+// ==========================================
+async function checkIfCanProceed() {
+    try {
+        const response = await fetch(`/api/grupo/pregunta-estado/${sesionId}/${currentQuestion.id}`);
+        const result = await response.json();
+
+        if (result.success) {
+            // Actualizar contador
+            waitingCount.textContent = `${result.answered}/${result.total} han respondido`;
+
+            // Si todos respondieron, pasar a siguiente pregunta
+            if (result.all_answered) {
+                clearInterval(checkAnswersInterval);
+                stopTimer();
+                showTransition(true); // true indica que todos respondieron
+            }
+        }
+    } catch (error) {
+        console.error('Error al verificar estado:', error);
+    }
 }
 
 // ==========================================
 // Pantalla de Transición
 // ==========================================
-function showTransition() {
+function showTransition(allAnswered = false) {
     questionSection.style.display = 'none';
     transitionScreen.style.display = 'flex';
 
@@ -377,7 +525,26 @@ function showTransition() {
     const title = document.getElementById('transitionTitle');
     const points = document.getElementById('transitionPoints');
 
-    if (currentQuestion.userResult) {
+    // Si todos respondieron antes del timeout, mostrar mensaje especial
+    if (allAnswered && !esCreador && currentQuestion.userResult) {
+        if (currentQuestion.userResult.correct) {
+            icon.textContent = '✓';
+            icon.className = 'transition-icon correct';
+            title.textContent = '¡Correcta!';
+            points.textContent = `+${currentQuestion.userResult.points} puntos`;
+        } else if (currentQuestion.userResult.timeout) {
+            // Timeout pero todos respondieron
+            icon.textContent = '👥';
+            icon.className = 'transition-icon info';
+            title.textContent = 'Todos respondieron';
+            points.textContent = 'Pasando a la siguiente pregunta';
+        } else {
+            icon.textContent = '✗';
+            icon.className = 'transition-icon incorrect';
+            title.textContent = 'Incorrecta';
+            points.textContent = '0 puntos';
+        }
+    } else if (currentQuestion.userResult) {
         if (currentQuestion.userResult.correct) {
             icon.textContent = '✓';
             icon.className = 'transition-icon correct';
@@ -390,11 +557,18 @@ function showTransition() {
             points.textContent = '0 puntos';
         }
     } else {
-        // Sin respuesta
-        icon.textContent = '⏱';
-        icon.className = 'transition-icon timeout';
-        title.textContent = 'Tiempo agotado';
-        points.textContent = '0 puntos';
+        // Sin respuesta o creador
+        if (allAnswered) {
+            icon.textContent = '👥';
+            icon.className = 'transition-icon info';
+            title.textContent = 'Todos respondieron';
+            points.textContent = 'Pasando a la siguiente pregunta';
+        } else {
+            icon.textContent = '⏱';
+            icon.className = 'transition-icon timeout';
+            title.textContent = 'Tiempo agotado';
+            points.textContent = '0 puntos';
+        }
     }
 
     // Después de 3 segundos, mostrar siguiente pregunta

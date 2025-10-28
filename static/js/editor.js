@@ -440,7 +440,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     file.files = e.dataTransfer.files;
     drop.querySelector('.drop-inner').innerHTML = '<div class="drop-icon">✅</div><div>'+f.name+'</div>';
   });
-  drop && drop.addEventListener('click', ()=> file && file.click());
+  // NO necesitamos drop.addEventListener('click') porque el <label> ya abre el input automáticamente
   file && file.addEventListener('change', ()=>{
     const f = file.files[0]; if (f) drop.querySelector('.drop-inner').innerHTML = '<div class="drop-icon">✅</div><div>'+f.name+'</div>';
   });
@@ -737,6 +737,85 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
+// ===== Función para Importar Preguntas desde Excel =====
+(function(){
+  const importBtn = document.getElementById('importExcelBtn');
+  const fileInput = document.getElementById('excelFileInput');
+
+  if (importBtn && fileInput) {
+    // Al hacer clic en el botón, abrir el selector de archivos
+    importBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      fileInput.click();
+    });
+
+    // Cuando se selecciona un archivo
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      
+      if (!file) return;
+
+      // Validar que sea un archivo Excel
+      if (!file.name.match(/\.(xlsx|xls)$/i)) {
+        alert('Por favor, selecciona un archivo Excel válido (.xlsx o .xls)');
+        fileInput.value = '';
+        return;
+      }
+
+      // Mostrar indicador de carga
+      importBtn.disabled = true;
+      importBtn.innerHTML = '<span class="pill-icon">⏳</span><span>Importando...</span>';
+
+      // Crear FormData para enviar el archivo
+      const formData = new FormData();
+      formData.append('excel_file', file);
+
+      // Enviar al servidor
+      fetch('/api/importar-preguntas-excel', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(result => {
+        // Restaurar el botón
+        importBtn.disabled = false;
+        importBtn.innerHTML = '<span class="pill-icon">📊</span><span>Importar Excel</span>';
+        fileInput.value = '';
+
+        if (result.success && result.preguntas && result.preguntas.length > 0) {
+          // Guardar la pregunta actual antes de importar
+          if (typeof saveCurrentQuestion === 'function') {
+            saveCurrentQuestion();
+          }
+
+          // Reemplazar todas las preguntas con las importadas
+          questions = result.preguntas;
+          currentQuestionIndex = 0;
+
+          // Renderizar el sidebar y cargar la primera pregunta
+          if (typeof renderSidebar === 'function') {
+            renderSidebar();
+          }
+          if (typeof loadQuestion === 'function') {
+            loadQuestion(0);
+          }
+
+          alert(`¡Importación exitosa! Se importaron ${result.preguntas.length} pregunta(s).`);
+        } else {
+          alert('Error: ' + (result.error || result.message || 'No se pudieron importar las preguntas'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        importBtn.disabled = false;
+        importBtn.innerHTML = '<span class="pill-icon">📊</span><span>Importar Excel</span>';
+        fileInput.value = '';
+        alert('Error al importar el archivo. Por favor, verifica que el formato sea correcto e intenta de nuevo.');
+      });
+    });
+  }
+})();
 
 // ===== Función para Guardar el Cuestionario =====
 function guardarCuestionario() {

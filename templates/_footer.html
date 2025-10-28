@@ -77,4 +77,60 @@
   <div class="footer-bottom">
     <p>Todos los derechos reservados © Alumnos USAT Grupo 2, 2025</p>
   </div>
+    <style>
+    footer {
+      background: var(--color-azul-footer);
+      color: white;
+      padding-top: 3.5rem;
+      /* más aire arriba */
+      overflow-x: hidden;
+      width: 100%;
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 3.5rem;
+      /* más espacio entre columnas */
+      padding: 0 3rem 3.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .footer-column h4 {
+      margin-bottom: 1rem;
+      font-weight: bold;
+    }
+
+    .footer-column a {
+      color: white;
+      text-decoration: none;
+    }
+
+    .footer-column a:hover {
+      text-decoration: underline;
+    }
+
+    .logo_footer img {
+      width: 110px;
+    }
+
+    .footer-bottom {
+      background: var(--color-footer-fondo);
+      text-align: center;
+      padding: 1.3rem;
+      font-size: .9rem;
+    }
+
+    @media (max-width: 768px) {
+      .footer-content {
+        flex-direction: column;
+        text-align: center;
+        align-items: center;
+        gap: 2.5rem;
+      }
+    }
+  </style>
+
 </footer>

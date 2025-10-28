@@ -1,5 +1,37 @@
 {% extends "base.html" %}
-{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+<style>
+  .team-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .team-card {
+    flex: 0 1 calc(33.333% - 2rem);
+    min-width: 280px;
+  }
+  
+  .team-photo {
+    display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .team-card {
+      flex: 0 1 calc(50% - 2rem);
+    }
+  }
+  
+  @media (max-width: 560px) {
+    .team-card {
+      flex: 0 1 100%;
+    }
+  }
+</style>
+{% endblock %}
 {% block content %}
 
 <main class="hero-section">
@@ -13,58 +45,52 @@
     <div class="team-grid">
 
       <div class="team-card">
-        <img src="/static/img/dev1.jpg" alt="Programador 1" class="team-photo">
-        <h3 class="team-name">María López</h3>
-        <p class="team-role">Desarrolladora Backend</p>
-        <p class="team-desc">Especialista en Python, Flask y bases de datos. Le encanta optimizar código y diseñar APIs eficientes.</p>
+        <h3 class="team-name">Ancajima Camacho Valentino</h3>
+        <p class="team-role">Desarrollador</p>
+        <p class="team-desc">Apasionado por crear soluciones tecnológicas innovadoras y eficientes.</p>
       </div>
 
       <div class="team-card">
-        <img src="/static/img/dev2.jpg" alt="Programador 2" class="team-photo">
-        <h3 class="team-name">Carlos Sandoval</h3>
-        <p class="team-role">Desarrollador Frontend</p>
-        <p class="team-desc">Experto en HTML, CSS y JavaScript. Disfruta crear interfaces limpias y accesibles.</p>
+        <h3 class="team-name">Benites Mio Jim</h3>
+        <p class="team-role">Desarrollador</p>
+        <p class="team-desc">Especialista en implementar funcionalidades robustas y escalables.</p>
       </div>
 
       <div class="team-card">
-        <img src="/static/img/dev3.jpg" alt="Programador 3" class="team-photo">
-        <h3 class="team-name">Lucía Rivera</h3>
-        <p class="team-role">Diseñadora UI/UX</p>
-        <p class="team-desc">Apasionada por la experiencia del usuario. Transforma ideas en diseños atractivos y funcionales.</p>
-      </div>
-
-            <div class="team-card">
-        <img src="/static/img/dev1.jpg" alt="Programador 1" class="team-photo">
-        <h3 class="team-name">María López</h3>
-        <p class="team-role">Desarrolladora Backend</p>
-        <p class="team-desc">Especialista en Python, Flask y bases de datos. Le encanta optimizar código y diseñar APIs eficientes.</p>
+        <h3 class="team-name">Maguiña Sánchez Rosmer</h3>
+        <p class="team-role">Coordinador del Proyecto</p>
+        <p class="team-desc">Líder del equipo, enfocado en la gestión y dirección del proyecto.</p>
       </div>
 
       <div class="team-card">
-        <img src="/static/img/dev2.jpg" alt="Programador 2" class="team-photo">
-        <h3 class="team-name">Carlos Sandoval</h3>
-        <p class="team-role">Desarrollador Frontend</p>
-        <p class="team-desc">Experto en HTML, CSS y JavaScript. Disfruta crear interfaces limpias y accesibles.</p>
+        <h3 class="team-name">Sandoval Mija Carlo</h3>
+        <p class="team-role">Desarrollador</p>
+        <p class="team-desc">Experto en diseño de interfaces y experiencia de usuario.</p>
       </div>
 
       <div class="team-card">
-        <img src="/static/img/dev3.jpg" alt="Programador 3" class="team-photo">
-        <h3 class="team-name">Lucía Rivera</h3>
-        <p class="team-role">Diseñadora UI/UX</p>
-        <p class="team-desc">Apasionada por la experiencia del usuario. Transforma ideas en diseños atractivos y funcionales.</p>
+        <h3 class="team-name">Ventura González Eduardo</h3>
+        <p class="team-role">Desarrollador</p>
+        <p class="team-desc">Enfocado en la arquitectura del sistema y optimización del código.</p>
+      </div>
+
+      <div class="team-card">
+        <h3 class="team-name">Fiestas Fiestas Carlos</h3>
+        <p class="team-role">Desarrollador</p>
+        <p class="team-desc">Especializado en integración de sistemas y desarrollo de APIs.</p>
       </div>
       
     </div>
     
   </div>
-  <div class="curve" >
-        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
-        </svg>
-    </div>
+  <div class="curve">
+    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+    </svg>
+  </div>
 </main>
-
 
 {% endblock %}
 {% block page_js %}
-<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}

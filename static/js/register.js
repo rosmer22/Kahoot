@@ -18,7 +18,7 @@ const rules = [
     { text: 'Mínimo 8 caracteres', test: p => RE_LENGTH.test(p) },
     { text: 'Al menos 1 mayúscula (A–Z)', test: p => RE_UPPER.test(p) },
     { text: 'Al menos 1 minúscula (a–z)', test: p => RE_LOWER.test(p) },
-    { text: 'Al menos 1 carácter especial (!@#$%^&*)', test: p => RE_SPECIAL.test(p) },
+    { text: 'Al menos 1 carácter especial (@$!%*?&#._-)', test: p => RE_SPECIAL.test(p) },
 ];
 
 // Render feedback con deslizamiento

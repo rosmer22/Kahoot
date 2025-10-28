@@ -17,10 +17,8 @@
 -- 3. Ejecutar este script completo
 --
 -- =====================================================
-CREATE DATABASE IF NOT EXISTS `robot` CHARACTER SET utf8 COLLATE utf8_general_ci;
-USE `robot`;
-SET NAMES utf8;
-SET FOREIGN_KEY_CHECKS = 0;
+
+SET FOREIGN_KEY_CHECKS=0;
 
 -- =====================================================
 -- TABLA: users

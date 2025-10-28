@@ -126,42 +126,9 @@
 </section>
 
 <script>
-// Función para iniciar cuestionario individual con sistema de sala
-async function startIndividualQuiz(quizId) {
-  const btn = document.getElementById('startQuizBtn');
-  btn.classList.add('loading');
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-  btn.disabled = true;
-
-  try {
-    const response = await fetch('/api/individual/iniciar-cuestionario', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        cuestionario_id: quizId
-      })
-    });
-
-    const result = await response.json();
-
-    if (result.success) {
-      // Redirigir a la sala de espera con el sesion_id
-      window.location.href = `/individual/quiz/${result.sesion_id}`;
-    } else {
-      alert('Error al iniciar el cuestionario: ' + (result.message || 'Error desconocido'));
-      btn.classList.remove('loading');
-      btn.innerHTML = '<i class="fas fa-play"></i> Iniciar ahora';
-      btn.disabled = false;
-    }
-  } catch (error) {
-    console.error('Error:', error);
-    alert('Error al iniciar el cuestionario. Por favor, intenta de nuevo.');
-    btn.classList.remove('loading');
-    btn.innerHTML = '<i class="fas fa-play"></i> Iniciar ahora';
-    btn.disabled = false;
-  }
+// Iniciar en modo grupal (mismo flujo que grupos)
+function startIndividualQuiz(quizId) {
+  window.location.href = `/lobby/${quizId}?modo=grupal`;
 }
 </script>
 {% endblock %}

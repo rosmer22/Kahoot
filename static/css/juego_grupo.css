@@ -295,6 +295,10 @@ body {
     color: var(--color-warning);
 }
 
+.transition-icon.info {
+    color: var(--color-primary);
+}
+
 #transitionTitle {
     font-size: 3rem;
     font-weight: 700;

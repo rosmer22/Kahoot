@@ -36,7 +36,7 @@
                     </div>
                     <span class="member-name">{{ miembro.username }}</span>
                     <div class="member-status">
-                        <span class="status-indicator {% if miembro.esta_listo %}ready{% else %}waiting{% endif %}"></span>
+                        <span class="status-indicator ready"></span>
                     </div>
                 </div>
                 {% endfor %}
@@ -52,14 +52,23 @@
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <h2>Esperando a que todos estén listos</h2>
-                <p>El cuestionario comenzará cuando todos los miembros estén preparados</p>
+                <h2 id="waitingTitle">Esperando a que el creador inicie el juego</h2>
+                <p id="waitingSubtitle">El cuestionario comenzará pronto</p>
+                
+                <!-- Mensaje del creador -->
+                <div class="creator-message" id="creatorMessage" style="display: none;">
+                    <div class="creator-icon">👑</div>
+                    <p>Eres el creador de la sala</p>
+                    <p class="creator-subtitle">Haz clic en "Empezar Juego" cuando estés listo</p>
+                </div>
+                
                 <div class="ready-button">
-                    <button class="btn-ready" id="readyBtn">
+                    <!-- Botón de Empezar Juego solo para el creador -->
+                    <button class="btn-start-game" id="startGameBtn" style="display: none;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
                         </svg>
-                        Estoy Listo
+                        Empezar Juego
                     </button>
                 </div>
             </div>
@@ -143,10 +152,10 @@
    ========================= */
 const sesionId = {{ sesion_id }};
 const userId = {{ g.user.id if g.user else 0 }};
+const esCreador = {{ es_creador | tojson }};
 let currentQuestion = 0;
 let questions = [];
 let userAnswers = [];
-let isReady = false;
 let questionTimer = null;
 let gameStarted = false; // evita iniciar dos veces
 
@@ -155,9 +164,10 @@ const statusWaiting = document.getElementById('statusWaiting');
 const statusStarting = document.getElementById('statusStarting');
 const statusActive   = document.getElementById('statusActive');
 const questionContainer = document.getElementById('questionContainer');
-const readyBtn     = document.getElementById('readyBtn');
+const startGameBtn = document.getElementById('startGameBtn');
 const membersList  = document.getElementById('membersList');
 const confirmModal = document.getElementById('confirmModal');
+const creatorMessage = document.getElementById('creatorMessage');
 
 /* =========================
    Inicialización
@@ -166,6 +176,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initializeQuiz();
   setupEventListeners();
   startPolling();
+  setupCreatorInterface();
 });
 
 function initializeQuiz() {
@@ -173,11 +184,30 @@ function initializeQuiz() {
   questions = JSON.parse({{ preguntas_json | tojson }});
 }
 
+function setupCreatorInterface() {
+  const waitingTitle = document.getElementById('waitingTitle');
+  const waitingSubtitle = document.getElementById('waitingSubtitle');
+  
+  if (esCreador) {
+    // Si es el creador, mostrar botón de empezar juego y mensaje
+    if (startGameBtn) startGameBtn.style.display = 'block';
+    if (creatorMessage) creatorMessage.style.display = 'block';
+    if (waitingTitle) waitingTitle.textContent = 'Sala creada exitosamente';
+    if (waitingSubtitle) waitingSubtitle.textContent = 'Cuando estés listo, haz clic en "Empezar Juego"';
+  } else {
+    // Si no es el creador, solo mostrar mensaje de espera
+    if (startGameBtn) startGameBtn.style.display = 'none';
+    if (creatorMessage) creatorMessage.style.display = 'none';
+    if (waitingTitle) waitingTitle.textContent = 'Esperando a que el creador inicie el juego';
+    if (waitingSubtitle) waitingSubtitle.textContent = 'El cuestionario comenzará pronto';
+  }
+}
+
 /* =========================
    Eventos
    ========================= */
 function setupEventListeners() {
-  if (readyBtn) readyBtn.addEventListener('click', toggleReady);
+  if (startGameBtn) startGameBtn.addEventListener('click', startGame);
 
   // Selección de respuesta (delegado)
   document.addEventListener('click', function (e) {
@@ -189,51 +219,46 @@ function setupEventListeners() {
 }
 
 /* =========================
-   Estado "Listo" (Ready)
+   Función para el Creador
    ========================= */
-function toggleReady() {
-  isReady = !isReady;
-  toggleReadyVisuals(); // <-- Llama a la función que actualiza la UI inmediatamente
-
-  sendReadyStatus(isReady);
-}
-
-function sendReadyStatus(ready) {
-  fetch('/api/grupo/ready', {
+function startGame() {
+  if (!esCreador) return;
+  
+  // El creador puede iniciar el juego con los que estén listos
+  fetch('/api/grupo/start-game', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      sesion_id: sesionId,
-      user_id: userId,
-      ready: ready
+      sesion_id: sesionId
     })
   })
-    .then((r) => r.json())
-    .then((data) => {
-      if (!data.success) {
-        // Si falla, revertir el estado visual del botón
-        isReady = !isReady;
-        toggleReadyVisuals();
-        return;
-      }
-      if (data.members) updateMembersStatus(data.members);
-
-      // Si el servidor detectó que TODOS están listos, arrancamos ya
-      if (data.all_ready && !gameStarted) {
+  .then((r) => r.json())
+  .then((data) => {
+    if (data.success) {
+      if (!gameStarted) {
         gameStarted = true;
         startQuiz();
       }
-    })
-    .catch(() => {});
+    } else {
+      alert(data.message || 'Error al iniciar el juego');
+    }
+  })
+  .catch(() => {
+    alert('Error de conexión al iniciar el juego');
+  });
 }
 
+/* =========================
+   Actualizar Lista de Miembros
+   ========================= */
 function updateMembersStatus(members) {
   members.forEach((member) => {
     const memberEl = membersList.querySelector(`.member-item[data-user-id="${member.id}"]`);
     if (memberEl) {
       const indicator = memberEl.querySelector('.status-indicator');
-      indicator.classList.remove('ready', 'waiting');
-      indicator.classList.add(member.ready ? 'ready' : 'waiting');
+      // Ya no se usa el estado "listo", solo mostrar como conectados
+      indicator.classList.remove('waiting');
+      indicator.classList.add('ready');
     }
   });
 }
@@ -561,18 +586,6 @@ function updateQuizStatus(status) {
     return true; // El juego ha finalizado, detener polling
   }
   return false;
-}
-
-function toggleReadyVisuals() {
-    const indicator = membersList.querySelector(`.member-item[data-user-id="${userId}"] .status-indicator`);
-    if (isReady) {
-        readyBtn.classList.add('ready');
-        readyBtn.querySelector('svg').style.display = 'inline';
-        if (indicator) indicator.classList.replace('waiting', 'ready');
-    } else {
-        readyBtn.classList.remove('ready');
-        if (indicator) indicator.classList.replace('ready', 'waiting');
-    }
 }
 
 // Función para copiar el código de sesión
