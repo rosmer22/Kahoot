@@ -736,12 +736,52 @@ def mis_puntos():
         flash('Debes iniciar sesión para ver tus puntos', 'warning')
         return redirect(url_for('login'))
     
+    # Verificar si el usuario es docente
+    es_docente = g.user.get('role') == 'docente'
+    
     db = None
     cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
         
+        # Si es docente, mostrar ranking de todos los alumnos
+        if es_docente:
+            cursor.execute("""
+                SELECT 
+                    u.id,
+                    u.username,
+                    u.email,
+                    u.puntosmoneda,
+                    r.nombre as rango_nombre,
+                    r.icono as rango_icono,
+                    r.color as rango_color
+                FROM users u
+                LEFT JOIN rangos r ON u.puntosmoneda >= r.puntos_minimos 
+                                   AND u.puntosmoneda <= r.puntos_maximos
+                WHERE u.role = 'alumno'
+                ORDER BY u.puntosmoneda DESC
+            """)
+            
+            ranking_alumnos = cursor.fetchall()
+            
+            # Calcular puntos totales de todos los alumnos
+            cursor.execute("""
+                SELECT SUM(puntosmoneda) as total_puntos
+                FROM users
+                WHERE role = 'alumno'
+            """)
+            
+            total_result = cursor.fetchone()
+            total_puntos_alumnos = total_result['total_puntos'] if total_result else 0
+            
+            return render_template('mis_puntos.html', 
+                                 title='Ranking de Alumnos',
+                                 es_docente=True,
+                                 ranking_alumnos=ranking_alumnos,
+                                 total_puntos_alumnos=total_puntos_alumnos)
+        
+        # Si es alumno, mostrar sus puntos individuales
         # Obtener información del usuario con su rango
         cursor.execute("""
             SELECT 
@@ -829,6 +869,7 @@ def mis_puntos():
         
         return render_template('mis_puntos.html', 
                              title='Mis Puntos',
+                             es_docente=False,
                              usuario_info=usuario_info,
                              todos_rangos=todos_rangos,
                              historial=historial,
@@ -1257,6 +1298,15 @@ def join_quiz():
 
 @app.route('/editor')
 def editor():
+    # Verificar que solo los docentes puedan acceder
+    if g.user is None:
+        flash('Debes iniciar sesión para acceder al editor', 'warning')
+        return redirect(url_for('login'))
+    
+    if g.user.get('role') != 'docente':
+        flash('Solo los docentes pueden crear cuestionarios', 'error')
+        return redirect(url_for('home'))
+    
     return render_template('editor.html', title='Editor', creating_quiz=True)
 
 
@@ -1347,7 +1397,13 @@ def quiz_details(cuestionario_id):
 def editor_edit(cuestionario_id):
     """Editar un cuestionario existente"""
     if g.user is None:
+        flash('Debes iniciar sesión para editar cuestionarios', 'warning')
         return redirect(url_for('login'))
+    
+    # Verificar que solo los docentes puedan editar cuestionarios
+    if g.user.get('role') != 'docente':
+        flash('Solo los docentes pueden editar cuestionarios', 'error')
+        return redirect(url_for('home'))
 
     db = bd.obtener_conexion()
     response = quiz_controller.obtener_cuestionario(db, cuestionario_id)
@@ -1370,6 +1426,10 @@ def crear_cuestionario():
     """Crear un nuevo cuestionario"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
+    
+    # Verificar que solo los docentes puedan crear cuestionarios
+    if g.user.get('role') != 'docente':
+        return jsonify({'error': 'Solo los docentes pueden crear cuestionarios'}), 403
 
     try:
         data = {}
@@ -1407,6 +1467,10 @@ def actualizar_cuestionario(cuestionario_id):
     """Actualizar un cuestionario existente"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
+    
+    # Verificar que solo los docentes puedan actualizar cuestionarios
+    if g.user.get('role') != 'docente':
+        return jsonify({'error': 'Solo los docentes pueden actualizar cuestionarios'}), 403
 
     try:
         data = {}
@@ -1726,6 +1790,10 @@ def api_crear_grupo():
     """API para crear un nuevo grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    # Verificar que solo los docentes puedan crear grupos/salas
+    if g.user.get('role') != 'docente':
+        return jsonify({'success': False, 'message': 'Solo los docentes pueden crear salas'}), 403
 
     data = request.get_json()
     nombre = data.get('nombre', '').strip()
@@ -2649,6 +2717,117 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
         })
 
     except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+@app.route('/api/grupo/timer-sync/<int:sesion_id>', methods=['GET'])
+def api_grupo_timer_sync(sesion_id):
+    """API para sincronizar el timer entre todos los jugadores"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    db = None
+    cursor = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Obtener información del timer actual de la sesión
+        cursor.execute("""
+            SELECT 
+                pregunta_actual_id,
+                pregunta_inicio_time,
+                pregunta_tiempo_limite
+            FROM sesiones_grupo
+            WHERE id = %s
+        """, (sesion_id,))
+        
+        sesion_info = cursor.fetchone()
+        
+        if not sesion_info or not sesion_info['pregunta_inicio_time']:
+            return jsonify({
+                'success': False,
+                'message': 'No hay pregunta activa',
+                'tiempo_restante': 0
+            })
+        
+        # Calcular tiempo transcurrido
+        from datetime import datetime
+        inicio = sesion_info['pregunta_inicio_time']
+        ahora = datetime.now()
+        tiempo_transcurrido = (ahora - inicio).total_seconds()
+        tiempo_limite = sesion_info['pregunta_tiempo_limite'] or 30
+        tiempo_restante = max(0, int(tiempo_limite - tiempo_transcurrido))
+        
+        return jsonify({
+            'success': True,
+            'tiempo_restante': tiempo_restante,
+            'pregunta_id': sesion_info['pregunta_actual_id'],
+            'tiempo_limite': tiempo_limite
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+@app.route('/api/grupo/set-pregunta-actual', methods=['POST'])
+def api_grupo_set_pregunta_actual():
+    """API para que el docente establezca la pregunta actual (inicia el timer compartido)"""
+    if not g.user:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    sesion_id = data.get('sesion_id')
+    pregunta_id = data.get('pregunta_id')
+    tiempo_limite = data.get('tiempo_limite', 30)
+    
+    db = None
+    cursor = None
+    try:
+        db = bd.obtener_conexion()
+        cursor = db.cursor()
+        
+        # Verificar que el usuario es el creador de la sesión
+        cursor.execute("""
+            SELECT iniciado_por
+            FROM sesiones_grupo
+            WHERE id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        if not sesion or sesion['iniciado_por'] != g.user['id']:
+            return jsonify({'success': False, 'message': 'No autorizado - solo el creador puede controlar el timer'}), 403
+        
+        # Actualizar la pregunta actual y el timestamp de inicio
+        from datetime import datetime
+        cursor.execute("""
+            UPDATE sesiones_grupo
+            SET pregunta_actual_id = %s,
+                pregunta_inicio_time = %s,
+                pregunta_tiempo_limite = %s
+            WHERE id = %s
+        """, (pregunta_id, datetime.now(), tiempo_limite, sesion_id))
+        
+        db.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Timer sincronizado iniciado'
+        })
+        
+    except Exception as e:
+        if db:
+            db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
     
     finally:

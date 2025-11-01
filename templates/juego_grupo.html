@@ -120,7 +120,7 @@
 
             <div class="waiting-message" id="waitingMessage" style="display: none;">
                 <div class="spinner"></div>
-                <p>Esperando a que todos respondan...</p>
+                <p>Esperando siguiente pregunta...</p>
                 <p class="waiting-count" id="waitingCount">0/0 han respondido</p>
             </div>
             
@@ -170,6 +170,7 @@ let hasAnswered = false;
 let selectedAnswer = null;
 let questionStartTime = null;
 let checkAnswersInterval = null;
+let timerSyncInterval = null; // Para sincronizar el timer con el servidor
 
 // Elementos DOM
 const questionText = document.getElementById('questionText');
@@ -233,7 +234,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // ==========================================
 // Función Principal: Mostrar Pregunta
 // ==========================================
-function showQuestion(index) {
+async function showQuestion(index) {
     if (index >= questions.length) {
         // Juego terminado
         finishGame();
@@ -285,8 +286,14 @@ function showQuestion(index) {
         answersGrid.appendChild(answerBtn);
     });
 
-    // Iniciar temporizador
+    // Iniciar temporizador sincronizado
     timeLeft = currentQuestion.time_limit || 30;
+    
+    // Si es el creador, registrar el inicio de la pregunta en el servidor
+    if (esCreador) {
+        await registrarInicioPregunta(currentQuestion.id, timeLeft);
+    }
+    
     startTimer();
 
     // Si es el creador, empezar a verificar inmediatamente si todos respondieron
@@ -301,6 +308,50 @@ function showQuestion(index) {
 }
 
 // ==========================================
+// Registrar Inicio de Pregunta (solo creador)
+// ==========================================
+async function registrarInicioPregunta(preguntaId, tiempoLimite) {
+    if (!esCreador) return;
+    
+    try {
+        await fetch('/api/grupo/set-pregunta-actual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sesion_id: sesionId,
+                pregunta_id: preguntaId,
+                tiempo_limite: tiempoLimite
+            })
+        });
+        console.log('⏰ Timer sincronizado iniciado en servidor');
+    } catch (error) {
+        console.error('Error al registrar inicio de pregunta:', error);
+    }
+}
+
+// ==========================================
+// Sincronización del Timer con Servidor
+// ==========================================
+async function syncTimerWithServer() {
+    try {
+        const response = await fetch(`/api/grupo/timer-sync/${sesionId}`);
+        const result = await response.json();
+        
+        if (result.success && result.pregunta_id === currentQuestion.id) {
+            // Solo actualizar si la diferencia es mayor a 2 segundos (evita saltos menores)
+            const diferencia = Math.abs(timeLeft - result.tiempo_restante);
+            
+            if (diferencia > 2) {
+                timeLeft = result.tiempo_restante;
+                console.log(`🔄 Timer re-sincronizado (diferencia: ${diferencia}s): ${timeLeft}s restantes`);
+            }
+        }
+    } catch (error) {
+        console.error('Error al sincronizar timer:', error);
+    }
+}
+
+// ==========================================
 // Temporizador
 // ==========================================
 function startTimer() {
@@ -312,6 +363,12 @@ function startTimer() {
     timerProgress.style.strokeDashoffset = 0;
 
     if (timerInterval) clearInterval(timerInterval);
+    if (timerSyncInterval) clearInterval(timerSyncInterval);
+
+    // Sincronizar con el servidor cada 2 segundos
+    timerSyncInterval = setInterval(() => {
+        syncTimerWithServer();
+    }, 2000);
 
     timerInterval = setInterval(() => {
         timeLeft--;
@@ -329,15 +386,17 @@ function startTimer() {
 
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
+            clearInterval(timerSyncInterval);
             if (!hasAnswered) {
                 // Tiempo agotado sin responder
                 handleTimeOut();
-            } else {
-                // Tiempo agotado pero ya respondió, verificar si puede proceder
-                setTimeout(() => {
-                    checkIfCanProceed();
-                }, 1000);
             }
+            // Cuando el tiempo se agota, avanzar a la siguiente pregunta
+            // (solo el tiempo del anfitrión controla el avance)
+            clearInterval(checkAnswersInterval);
+            setTimeout(() => {
+                showTransition(); // Avanzar por tiempo agotado
+            }, 1000);
         }
     }, 1000);
 }
@@ -346,6 +405,10 @@ function stopTimer() {
     if (timerInterval) {
         clearInterval(timerInterval);
         timerInterval = null;
+    }
+    if (timerSyncInterval) {
+        clearInterval(timerSyncInterval);
+        timerSyncInterval = null;
     }
 }
 
@@ -363,7 +426,7 @@ function selectAnswer(optionId, btnElement) {
 
     hasAnswered = true;
     selectedAnswer = optionId;
-    stopTimer();
+    // NO detenemos el timer - debe seguir corriendo hasta que se acabe
 
     // Calcular tiempo de respuesta
     const timeToAnswer = Math.floor((Date.now() - questionStartTime) / 1000);
@@ -381,8 +444,10 @@ function selectAnswer(optionId, btnElement) {
     // Mostrar mensaje de espera
     waitingMessage.style.display = 'block';
     
-    // Iniciar polling para verificar si todos respondieron
+    // Iniciar polling para actualizar el contador de respuestas
     startCheckingAnswers();
+    
+    console.log('✅ Respuesta registrada. Esperando a que se acabe el tiempo...');
 }
 
 // ==========================================
@@ -439,10 +504,9 @@ function handleTimeOut() {
 
     // Mostrar mensaje de espera
     waitingMessage.style.display = 'block';
-    waitingCount.textContent = 'Tiempo agotado. Esperando a otros jugadores...';
+    waitingCount.textContent = 'Tiempo agotado. Esperando...';
     
-    // Iniciar polling para verificar si todos respondieron
-    startCheckingAnswers();
+    // Ya no iniciamos polling aquí porque solo avanzamos por tiempo
 }
 
 // Enviar respuesta de timeout
@@ -480,7 +544,7 @@ async function sendTimeoutAnswer(questionId) {
 }
 
 // ==========================================
-// Polling: Verificar si todos respondieron O se agotó el tiempo
+// Polling: Actualizar contador de jugadores que han respondido
 // ==========================================
 function startCheckingAnswers() {
     if (checkAnswersInterval) clearInterval(checkAnswersInterval);
@@ -502,12 +566,8 @@ async function checkIfCanProceed() {
             // Actualizar contador
             waitingCount.textContent = `${result.answered}/${result.total} han respondido`;
 
-            // Si todos respondieron, pasar a siguiente pregunta
-            if (result.all_answered) {
-                clearInterval(checkAnswersInterval);
-                stopTimer();
-                showTransition(true); // true indica que todos respondieron
-            }
+            // NOTA: Ya no se avanza cuando todos responden
+            // Solo se avanza cuando se acaba el tiempo del anfitrión
         }
     } catch (error) {
         console.error('Error al verificar estado:', error);
@@ -517,7 +577,7 @@ async function checkIfCanProceed() {
 // ==========================================
 // Pantalla de Transición
 // ==========================================
-function showTransition(allAnswered = false) {
+function showTransition() {
     questionSection.style.display = 'none';
     transitionScreen.style.display = 'flex';
 
@@ -525,31 +585,18 @@ function showTransition(allAnswered = false) {
     const title = document.getElementById('transitionTitle');
     const points = document.getElementById('transitionPoints');
 
-    // Si todos respondieron antes del timeout, mostrar mensaje especial
-    if (allAnswered && !esCreador && currentQuestion.userResult) {
+    // Mostrar resultado según si el jugador respondió o no
+    if (currentQuestion.userResult && !esCreador) {
         if (currentQuestion.userResult.correct) {
             icon.textContent = '✓';
             icon.className = 'transition-icon correct';
             title.textContent = '¡Correcta!';
             points.textContent = `+${currentQuestion.userResult.points} puntos`;
         } else if (currentQuestion.userResult.timeout) {
-            // Timeout pero todos respondieron
-            icon.textContent = '👥';
-            icon.className = 'transition-icon info';
-            title.textContent = 'Todos respondieron';
-            points.textContent = 'Pasando a la siguiente pregunta';
-        } else {
-            icon.textContent = '✗';
-            icon.className = 'transition-icon incorrect';
-            title.textContent = 'Incorrecta';
+            icon.textContent = '⏱';
+            icon.className = 'transition-icon timeout';
+            title.textContent = 'Tiempo agotado';
             points.textContent = '0 puntos';
-        }
-    } else if (currentQuestion.userResult) {
-        if (currentQuestion.userResult.correct) {
-            icon.textContent = '✓';
-            icon.className = 'transition-icon correct';
-            title.textContent = '¡Correcta!';
-            points.textContent = `+${currentQuestion.userResult.points} puntos`;
         } else {
             icon.textContent = '✗';
             icon.className = 'transition-icon incorrect';
@@ -558,17 +605,10 @@ function showTransition(allAnswered = false) {
         }
     } else {
         // Sin respuesta o creador
-        if (allAnswered) {
-            icon.textContent = '👥';
-            icon.className = 'transition-icon info';
-            title.textContent = 'Todos respondieron';
-            points.textContent = 'Pasando a la siguiente pregunta';
-        } else {
-            icon.textContent = '⏱';
-            icon.className = 'transition-icon timeout';
-            title.textContent = 'Tiempo agotado';
-            points.textContent = '0 puntos';
-        }
+        icon.textContent = '⏱';
+        icon.className = 'transition-icon timeout';
+        title.textContent = 'Tiempo agotado';
+        points.textContent = esCreador ? 'Siguiente pregunta...' : '0 puntos';
     }
 
     // Después de 3 segundos, mostrar siguiente pregunta

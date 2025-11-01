@@ -5,9 +5,18 @@ import psycopg2
 
 def insertar_usuario(username, email, password):
     conexion = obtener_conexion()
+    
+    # Determinar el rol según el dominio del email
+    if email.endswith('@usat.edu.pe'):
+        role = 'docente'
+    elif email.endswith('@usat.pe'):
+        role = 'alumno'
+    else:
+        role = 'usuario'  # Por si acaso hay otros dominios
+    
     with conexion.cursor() as cursor:
-        cursor.execute("INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-                       (username, email, generate_password_hash(password)))
+        cursor.execute("INSERT INTO users (username, email, password, role) VALUES (%s, %s, %s, %s)",
+                       (username, email, generate_password_hash(password), role))
     conexion.commit()
     conexion.close()
 

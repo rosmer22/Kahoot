@@ -311,6 +311,73 @@
 </style>
 
 <div class="puntos-container">
+    {% if es_docente %}
+    <!-- Vista para docentes: Ranking de todos los alumnos -->
+    <div class="puntos-header">
+        <h1>👨‍🏫 Ranking de Alumnos</h1>
+        <p>Puntuación total de todos los alumnos</p>
+    </div>
+    
+    <div class="puntos-card">
+        <div class="puntos-main">
+            <div class="puntos-display">
+                <div class="puntos-numero">{{ total_puntos_alumnos or 0 }}</div>
+                <div class="puntos-label">Puntos Totales de Alumnos</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="historial-section">
+        <h2>📊 Ranking General de Alumnos</h2>
+        {% if ranking_alumnos %}
+        <div class="historial-tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Posición</th>
+                        <th>Alumno</th>
+                        <th>Email</th>
+                        <th>Rango</th>
+                        <th>Puntosmoneda</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alumno in ranking_alumnos %}
+                    <tr>
+                        <td>
+                            {% if loop.index == 1 %}
+                                <span class="medalla">🥇</span> {{ loop.index }}
+                            {% elif loop.index == 2 %}
+                                <span class="medalla">🥈</span> {{ loop.index }}
+                            {% elif loop.index == 3 %}
+                                <span class="medalla">🥉</span> {{ loop.index }}
+                            {% else %}
+                                {{ loop.index }}
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ alumno.username }}</strong></td>
+                        <td>{{ alumno.email }}</td>
+                        <td>
+                            <span style="color: {{ alumno.rango_color }}">
+                                {{ alumno.rango_icono }} {{ alumno.rango_nombre or 'Sin rango' }}
+                            </span>
+                        </td>
+                        <td class="puntos-ganados">{{ alumno.puntosmoneda }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <p>Aún no hay alumnos registrados</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% else %}
+    <!-- Vista para alumnos: Sus puntos individuales -->
     <div class="puntos-header">
         <h1>🪙 Mis Puntos y Rango</h1>
         <p>Sigue jugando para subir de rango y desbloquear logros</p>
@@ -431,6 +498,7 @@
         </div>
         {% endif %}
     </div>
+    {% endif %}
     {% endif %}
 </div>
 {% endblock %}
