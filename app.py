@@ -490,7 +490,16 @@ def handle_exception(e):
 
 @app.route('/empezar', methods=['GET'])
 def empezar():
-     return render_template('empezar.html', title='Empezar')
+    if not g.user:
+        flash('Debes iniciar sesión para empezar un cuestionario', 'warning')
+        return redirect(url_for('login'))
+    
+    # Solo docentes pueden empezar cuestionarios
+    if g.user.get('role') != 'docente':
+        flash('Solo los docentes pueden empezar cuestionarios', 'error')
+        return redirect(url_for('home'))
+    
+    return render_template('empezar.html', title='Empezar')
 
 
 
@@ -944,6 +953,11 @@ def change_password():
 def my_quizzes():
     if g.user is None:
         return redirect(url_for('login'))
+    
+    # Solo docentes pueden ver cuestionarios
+    if g.user.get('role') != 'docente':
+        flash('Solo los docentes pueden acceder a los cuestionarios', 'error')
+        return redirect(url_for('home'))
 
     db = bd.obtener_conexion()
     created = quiz_controller.listar_cuestionarios_usuario(db, g.user['id'])
@@ -960,6 +974,11 @@ def lobby(cuestionario_id):
     if not g.user:
         flash('Debes iniciar sesión para acceder a esta página.', 'warning')
         return redirect(url_for('login'))
+    
+    # Solo docentes pueden iniciar sesiones
+    if g.user.get('role') != 'docente':
+        flash('Solo los docentes pueden iniciar sesiones de cuestionarios', 'error')
+        return redirect(url_for('home'))
 
     modo = request.args.get('modo', 'individual')
 
@@ -1248,6 +1267,15 @@ def api_responder_pregunta():
 @app.route('/explore')
 def explore():
     """Explorar cuestionarios públicos (versión que consulta BD)."""
+    if not g.user:
+        flash('Debes iniciar sesión para explorar cuestionarios', 'warning')
+        return redirect(url_for('login'))
+    
+    # Solo docentes pueden explorar cuestionarios
+    if g.user.get('role') != 'docente':
+        flash('Solo los docentes pueden explorar cuestionarios', 'error')
+        return redirect(url_for('home'))
+    
     search_query = request.args.get('q', '').strip()
 
     db = bd.obtener_conexion()
@@ -1313,6 +1341,15 @@ def editor():
 @app.route('/quiz/<int:cuestionario_id>')
 def quiz_details(cuestionario_id):
     """Ver detalles de un cuestionario público o del usuario actual"""
+    if not g.user:
+        flash('Debes iniciar sesión para ver cuestionarios', 'warning')
+        return redirect(url_for('login'))
+    
+    # Solo docentes pueden ver detalles de cuestionarios
+    if g.user.get('role') != 'docente':
+        flash('Solo los docentes pueden ver cuestionarios', 'error')
+        return redirect(url_for('home'))
+    
     db = bd.obtener_conexion()
     cursor = db.cursor()
 
@@ -1400,7 +1437,7 @@ def editor_edit(cuestionario_id):
         flash('Debes iniciar sesión para editar cuestionarios', 'warning')
         return redirect(url_for('login'))
     
-    # Verificar que solo los docentes puedan editar cuestionarios
+    # Solo docentes pueden editar cuestionarios
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden editar cuestionarios', 'error')
         return redirect(url_for('home'))
@@ -1510,6 +1547,10 @@ def obtener_cuestionario(cuestionario_id):
     """Obtener un cuestionario con todas sus preguntas"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
+    
+    # Solo docentes pueden obtener cuestionarios
+    if g.user.get('role') != 'docente':
+        return jsonify({'error': 'Solo los docentes pueden obtener cuestionarios'}), 403
 
     db = bd.obtener_conexion()
     response = quiz_controller.obtener_cuestionario(db, cuestionario_id)
@@ -1522,6 +1563,10 @@ def eliminar_cuestionario(cuestionario_id):
     """Eliminar un cuestionario"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
+    
+    # Solo docentes pueden eliminar cuestionarios
+    if g.user.get('role') != 'docente':
+        return jsonify({'error': 'Solo los docentes pueden eliminar cuestionarios'}), 403
 
     db = bd.obtener_conexion()
     response = quiz_controller.eliminar_cuestionario(db, cuestionario_id)
@@ -1534,6 +1579,10 @@ def importar_preguntas_excel():
     """Importar preguntas desde un archivo Excel"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
+    
+    # Solo docentes pueden importar preguntas
+    if g.user.get('role') != 'docente':
+        return jsonify({'error': 'Solo los docentes pueden importar preguntas'}), 403
 
     try:
         # Verificar que se haya enviado un archivo
@@ -1932,6 +1981,10 @@ def api_grupos_cuestionarios():
     """API para obtener cuestionarios disponibles para grupos"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    # Solo docentes pueden obtener cuestionarios
+    if g.user.get('role') != 'docente':
+        return jsonify({'success': False, 'message': 'Solo los docentes pueden acceder a cuestionarios'}), 403
 
     try:
         db = bd.obtener_conexion()
@@ -1965,6 +2018,10 @@ def api_iniciar_cuestionario_grupo():
     """API para iniciar un cuestionario en grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    # Solo docentes pueden iniciar cuestionarios en grupo
+    if g.user.get('role') != 'docente':
+        return jsonify({'success': False, 'message': 'Solo los docentes pueden iniciar cuestionarios'}), 403
 
     data = request.get_json()
     grupo_id = data.get('grupo_id')
@@ -2623,7 +2680,7 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
 
 @app.route('/api/grupo/obtener-pregunta-actual/<int:sesion_id>')
 def api_grupo_obtener_pregunta_actual(sesion_id):
-    """API para obtener el índice de la pregunta actual del usuario"""
+    """API para obtener el índice de la pregunta actual del usuario o del host"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
@@ -2633,7 +2690,48 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
         db = bd.obtener_conexion()
         cursor = db.cursor()
 
-        # Verificar si el usuario está en la sesión
+        # Primero verificar la información de la sesión
+        cursor.execute("""
+            SELECT sg.cuestionario_id, sg.iniciado_por, sg.pregunta_actual_id
+            FROM sesiones_grupo sg
+            WHERE sg.id = %s
+        """, (sesion_id,))
+        
+        sesion = cursor.fetchone()
+        if not sesion:
+            return jsonify({'success': False, 'message': 'Sesión no encontrada'})
+        
+        # Obtener todas las preguntas ordenadas
+        cursor.execute("""
+            SELECT id
+            FROM preguntas
+            WHERE cuestionario_id = %s
+            ORDER BY orden ASC
+        """, (sesion['cuestionario_id'],))
+        
+        preguntas = cursor.fetchall()
+        
+        # Si es el creador (host), usar pregunta_actual_id de sesiones_grupo
+        if sesion['iniciado_por'] == g.user['id']:
+            if sesion['pregunta_actual_id'] is not None:
+                # Buscar el índice de la pregunta actual
+                for idx, pregunta in enumerate(preguntas):
+                    if pregunta['id'] == sesion['pregunta_actual_id']:
+                        return jsonify({
+                            'success': True,
+                            'pregunta_id': sesion['pregunta_actual_id'],
+                            'pregunta_index': idx,
+                            'total_preguntas': len(preguntas)
+                        })
+            # Si no hay pregunta actual, empezar desde 0
+            return jsonify({
+                'success': True,
+                'pregunta_id': None,
+                'pregunta_index': 0,
+                'total_preguntas': len(preguntas)
+            })
+        
+        # Para estudiantes: Verificar si el usuario está en la sesión
         cursor.execute("""
             SELECT pregunta_actual 
             FROM usuario_estado_grupo 
@@ -2643,76 +2741,71 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
         resultado = cursor.fetchone()
         
         if not resultado:
+            # Usuario no registrado, empezar desde 0
             return jsonify({
-                'success': False,
-                'message': 'Usuario no encontrado en la sesión',
+                'success': True,
                 'pregunta_id': None,
-                'pregunta_index': 0
+                'pregunta_index': 0,
+                'total_preguntas': len(preguntas)
             })
         
-        # Si no tiene pregunta actual guardada, buscar la última pregunta respondida
-        if resultado['pregunta_actual'] is None:
-            # Buscar la última pregunta que respondió
-            cursor.execute("""
-                SELECT pregunta_id, MAX(created_at) as ultima_respuesta
-                FROM respuestas_grupo
-                WHERE sesion_id = %s AND user_id = %s
-                GROUP BY pregunta_id
-                ORDER BY ultima_respuesta DESC
-                LIMIT 1
-            """, (sesion_id, g.user['id']))
-            
-            ultima_respuesta = cursor.fetchone()
-            
-            if not ultima_respuesta:
-                # No ha respondido nada, empezar desde 0
-                return jsonify({
-                    'success': True,
-                    'pregunta_id': None,
-                    'pregunta_index': 0
-                })
-            
-            pregunta_id_actual = ultima_respuesta['pregunta_id']
-        else:
+        # CORRECCIÓN: Usar pregunta_actual_id de sesiones_grupo para sincronizar todos
+        # Esto asegura que todos los usuarios estén en la misma pregunta que el host
+        if sesion['pregunta_actual_id'] is not None:
+            # Buscar el índice de la pregunta actual de la sesión
+            for idx, pregunta in enumerate(preguntas):
+                if pregunta['id'] == sesion['pregunta_actual_id']:
+                    return jsonify({
+                        'success': True,
+                        'pregunta_id': sesion['pregunta_actual_id'],
+                        'pregunta_index': idx,
+                        'total_preguntas': len(preguntas)
+                    })
+        
+        # Si no hay pregunta actual en la sesión, buscar la última pregunta del usuario
+        if resultado['pregunta_actual'] is not None:
             pregunta_id_actual = resultado['pregunta_actual']
+            # Buscar el índice de esta pregunta
+            for idx, pregunta in enumerate(preguntas):
+                if pregunta['id'] == pregunta_id_actual:
+                    # CORRECCIÓN: NO avanzar automáticamente a la siguiente
+                    # El usuario debe quedarse en la pregunta actual hasta que termine el tiempo
+                    return jsonify({
+                        'success': True,
+                        'pregunta_id': pregunta_id_actual,
+                        'pregunta_index': idx,
+                        'total_preguntas': len(preguntas)
+                    })
         
-        # Obtener el cuestionario de la sesión
+        # Buscar la última pregunta que respondió
         cursor.execute("""
-            SELECT sg.cuestionario_id
-            FROM sesiones_grupo sg
-            WHERE sg.id = %s
-        """, (sesion_id,))
+            SELECT pregunta_id
+            FROM respuestas_grupo
+            WHERE sesion_id = %s AND user_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (sesion_id, g.user['id']))
         
-        sesion = cursor.fetchone()
-        if not sesion:
-            return jsonify({'success': False, 'message': 'Sesión no encontrada'})
+        ultima_respuesta = cursor.fetchone()
         
-        # Obtener todas las preguntas ordenadas para encontrar el índice
-        cursor.execute("""
-            SELECT id
-            FROM preguntas
-            WHERE cuestionario_id = %s
-            ORDER BY orden ASC
-        """, (sesion['cuestionario_id'],))
+        if ultima_respuesta:
+            pregunta_id_actual = ultima_respuesta['pregunta_id']
+            # Buscar el índice de esta pregunta
+            for idx, pregunta in enumerate(preguntas):
+                if pregunta['id'] == pregunta_id_actual:
+                    # CORRECCIÓN: Quedarse en la pregunta que respondió, no avanzar
+                    return jsonify({
+                        'success': True,
+                        'pregunta_id': pregunta_id_actual,
+                        'pregunta_index': idx,
+                        'total_preguntas': len(preguntas)
+                    })
         
-        preguntas = cursor.fetchall()
-        pregunta_index = 0
-        encontrada = False
-        
-        for idx, pregunta in enumerate(preguntas):
-            if pregunta['id'] == pregunta_id_actual:
-                pregunta_index = idx
-                encontrada = True
-                break
-        
-        # Si la pregunta ya fue respondida, avanzar a la siguiente
-        if encontrada and resultado['pregunta_actual'] is not None:
-            pregunta_index = min(pregunta_index + 1, len(preguntas) - 1)
-        
+        # No ha respondido nada, empezar desde 0
         return jsonify({
             'success': True,
-            'pregunta_id': pregunta_id_actual,
-            'pregunta_index': pregunta_index,
+            'pregunta_id': None,
+            'pregunta_index': 0,
             'total_preguntas': len(preguntas)
         })
 
@@ -3248,6 +3341,10 @@ def api_iniciar_cuestionario_individual():
     """API para iniciar un cuestionario individual con sistema de sala"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    # Solo docentes pueden iniciar cuestionarios individuales
+    if g.user.get('role') != 'docente':
+        return jsonify({'success': False, 'message': 'Solo los docentes pueden iniciar cuestionarios'}), 403
 
     data = request.get_json()
     cuestionario_id = data.get('cuestionario_id')
@@ -4158,6 +4255,31 @@ def exportar_resultados_individual_excel(sesion_id):
     except Exception as e:
         flash(f'Error al exportar resultados: {str(e)}', 'error')
         return redirect(url_for('individual_resultados', sesion_id=sesion_id))
+
+# =====================
+#  Descarga de Plantilla de Ejemplo
+# =====================
+@app.route('/descargar-plantilla-ejemplo')
+def descargar_plantilla_ejemplo():
+    """Descargar la plantilla de ejemplo de preguntas en Excel"""
+    try:
+        import os
+        # La plantilla debe estar en la raíz del proyecto Kahoot
+        plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla_preguntas_ejemplo.xlsx')
+        
+        if not os.path.exists(plantilla_path):
+            flash('La plantilla de ejemplo no está disponible', 'error')
+            return redirect(url_for('editor'))
+        
+        return send_file(
+            plantilla_path,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='plantilla_preguntas_ejemplo.xlsx'
+        )
+    except Exception as e:
+        flash(f'Error al descargar la plantilla: {str(e)}', 'error')
+        return redirect(url_for('editor'))
 
 if __name__ == '__main__':
     # Ya no es necesario crear la carpeta aquí; se crea arriba en tiempo de carga.

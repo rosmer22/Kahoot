@@ -374,5 +374,26 @@
         // Se usa un pequeño timeout para asegurar que el layout esté completo
         setTimeout(updateNavButtons, 100);
     });
+
+    // ==========================================
+    // Atajos de Teclado
+    // ==========================================
+    document.addEventListener('keydown', (e) => {
+        // Ctrl+1: Crear cuestionario
+        if (e.ctrlKey && e.key === '1') {
+            e.preventDefault();
+            {% if g.user and g.user.role == 'docente' %}
+                window.location.href = "{{ url_for('editor') }}";
+            {% else %}
+                alert('Solo los docentes pueden crear cuestionarios');
+            {% endif %}
+        }
+        
+        // Ctrl+2: Unirse a cuestionario
+        if (e.ctrlKey && e.key === '2') {
+            e.preventDefault();
+            window.location.href = "{{ url_for('join_quiz') }}";
+        }
+    });
 </script>
 {% endblock %}

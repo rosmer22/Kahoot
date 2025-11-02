@@ -84,6 +84,8 @@
   cursor: pointer;
   font-size: 0.95rem;
   transition: background-color 0.2s ease;
+  text-decoration: none;
+  color: inherit;
 }
 
 .subbar-pill:hover {

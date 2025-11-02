@@ -194,14 +194,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     console.log(`Total de preguntas: ${totalQuestions}`);
     console.log(`Usuario ID: ${userId}, Es creador: ${esCreador}`);
     
-    // Si es el creador, siempre empezar desde 0
-    if (esCreador) {
-        console.log('👑 Creador de la sala - iniciando desde pregunta 1');
-        showQuestion(0);
-        return;
-    }
-    
-    // Para jugadores: Obtener pregunta actual del servidor (por si hubo refresh)
+    // CAMBIO: Tanto el creador como los jugadores deben sincronizar con el servidor
+    // Obtener pregunta actual del servidor (por si hubo refresh)
     try {
         console.log('🔄 Sincronizando pregunta actual con el servidor...');
         const response = await fetch(`/api/grupo/obtener-pregunta-actual/${sesionId}`);
