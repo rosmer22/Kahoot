@@ -487,3 +487,14 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('✅ Módulo de Grupos cargado correctamente');
     console.log('🔄 Auto-refresh de grupos públicos cada 30 segundos');
 });
+
+document.addEventListener('click', function (e) {
+    const leaveBtn = e.target.closest('.btn-icon[title="Salir del grupo"]');
+    if (leaveBtn) {
+        const groupCard = leaveBtn.closest('.group-card');
+        const groupId = groupCard ? groupCard.dataset.groupId : null;
+        if (groupId) {
+            leaveGroup(groupId);
+        }
+    }
+});

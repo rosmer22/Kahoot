@@ -1855,7 +1855,7 @@ def api_crear_grupo():
     # Generar código único de 8 caracteres
     import string
     import random
-    codigo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    codigo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
     try:
         db = bd.obtener_conexion()
@@ -1898,7 +1898,7 @@ def api_unirse_grupo():
     data = request.get_json()
     codigo = data.get('codigo', '').strip().upper()
 
-    if len(codigo) != 8:
+    if len(codigo) != 6:
         return jsonify({'success': False, 'message': 'El código debe tener 8 caracteres'})
 
     try:
