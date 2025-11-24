@@ -61,14 +61,20 @@
         </div>
         {% endif %}
     {% endwith %}
-<main class="resultados-container">
-    <!-- Header -->
+<section class="results-hero">
     <div class="results-header">
         <div class="trophy-icon">🏆</div>
         <h1>¡Juego Finalizado!</h1>
-        <p class="subtitle">{{ grupo_nombre }} - {{ cuestionario_titulo }}</p>
+        <p class="subtitle">{{ grupo_nombre }} • {{ cuestionario_titulo }}</p>
     </div>
+    <div class="results-curve" aria-hidden="true">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,50 C400,150 800,0 1200,80 L1200,120 L0,120 Z" class="shape-fill"></path>
+        </svg>
+    </div>
+</section>
 
+<main class="resultados-container">
     <!-- Podio (Top 3) -->
     <div class="podium">
         {% if resultados|length >= 2 %}
@@ -115,6 +121,9 @@
     <!-- Tabla completa de resultados -->
     <div class="results-table-container">
         <h2>Tabla de Resultados Completa</h2>
+        {% if es_creador %}
+        <p class="detail-instruction">Haz clic en cualquier jugador para ver sus respuestas detalladas</p>
+        {% endif %}
         <div class="results-table">
             <div class="table-header">
                 <div class="col-rank">Posición</div>
@@ -123,7 +132,8 @@
                 <div class="col-score">Puntos</div>
             </div>
             {% for resultado in resultados %}
-            <div class="table-row {% if loop.index == 1 %}first{% elif loop.index == 2 %}second{% elif loop.index == 3 %}third{% endif %}">
+            <div class="table-row {% if loop.index == 1 %}first{% elif loop.index == 2 %}second{% elif loop.index == 3 %}third{% endif %} {% if es_creador %}clickable{% endif %}" 
+                 {% if es_creador %}onclick="togglePlayerDetails({{ resultado.id }})" data-user-id="{{ resultado.id }}"{% endif %}>
                 <div class="col-rank">
                     {% if loop.index == 1 %}
                         <span class="rank-badge gold">#1</span>
@@ -148,9 +158,76 @@
                     <span class="score-value">{{ resultado.score }}</span>
                 </div>
             </div>
+            
+            <!-- Detalle expandible debajo de cada fila (solo para creador) -->
+            {% if es_creador %}
+            <div class="player-detail-row" id="detail-{{ resultado.id }}" style="display: none;">
+                <div class="player-detail-content">
+                    <h3>📝 Respuestas de {{ resultado.username }}</h3>
+                    <div class="answers-list-inline">
+                        <!-- Se llenará dinámicamente con JavaScript -->
+                        <div class="loading-details">Cargando respuestas...</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             {% endfor %}
         </div>
     </div>
+
+    <!-- Detalle de Respuestas (solo para jugadores) -->
+    {% if not es_creador %}
+    <div class="answers-detail-container">
+        <h2>📝 Tus Respuestas</h2>
+        
+        <div class="answers-list">
+            {% for respuesta in detalle_respuestas %}
+            <div class="answer-item {% if respuesta.es_correcta %}correct{% elif respuesta.opcion_seleccionada %}incorrect{% endif %}">
+                <div class="answer-header">
+                    <span class="question-number">Pregunta {{ respuesta.orden }}</span>
+                    {% if respuesta.opcion_seleccionada %}
+                        {% if respuesta.es_correcta %}
+                            <span class="answer-status correct">✓ Correcta</span>
+                        {% else %}
+                            <span class="answer-status incorrect">✗ Incorrecta</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="answer-status not-answered">⊘ Sin responder</span>
+                    {% endif %}
+                </div>
+                
+                <div class="question-text">{{ respuesta.texto_pregunta }}</div>
+                
+                <div class="answer-options">
+                    {% if respuesta.opcion_seleccionada %}
+                        {% if respuesta.es_correcta %}
+                            <div class="answer-option correct-answer user-answer">{{ respuesta.texto_respuesta }}</div>
+                        {% else %}
+                            <div class="answer-option wrong-answer user-answer">{{ respuesta.texto_respuesta }}</div>
+                            <div class="answer-option correct-answer">{{ respuesta.texto_correcta }}</div>
+                        {% endif %}
+                    {% else %}
+                        <div class="answer-option correct-answer">{{ respuesta.texto_correcta }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="answer-points">
+                    Puntos obtenidos: <strong>{{ respuesta.puntos_obtenidos or 0 }}</strong> de {{ respuesta.puntos_pregunta }}
+                    {% if respuesta.tiempo_respuesta %}
+                        | Tiempo de respuesta: {{ respuesta.tiempo_respuesta }}s
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            
+            {% if detalle_respuestas|length == 0 %}
+                <p style="text-align: center; color: var(--color-text-secondary); padding: 2rem;">
+                    No respondiste ninguna pregunta
+                </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Acciones -->
     <div class="actions">
@@ -296,6 +373,95 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// Datos de respuestas por jugador (inyectados desde el servidor)
+const detalleRespuestas = {{ detalle_respuestas | tojson }};
+
+// Función para expandir/colapsar detalles del jugador desde la tabla
+function togglePlayerDetails(userId) {
+    const detailRow = document.getElementById(`detail-${userId}`);
+    const tableRow = document.querySelector(`.table-row[data-user-id="${userId}"]`);
+    
+    if (!detailRow || !tableRow) return;
+    
+    // Si ya está visible, ocultarlo
+    if (detailRow.style.display === 'flex') {
+        detailRow.style.display = 'none';
+        tableRow.classList.remove('expanded');
+        return;
+    }
+    
+    // Cerrar cualquier otro detalle abierto
+    document.querySelectorAll('.player-detail-row').forEach(row => {
+        row.style.display = 'none';
+    });
+    document.querySelectorAll('.table-row').forEach(row => {
+        row.classList.remove('expanded');
+    });
+    
+    // Mostrar el detalle de este jugador
+    detailRow.style.display = 'flex';
+    tableRow.classList.add('expanded');
+    
+    // Cargar las respuestas si aún no se han cargado
+    const contentDiv = detailRow.querySelector('.answers-list-inline');
+    if (contentDiv.innerHTML.includes('Cargando')) {
+        loadPlayerAnswers(userId, contentDiv);
+    }
+    
+    // Scroll suave hacia el detalle
+    setTimeout(() => {
+        detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+}
+
+// Cargar respuestas del jugador
+function loadPlayerAnswers(userId, container) {
+    // Filtrar respuestas de este jugador
+    const userAnswers = detalleRespuestas.filter(r => r.user_id === userId);
+    
+    if (userAnswers.length === 0) {
+        container.innerHTML = '<p class="no-answers">Este jugador no respondió ninguna pregunta</p>';
+        return;
+    }
+    
+    // Generar HTML de las respuestas
+    let html = '';
+    userAnswers.forEach((respuesta, index) => {
+        const statusClass = respuesta.es_correcta ? 'correct' : (respuesta.opcion_seleccionada ? 'incorrect' : '');
+        const statusText = respuesta.es_correcta ? '✓ Correcta' : (respuesta.opcion_seleccionada ? '✗ Incorrecta' : '⊘ Sin responder');
+        const statusBadge = respuesta.es_correcta ? 'correct' : (respuesta.opcion_seleccionada ? 'incorrect' : 'not-answered');
+        
+        html += `
+            <div class="answer-item ${statusClass}" style="animation: fadeInUp 0.3s ease ${index * 0.05}s forwards; opacity: 0;">
+                <div class="answer-header">
+                    <span class="question-number">Pregunta ${respuesta.orden}</span>
+                    <span class="answer-status ${statusBadge}">${statusText}</span>
+                </div>
+                
+                <div class="question-text">${respuesta.texto_pregunta}</div>
+                
+                <div class="answer-options">
+                    ${respuesta.opcion_seleccionada ? 
+                        (respuesta.es_correcta ? 
+                            `<div class="answer-option correct-answer user-answer">${respuesta.texto_respuesta}</div>` :
+                            `<div class="answer-option wrong-answer user-answer">${respuesta.texto_respuesta}</div>
+                             <div class="answer-option correct-answer">${respuesta.texto_correcta}</div>`
+                        ) :
+                        `<div class="answer-option correct-answer">${respuesta.texto_correcta}</div>`
+                    }
+                </div>
+                
+                <div class="answer-points">
+                    Puntos obtenidos: <strong>${respuesta.puntos_obtenidos || 0}</strong> de ${respuesta.puntos_pregunta}
+                    ${respuesta.tiempo_respuesta ? `| Tiempo: ${respuesta.tiempo_respuesta}s` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
 
 console.log('✅ Página de resultados cargada');
 </script>

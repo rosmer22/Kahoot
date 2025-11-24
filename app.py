@@ -1,8 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g, send_file
-from controllers import user_controller, quiz_controller
-from werkzeug.security import check_password_hash
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
 from io import BytesIO
 from datetime import datetime, timedelta
 from werkzeug.exceptions import HTTPException
@@ -10,6 +9,14 @@ from flask_mail import Mail, Message
 import random
 import math
 import bd
+import hashlib
+import hmac
+import base64
+from flask_jwt import JWT, jwt_required, current_identity
+try:
+    import jwt as pyjwt
+except ImportError:
+    pyjwt = None
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
@@ -18,11 +25,34 @@ import pickle
 import logging
 import os
 import re
+from flask_cors import CORS
 from pathlib import Path  # ✅ agregado para rutas absolutas seguras
 import json
 
+
+def encriptar_sha256(cadena):
+    cadbytes = cadena.encode('utf-8')
+    sha256_hash_object = hashlib.sha256()
+    sha256_hash_object.update(cadbytes)
+    hex_digest = sha256_hash_object.hexdigest()
+    return hex_digest
+
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = 'dev-secret-change-me'
+CORS(app, resources={r"/*": {"origins": "*"}})
+app.debug = True
+# SECRET_KEY es necesario para Flask-JWT (igual que en Ejemplo.py)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+app.config['SECRET_KEY'] = app.secret_key
+
+# Configuración JWT (basada en Ejemplo.py pero con configs adicionales necesarias)
+app.config['JWT_AUTH_USERNAME_KEY'] = 'email'
+app.config['JWT_AUTH_PASSWORD_KEY'] = 'password'
+app.config['JWT_AUTH_HEADER_PREFIX'] = 'JWT'
+app.config['JWT_EXPIRATION_DELTA'] = timedelta(hours=12)
+app.config['JWT_EXPIRATION_MINUTES'] = 12 * 60
+app.config['JWT_COOKIE_NAME'] = 'access_token'
+app.config['JWT_COOKIE_SECURE'] = False
+app.config['JWT_COOKIE_SAMESITE'] = 'Lax'
 
 # === Config generales (MODIFICADO: usar rutas absolutas y crear carpeta en carga) ===
 BASE_DIR = Path(__file__).resolve().parent               # /home/usuario/mysite
@@ -125,6 +155,11 @@ def subir_a_google_drive(file_stream, filename, mimetype='application/vnd.openxm
             'message': f'Error al subir a Google Drive: {str(e)}'
         }
 
+from werkzeug.security import generate_password_hash
+new_hash = generate_password_hash("Lostresconsejos@27", method='pbkdf2:sha256', salt_length=16)
+print(new_hash)
+
+
 # === Config de correo (Gmail SMTP) ===
 # Sugerencia: usar variables de entorno para no exponer credenciales en código
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -142,6 +177,301 @@ logging.basicConfig(level=logging.ERROR)
 usuarios_pendientes = {}
 codigos = {}
 
+from controllers import user_controller, quiz_controller
+
+
+class User(object):
+    def __init__(self, id, username, password, role='usuario'):
+        self.id = id
+        self.username = username
+        self.password = password
+        self.role = role
+
+    def __str__(self):
+        return "User(id='%s')" % self.id
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'role': self.role
+        }
+
+
+class UserIdentity(object):
+    def __init__(self, user_dict):
+        self.id = user_dict.get('id')
+        self.username = user_dict.get('username')
+        self.email = user_dict.get('email')
+        self.role = user_dict.get('role', 'usuario')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'role': self.role
+        }
+
+
+def authenticate(username, password):
+    try:
+        import sys
+        print(f"\n=== AUTHENTICATE LLAMADO ===", file=sys.stderr)
+        print(f"Email: {username}", file=sys.stderr)
+        sys.stderr.flush()
+
+        usuario = user_controller.obtener_usuario_por_email(username)
+        if not usuario:
+            print(f"Usuario no encontrado para email: {username}", file=sys.stderr)
+            sys.stderr.flush()
+            return None
+
+        print(f"Usuario encontrado en BD: {usuario.get('id')}", file=sys.stderr)
+        sys.stderr.flush()
+
+        # Comparar password hasheado
+        if usuario['password'] == encriptar_sha256(password):
+            user_obj = User(usuario["id"], usuario["email"], usuario["password"], usuario["role"])
+            print(f"AUTENTICACION EXITOSA - ID: {user_obj.id}, Username: {user_obj.username}, Role: {user_obj.role}", file=sys.stderr)
+            sys.stderr.flush()
+            return user_obj
+
+        print(f"Password no coincide para usuario: {username}", file=sys.stderr)
+        sys.stderr.flush()
+        return None
+    except Exception as e:
+        import sys
+        print(f"ERROR en authenticate: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return None
+
+
+def identity(payload):
+    user_id = payload['identity']
+    usuario = user_controller.obtener_usuario_por_id(user_id)
+    user = None
+    if usuario:
+        user = User(usuario["id"], usuario["email"], usuario["password"], usuario["role"])
+    return user
+
+
+
+# Inicializar Flask-JWT (configuración simple como en Ejemplo.py)
+jwt_manager = JWT(app, authenticate, identity)
+
+# SOLO personalizar la respuesta para que devuelva JSON en vez de HTML
+@jwt_manager.auth_response_handler
+def custom_auth_response(access_token, identity):
+    """Devuelve JSON en vez de HTML"""
+    import sys
+    try:
+        print(f"\n=== AUTH RESPONSE HANDLER LLAMADO ===", file=sys.stderr)
+        print(f"Token recibido: {str(access_token)[:30]}...", file=sys.stderr)
+        print(f"Identity type: {type(identity)}", file=sys.stderr)
+        print(f"Identity value: {identity}", file=sys.stderr)
+
+        # Intentar acceder a los atributos
+        try:
+            user_id = identity.id
+            username = identity.username
+            role = identity.role
+            print(f"Atributos obtenidos: id={user_id}, username={username}, role={role}", file=sys.stderr)
+        except Exception as e:
+            print(f"ERROR al acceder atributos: {e}", file=sys.stderr)
+            # Si identity no tiene los atributos esperados, intentar acceder de otra forma
+            user_id = getattr(identity, 'id', None)
+            username = getattr(identity, 'username', None)
+            role = getattr(identity, 'role', 'usuario')
+            print(f"Atributos con getattr: id={user_id}, username={username}, role={role}", file=sys.stderr)
+
+        sys.stderr.flush()
+
+        response = jsonify({
+            'access_token': access_token,
+            'user': {
+                'id': user_id,
+                'username': username,
+                'role': role
+            }
+        })
+
+        print(f"Respuesta JSON creada exitosamente", file=sys.stderr)
+        sys.stderr.flush()
+        return response
+
+    except Exception as e:
+        print(f"\n!!! ERROR CRITICO en auth_response_handler !!!", file=sys.stderr)
+        print(f"Error: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+
+        # Intentar devolver algo aunque sea
+        return jsonify({
+            'error': 'Error al generar respuesta',
+            'message': str(e),
+            'access_token': str(access_token) if access_token else None
+        }), 500
+
+
+@jwt_manager.jwt_error_handler
+def custom_jwt_error_handler(error):
+    """Maneja errores de JWT"""
+    import sys
+    print(f"\n=== JWT ERROR HANDLER ===", file=sys.stderr)
+    print(f"Error: {str(error)}", file=sys.stderr)
+    sys.stderr.flush()
+
+    return jsonify({
+        'error': 'Authentication failed',
+        'message': str(error)
+    }), 401
+
+
+# Funciones helper para JWT (necesarias para endpoints personalizados)
+def _b64url_encode(data: bytes) -> bytes:
+    return base64.urlsafe_b64encode(data).rstrip(b'=')
+
+
+def _b64url_decode(data: str) -> bytes:
+    padding = '=' * (-len(data) % 4)
+    return base64.urlsafe_b64decode(data + padding)
+
+
+def build_jwt_payload(identity_obj):
+    """Construye el payload del token JWT"""
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    exp_delta = timedelta(minutes=app.config['JWT_EXPIRATION_MINUTES'])
+    payload = {
+        'identity': identity_obj.id,
+        'username': identity_obj.username,
+        'role': identity_obj.role,
+        'iat': int(now.timestamp()),
+        'nbf': int(now.timestamp()),
+        'exp': int((now + exp_delta).timestamp())
+    }
+    return payload
+
+
+def _encode_jwt_payload(payload: dict) -> str:
+    """Codifica un payload a token JWT"""
+    secret = app.config['SECRET_KEY']
+    algorithm = 'HS256'
+
+    # Intentar usar PyJWT si está disponible
+    if pyjwt and hasattr(pyjwt, 'encode'):
+        token = pyjwt.encode(payload, secret, algorithm=algorithm)
+        if isinstance(token, bytes):
+            token = token.decode('utf-8')
+        return token
+
+    # Fallback manual si PyJWT no disponible
+    header = {'typ': 'JWT', 'alg': algorithm}
+    header_bytes = json.dumps(header, separators=(',', ':'), sort_keys=True).encode('utf-8')
+    payload_bytes = json.dumps(payload, separators=(',', ':'), sort_keys=True).encode('utf-8')
+    segments = [_b64url_encode(header_bytes), _b64url_encode(payload_bytes)]
+    signing_input = b'.'.join(segments)
+    signature = hmac.new(secret.encode('utf-8'), signing_input, hashlib.sha256).digest()
+    segments.append(_b64url_encode(signature))
+    return '.'.join(segment.decode('utf-8') for segment in segments)
+
+
+def _decode_jwt_payload(token: str) -> dict:
+    """Decodifica un token JWT"""
+    secret = app.config['SECRET_KEY']
+    algorithm = 'HS256'
+
+    # Intentar usar PyJWT si está disponible
+    if pyjwt and hasattr(pyjwt, 'decode'):
+        return pyjwt.decode(token, secret, algorithms=[algorithm])
+
+    # Fallback manual
+    try:
+        header_b64, payload_b64, signature_b64 = token.split('.')
+    except ValueError as exc:
+        raise ValueError('Token JWT mal formado') from exc
+    signing_input = f'{header_b64}.{payload_b64}'.encode('utf-8')
+    signature = _b64url_decode(signature_b64)
+    expected_signature = hmac.new(secret.encode('utf-8'), signing_input, hashlib.sha256).digest()
+    if not hmac.compare_digest(signature, expected_signature):
+        raise ValueError('Firma JWT inválida')
+    payload = json.loads(_b64url_decode(payload_b64))
+    exp = payload.get('exp')
+    if exp is not None and int(exp) < int(datetime.utcnow().timestamp()):
+        raise ValueError('Token JWT expirado')
+    return payload
+
+
+def generar_token_usuario(usuario):
+    if not isinstance(usuario, UserIdentity):
+        identidad = UserIdentity(usuario)
+    else:
+        identidad = usuario
+    payload = build_jwt_payload(identidad)
+    token = _encode_jwt_payload(payload)
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
+    return token
+
+
+def obtener_token_actual():
+    auth_header = request.headers.get('Authorization', '')
+    token = None
+    prefix = app.config['JWT_AUTH_HEADER_PREFIX']
+    if auth_header.startswith(f'{prefix} '):
+        token = auth_header.split(' ', 1)[1].strip()
+    elif auth_header.startswith('Bearer '):
+        token = auth_header.split(' ', 1)[1].strip()
+    if not token:
+        token = request.cookies.get(app.config['JWT_COOKIE_NAME'])
+    return token
+
+
+def adjuntar_token_response(response, token):
+    if isinstance(token, UserIdentity):
+        token = generar_token_usuario(token)
+    if not isinstance(token, str):
+        token = str(token)
+    response.set_cookie(
+        app.config['JWT_COOKIE_NAME'],
+        token,
+        max_age=app.config['JWT_EXPIRATION_MINUTES'] * 60,
+        httponly=True,
+        secure=app.config['JWT_COOKIE_SECURE'],
+        samesite=app.config['JWT_COOKIE_SAMESITE']
+    )
+    return response
+
+
+def limpiar_token_response(response):
+    response.set_cookie(
+        app.config['JWT_COOKIE_NAME'],
+        '',
+        max_age=0,
+        expires=0,
+        httponly=True,
+        secure=app.config['JWT_COOKIE_SECURE'],
+        samesite=app.config['JWT_COOKIE_SAMESITE']
+    )
+    return response
+
+
+def _obtener_usuario_desde_token(token):
+    if not token:
+        return None
+    try:
+        payload = _decode_jwt_payload(token)
+        identidad = identity(payload)
+        if identidad:
+            return identidad.to_dict()
+    except Exception as exc:
+        app.logger.info(f'Token JWT inválido o expirado: {exc}')
+    return None
+
 
 
 # =====================
@@ -149,11 +479,10 @@ codigos = {}
 # =====================
 @app.before_request
 def load_logged_in_user():
-    user_id = session.get('user_id')
-    if user_id is None:
-        g.user = None
-    else:
-        g.user = user_controller.obtener_usuario_por_id(user_id)
+    token = obtener_token_actual()
+    if token and 'HTTP_AUTHORIZATION' not in request.environ:
+        request.environ['HTTP_AUTHORIZATION'] = f"{app.config['JWT_AUTH_HEADER_PREFIX']} {token}"
+    g.user = _obtener_usuario_desde_token(token)
 
 def is_auth():
     return g.user is not None
@@ -178,23 +507,23 @@ def asignar_puntosmoneda_grupo(sesion_id):
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # ⚠️ IMPORTANTE: Verificar si ya se asignaron recompensas para esta sesión
         cursor.execute("""
             SELECT COUNT(*) as total
             FROM historial_recompensas
             WHERE sesion_id = %s AND tipo_sesion = 'grupo'
         """, (sesion_id,))
-        
+
         ya_asignadas = cursor.fetchone()['total']
-        
+
         if ya_asignadas > 0:
             app.logger.info(f"Recompensas ya asignadas para sesión grupo {sesion_id}, saltando...")
             return  # Ya se asignaron, no hacer nada
-        
+
         # Obtener el ranking de jugadores (excluyendo al creador)
         cursor.execute("""
-            SELECT 
+            SELECT
                 rg.user_id,
                 u.username,
                 SUM(rg.puntos) as puntos_totales,
@@ -208,47 +537,47 @@ def asignar_puntosmoneda_grupo(sesion_id):
             ORDER BY puntos_totales DESC
             LIMIT 3
         """, (sesion_id,))
-        
+
         ranking = cursor.fetchall()
-        
+
         if not ranking:
             return
-        
+
         # Asignar recompensas según posición
         recompensas = {
             0: 300,  # 1er lugar
             1: 150,   # 2do lugar
             2: 75    # 3er lugar
         }
-        
+
         for posicion, jugador in enumerate(ranking):
             if posicion < 3:  # Solo primeros 3 lugares
                 puntosmoneda = recompensas.get(posicion, 0)
                 user_id = jugador['user_id']
                 puntos_totales = jugador['puntos_totales']
-                
+
                 # Actualizar puntosmoneda del usuario
                 cursor.execute("""
-                    UPDATE users 
-                    SET puntosmoneda = puntosmoneda + %s 
+                    UPDATE users
+                    SET puntosmoneda = puntosmoneda + %s
                     WHERE id = %s
                 """, (puntosmoneda, user_id))
-                
+
                 # Registrar en historial de recompensas
                 cursor.execute("""
-                    INSERT INTO historial_recompensas 
+                    INSERT INTO historial_recompensas
                     (user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales)
                     VALUES (%s, %s, 'grupo', %s, %s, %s)
                 """, (user_id, sesion_id, posicion + 1, puntosmoneda, puntos_totales))
-        
+
         db.commit()
         app.logger.info(f"✅ Recompensas asignadas correctamente para sesión grupo {sesion_id}")
-        
+
     except Exception as e:
         if db:
             db.rollback()
         app.logger.error(f"Error al asignar puntosmoneda en sesión {sesion_id}: {str(e)}")
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -268,23 +597,23 @@ def asignar_puntosmoneda_individual(sesion_id):
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # ⚠️ IMPORTANTE: Verificar si ya se asignaron recompensas para esta sesión
         cursor.execute("""
             SELECT COUNT(*) as total
             FROM historial_recompensas
             WHERE sesion_id = %s AND tipo_sesion = 'individual'
         """, (sesion_id,))
-        
+
         ya_asignadas = cursor.fetchone()['total']
-        
+
         if ya_asignadas > 0:
             app.logger.info(f"Recompensas ya asignadas para sesión individual {sesion_id}, saltando...")
             return  # Ya se asignaron, no hacer nada
-        
+
         # Obtener el ranking de jugadores (excluyendo al creador)
         cursor.execute("""
-            SELECT 
+            SELECT
                 ri.user_id,
                 u.username,
                 SUM(ri.puntos) as puntos_totales,
@@ -298,47 +627,47 @@ def asignar_puntosmoneda_individual(sesion_id):
             ORDER BY puntos_totales DESC
             LIMIT 3
         """, (sesion_id,))
-        
+
         ranking = cursor.fetchall()
-        
+
         if not ranking:
             return
-        
+
         # Asignar recompensas según posición
         recompensas = {
             0: 300,  # 1er lugar
             1: 150,   # 2do lugar
             2: 75    # 3er lugar
         }
-        
+
         for posicion, jugador in enumerate(ranking):
             if posicion < 3:  # Solo primeros 3 lugares
                 puntosmoneda = recompensas.get(posicion, 0)
                 user_id = jugador['user_id']
                 puntos_totales = jugador['puntos_totales']
-                
+
                 # Actualizar puntosmoneda del usuario
                 cursor.execute("""
-                    UPDATE users 
-                    SET puntosmoneda = puntosmoneda + %s 
+                    UPDATE users
+                    SET puntosmoneda = puntosmoneda + %s
                     WHERE id = %s
                 """, (puntosmoneda, user_id))
-                
+
                 # Registrar en historial de recompensas
                 cursor.execute("""
-                    INSERT INTO historial_recompensas 
+                    INSERT INTO historial_recompensas
                     (user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales)
                     VALUES (%s, %s, 'individual', %s, %s, %s)
                 """, (user_id, sesion_id, posicion + 1, puntosmoneda, puntos_totales))
-        
+
         db.commit()
         app.logger.info(f"✅ Recompensas asignadas correctamente para sesión individual {sesion_id}")
-        
+
     except Exception as e:
         if db:
             db.rollback()
         app.logger.error(f"Error al asignar puntosmoneda en sesión individual {sesion_id}: {str(e)}")
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -473,16 +802,29 @@ def handle_exception(e):
         return e
 
     # Para cualquier otra excepción (errores 500), regístrala
-    app.logger.error(f"Error no manejado: {e}", exc_info=True)
-    
-    # Si es una ruta API, devolver JSON en lugar de HTML
-    if request.path.startswith('/api/'):
+    import sys
+    import traceback
+
+    # Obtener mensaje de error de forma segura sin usar str()
+    try:
+        error_message = repr(e)
+    except:
+        error_message = "Error desconocido"
+
+    print(f"\n!!! ERROR 500 CAPTURADO !!!", file=sys.stderr)
+    print(f"Path: {request.path}", file=sys.stderr)
+    print(f"Error: {error_message}", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
+    sys.stderr.flush()
+
+    # Si es una ruta API o /auth, devolver JSON en lugar de HTML
+    if request.path.startswith('/api/') or request.path == '/auth':
         return jsonify({
             'success': False,
             'error': 'Error interno del servidor',
-            'message': str(e) if app.debug else 'Ha ocurrido un error inesperado'
+            'message': error_message if app.debug else 'Ha ocurrido un error inesperado'
         }), 500
-    
+
     # Para rutas normales, mostrar la página de error
     flash("Ha ocurrido un error inesperado en el servidor. Nuestro equipo ha sido notificado.", "error")
     return render_template('error.html', title='Error del Sistema'), 500
@@ -493,12 +835,12 @@ def empezar():
     if not g.user:
         flash('Debes iniciar sesión para empezar un cuestionario', 'warning')
         return redirect(url_for('login'))
-    
+
     # Solo docentes pueden empezar cuestionarios
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden empezar cuestionarios', 'error')
         return redirect(url_for('home'))
-    
+
     return render_template('empezar.html', title='Empezar')
 
 
@@ -514,15 +856,13 @@ def login():
             flash('No existe una cuenta con ese usuario o correo. Por favor, regístrate.', 'error')
             return redirect(url_for('login'))
 
-        if check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['user'] = {
-                'username': user['username'],
-                'email': user['email'],
-                'role': user['role']
-            }
+        if user['password'] == encriptar_sha256(password):
+            token = generar_token_usuario(user)
             flash('¡Bienvenido de nuevo!', 'success')
-            return redirect(url_for('home'))
+            response = redirect(url_for('home'))
+            response.set_cookie('user_id', encriptar_sha256(str(user['id'])))
+            response.set_cookie('username', encriptar_sha256(user['username']))
+            return adjuntar_token_response(response, token)
         else:
             flash('Usuario o contraseña incorrectos.', 'error')
             return redirect(url_for('login'))
@@ -533,7 +873,10 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('home'))
+    response = redirect(url_for('home'))
+    response.set_cookie('user_id', '', max_age=0, expires=0)
+    response.set_cookie('username', '', max_age=0, expires=0)
+    return limpiar_token_response(response)
 
 
 # =====================
@@ -596,18 +939,22 @@ def register():
 
     return render_template('register.html', title='Registrarme')
 
+import sys
+
 @app.route('/codigo_recuperacion', methods=['GET', 'POST'])
 def codigo_recuperacion():
     if request.method == 'POST':
         email = request.form.get('email').strip()
 
         if user_controller.obtener_usuario_por_email(email):
-            # Generar código de verificación
+            # Generar código de 6 dígitos
             codigo = random.randint(100000, 999999)
+            print(f"[DEBUG] Código de verificación para {email}: {codigo}")
+            sys.stdout.flush()
+
 
             codigos[email] = {
-                'codigo': codigo,
-                'expira': datetime.now() + timedelta(minutes=10)
+                'codigo': str(codigo)
             }
 
             try:
@@ -616,19 +963,24 @@ def codigo_recuperacion():
                     sender=app.config['MAIL_USERNAME'],
                     recipients=[email]
                 )
-                msg.body = f"Tu código de confirmación es: {codigo}\nVálido por 10 minutos."
+                msg.body = f"Tu código de confirmación es: {codigo}\n(Sin expiración por ahora)."
                 mail.send(msg)
                 session['email_verificacion'] = email
                 flash('Se ha enviado un código de verificación a tu correo. Revisa tu bandeja.', 'info')
-                return redirect(url_for('verificar_recuperar_cuenta'))
+                # Si tu formulario de código está en esta ruta, está bien:
+                return redirect(url_for('verificar_codigo_recuperacion'))
             except Exception as e:
-                # Si el correo falla, se puede permitir registro directo o mostrar error.
-                # Aquí optamos por mostrar error para no crear cuentas sin verificación.
-                flash(f'No se pudo enviar el correo de verificación: {e}', 'error')
-                return redirect(url_for('verificar_codigo'))
+                print(f"[ERROR] No se pudo enviar el correo de verificación: {e}")
+                sys.stdout.flush()
+                flash('No se pudo enviar el correo de verificación. Usa el código que aparece en el log.', 'error')
+                return redirect(url_for('verificar_codigo_recuperacion'))
         else:
             flash('El correo electrónico no existe', 'error')
             return redirect(url_for('recuperar_cuenta'))
+
+    # Si entras por GET, por si acaso lo mandamos al form de recuperar
+    return redirect(url_for('recuperar_cuenta'))
+
 
 @app.route('/verify_email', methods=['GET', 'POST'])
 def verify_email():
@@ -661,15 +1013,12 @@ def verify_email():
 
             # Iniciar sesión automáticamente con la nueva cuenta
             if nuevo_usuario:
-                session['user_id'] = nuevo_usuario['id']
-                session['user'] = {
-                    'username': nuevo_usuario['username'],
-                    'email': nuevo_usuario['email'],
-                    'role': nuevo_usuario['role']
-                }
-
+                token = generar_token_usuario(nuevo_usuario)
                 flash('¡Bienvenido!', 'success')
-                return redirect(url_for('home'))
+                response = redirect(url_for('home'))
+                response.set_cookie('user_id', encriptar_sha256(str(nuevo_usuario['id'])))
+                response.set_cookie('username', encriptar_sha256(nuevo_usuario['username']))
+                return adjuntar_token_response(response, token)
             else:
                 flash('Error al iniciar sesión automáticamente. Intenta iniciar sesión manualmente.', 'warning')
                 return redirect(url_for('login'))
@@ -682,20 +1031,23 @@ def verify_email():
 def verificar_codigo_recuperacion():
     email = session.get('email_verificacion')
     if not email:
+        flash('Sesión inválida. Vuelve a solicitar un código.', 'error')
         return redirect(url_for('recuperar_cuenta'))
 
     if request.method == 'POST':
-        codigo_ingresado = request.form.get('codigo')
+        codigo_ingresado = request.form.get('codigo', '').strip()
         datos = codigos.get(email)
 
-        if datos and str(datos['codigo']) == codigo_ingresado and datetime.now() < datos['expira']:
-            # Código válido → redirige al formulario de cambio de contraseña
+        if datos and datos.get('codigo') == codigo_ingresado:
             codigos.pop(email, None)
-            return redirect(url_for('cambiar_contra'))  # 👈 ajusta este nombre si tu función de cambio de contraseña tiene otro nombre
+            return redirect(url_for('cambiar_contra'))
         else:
-            flash('Código inválido o expirado', 'error')
+            flash('Código inválido', 'error')
 
-    return render_template('verificar_codigo.html', title='Verificar código')
+    # ⬇⬇⬇ CAMBIA ESTA LÍNEA
+    return render_template('verificar_recuperar_cuenta.html', title='Verificar código')
+
+
 
 @app.route('/cambiar_contra', methods=['GET'])
 def cambiar_contra():
@@ -744,20 +1096,20 @@ def mis_puntos():
     if g.user is None:
         flash('Debes iniciar sesión para ver tus puntos', 'warning')
         return redirect(url_for('login'))
-    
+
     # Verificar si el usuario es docente
     es_docente = g.user.get('role') == 'docente'
-    
+
     db = None
     cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Si es docente, mostrar ranking de todos los alumnos
         if es_docente:
             cursor.execute("""
-                SELECT 
+                SELECT
                     u.id,
                     u.username,
                     u.email,
@@ -766,34 +1118,34 @@ def mis_puntos():
                     r.icono as rango_icono,
                     r.color as rango_color
                 FROM users u
-                LEFT JOIN rangos r ON u.puntosmoneda >= r.puntos_minimos 
+                LEFT JOIN rangos r ON u.puntosmoneda >= r.puntos_minimos
                                    AND u.puntosmoneda <= r.puntos_maximos
                 WHERE u.role = 'alumno'
                 ORDER BY u.puntosmoneda DESC
             """)
-            
+
             ranking_alumnos = cursor.fetchall()
-            
+
             # Calcular puntos totales de todos los alumnos
             cursor.execute("""
                 SELECT SUM(puntosmoneda) as total_puntos
                 FROM users
                 WHERE role = 'alumno'
             """)
-            
+
             total_result = cursor.fetchone()
             total_puntos_alumnos = total_result['total_puntos'] if total_result else 0
-            
-            return render_template('mis_puntos.html', 
+
+            return render_template('mis_puntos.html',
                                  title='Ranking de Alumnos',
                                  es_docente=True,
                                  ranking_alumnos=ranking_alumnos,
                                  total_puntos_alumnos=total_puntos_alumnos)
-        
+
         # Si es alumno, mostrar sus puntos individuales
         # Obtener información del usuario con su rango
         cursor.execute("""
-            SELECT 
+            SELECT
                 u.id,
                 u.username,
                 u.email,
@@ -804,38 +1156,38 @@ def mis_puntos():
                 r.orden as rango_orden,
                 r.puntos_minimos,
                 r.puntos_maximos,
-                CASE 
+                CASE
                     WHEN r.puntos_maximos >= 99999999 THEN 0
                     ELSE (r.puntos_maximos + 1 - u.puntosmoneda)
                 END as puntos_para_siguiente_rango,
-                (SELECT nombre 
-                 FROM rangos r2 
-                 WHERE r2.orden = r.orden + 1 
+                (SELECT nombre
+                 FROM rangos r2
+                 WHERE r2.orden = r.orden + 1
                  LIMIT 1) as siguiente_rango,
-                (SELECT icono 
-                 FROM rangos r2 
-                 WHERE r2.orden = r.orden + 1 
+                (SELECT icono
+                 FROM rangos r2
+                 WHERE r2.orden = r.orden + 1
                  LIMIT 1) as siguiente_rango_icono
             FROM users u
-            LEFT JOIN rangos r ON u.puntosmoneda >= r.puntos_minimos 
+            LEFT JOIN rangos r ON u.puntosmoneda >= r.puntos_minimos
                                AND u.puntosmoneda <= r.puntos_maximos
             WHERE u.id = %s
         """, (g.user['id'],))
-        
+
         usuario_info = cursor.fetchone()
-        
+
         # Obtener todos los rangos para mostrar el progreso
         cursor.execute("""
             SELECT nombre, puntos_minimos, puntos_maximos, icono, color, orden
             FROM rangos
             ORDER BY orden
         """)
-        
+
         todos_rangos = cursor.fetchall()
-        
+
         # Obtener historial de recompensas del usuario
         cursor.execute("""
-            SELECT 
+            SELECT
                 hr.created_at,
                 hr.tipo_sesion,
                 hr.posicion,
@@ -851,12 +1203,12 @@ def mis_puntos():
             ORDER BY hr.created_at DESC
             LIMIT 10
         """, (g.user['id'],))
-        
+
         historial = cursor.fetchall()
-        
+
         # Obtener estadísticas
         cursor.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) as total_juegos_premiados,
                 SUM(CASE WHEN posicion = 1 THEN 1 ELSE 0 END) as primeros_lugares,
                 SUM(CASE WHEN posicion = 2 THEN 1 ELSE 0 END) as segundos_lugares,
@@ -865,9 +1217,9 @@ def mis_puntos():
             FROM historial_recompensas
             WHERE user_id = %s
         """, (g.user['id'],))
-        
+
         estadisticas = cursor.fetchone()
-        
+
         # Calcular porcentaje de progreso
         if usuario_info and usuario_info['puntos_maximos'] < 99999999:
             rango_size = usuario_info['puntos_maximos'] - usuario_info['puntos_minimos']
@@ -875,8 +1227,8 @@ def mis_puntos():
             porcentaje_progreso = (progreso_actual / rango_size * 100) if rango_size > 0 else 0
         else:
             porcentaje_progreso = 100  # Rango máximo
-        
-        return render_template('mis_puntos.html', 
+
+        return render_template('mis_puntos.html',
                              title='Mis Puntos',
                              es_docente=False,
                              usuario_info=usuario_info,
@@ -884,12 +1236,12 @@ def mis_puntos():
                              historial=historial,
                              estadisticas=estadisticas,
                              porcentaje_progreso=porcentaje_progreso)
-    
+
     except Exception as e:
         app.logger.error(f"Error al cargar mis puntos: {str(e)}")
         flash('Error al cargar la información de puntos', 'error')
         return redirect(url_for('home'))
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -898,7 +1250,10 @@ def mis_puntos():
 
 
 @app.route('/update_profile', methods=['POST'])
+@jwt_required()
 def update_profile():
+    if g.user is None and current_identity:
+        g.user = current_identity.to_dict()
     if g.user is None:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
@@ -924,7 +1279,10 @@ def update_profile():
 
 
 @app.route('/change_password', methods=['POST'])
+@jwt_required()
 def change_password():
+    if g.user is None and current_identity:
+        g.user = current_identity.to_dict()
     if g.user is None:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
@@ -953,7 +1311,7 @@ def change_password():
 def my_quizzes():
     if g.user is None:
         return redirect(url_for('login'))
-    
+
     # Solo docentes pueden ver cuestionarios
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden acceder a los cuestionarios', 'error')
@@ -974,7 +1332,7 @@ def lobby(cuestionario_id):
     if not g.user:
         flash('Debes iniciar sesión para acceder a esta página.', 'warning')
         return redirect(url_for('login'))
-    
+
     # Solo docentes pueden iniciar sesiones
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden iniciar sesiones de cuestionarios', 'error')
@@ -1081,7 +1439,282 @@ def espera_cuestionario(pin):
 
     return render_template('lobby.html', quiz=quiz, pin=pin, modo='individual')
 
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    """
+    Endpoint de autenticación JWT para APIs.
+
+    Request Body (JSON):
+        {
+            "email": "usuario@ejemplo.com",
+            "password": "contraseña"
+        }
+
+    Response (Success):
+        {
+            "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+            "user": {
+                "id": 123,
+                "username": "usuario@ejemplo.com",
+                "role": "alumno"
+            }
+        }
+
+    Response (Error):
+        {
+            "error": "Descripción del error"
+        }
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No se recibieron datos JSON'}), 400
+
+        email = data.get('email')
+        password = data.get('password')
+
+        if not email or not password:
+            return jsonify({'error': 'Email y password son requeridos'}), 400
+
+        # Autenticar usuario
+        user_obj = authenticate(email, password)
+
+        if not user_obj:
+            return jsonify({'error': 'Credenciales inválidas'}), 401
+
+        # Generar token JWT
+        payload = build_jwt_payload(user_obj)
+        token = _encode_jwt_payload(payload)
+
+        return jsonify({
+            'access_token': token,
+            'user': {
+                'id': user_obj.id,
+                'username': user_obj.username,
+                'role': user_obj.role
+            }
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error en api_login: {str(e)}", exc_info=True)
+        return jsonify({
+            'error': 'Error interno del servidor',
+            'message': str(e) if app.debug else 'Ha ocurrido un error inesperado'
+        }), 500
+
+
+@app.route('/api/test-auth', methods=['POST'])
+def api_test_auth():
+    """Endpoint de prueba para autenticación JWT con debugging detallado"""
+    try:
+        data = request.get_json()
+        print(f"DEBUG api_test_auth - Datos recibidos: {data}")
+
+        if not data:
+            return jsonify({'error': 'No se recibieron datos JSON'}), 400
+
+        email = data.get('email')
+        password = data.get('password')
+
+        if not email or not password:
+            return jsonify({'error': 'Email y password son requeridos'}), 400
+
+        print(f"DEBUG api_test_auth - Intentando autenticar: {email}")
+
+        # Llamar a la función authenticate
+        user_obj = authenticate(email, password)
+
+        if not user_obj:
+            print(f"DEBUG api_test_auth - Autenticación fallida")
+            return jsonify({'error': 'Credenciales inválidas'}), 401
+
+        print(f"DEBUG api_test_auth - Usuario autenticado: {user_obj.id}")
+
+        # Intentar generar el token
+        payload = build_jwt_payload(user_obj)
+        print(f"DEBUG api_test_auth - Payload construido: {payload}")
+
+        token = _encode_jwt_payload(payload)
+        print(f"DEBUG api_test_auth - Token generado exitosamente")
+
+        return jsonify({
+            'access_token': token,
+            'user': {
+                'id': user_obj.id,
+                'username': user_obj.username,
+                'role': user_obj.role
+            }
+        })
+
+    except Exception as e:
+        print(f"ERROR en api_test_auth: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Error interno del servidor',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/verify-token', methods=['POST'])
+def api_verify_token():
+    """
+    Verifica si un token JWT es válido y devuelve información del usuario.
+
+    Request Headers:
+        Authorization: JWT <token>
+
+    O Request Body (JSON):
+        {
+            "token": "eyJ0eXAiOiJKV1QiLCJhbGc..."
+        }
+
+    Response (Success):
+        {
+            "valid": true,
+            "user": {
+                "id": 123,
+                "username": "usuario@ejemplo.com",
+                "role": "alumno"
+            }
+        }
+
+    Response (Error):
+        {
+            "valid": false,
+            "error": "Token inválido o expirado"
+        }
+    """
+    try:
+        # Intentar obtener el token del header Authorization
+        auth_header = request.headers.get('Authorization')
+        token = None
+
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0] == 'JWT':
+                token = parts[1]
+
+        # Si no está en el header, intentar obtenerlo del body
+        if not token:
+            data = request.get_json()
+            if data:
+                token = data.get('token')
+
+        if not token:
+            return jsonify({
+                'valid': False,
+                'error': 'Token no proporcionado'
+            }), 400
+
+        # Verificar el token
+        payload = _decode_jwt_payload(token)
+        user = identity(payload)
+
+        if not user:
+            return jsonify({
+                'valid': False,
+                'error': 'Usuario no encontrado'
+            }), 401
+
+        return jsonify({
+            'valid': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'role': user.role
+            }
+        }), 200
+
+    except ValueError as e:
+        return jsonify({
+            'valid': False,
+            'error': str(e)
+        }), 401
+    except Exception as e:
+        app.logger.error(f"Error en api_verify_token: {str(e)}", exc_info=True)
+        return jsonify({
+            'valid': False,
+            'error': 'Error al verificar el token'
+        }), 500
+
+
+@app.route('/api/refresh-token', methods=['POST'])
+def api_refresh_token():
+    """
+    Refresca un token JWT existente generando uno nuevo.
+
+    Request Headers:
+        Authorization: JWT <token>
+
+    Response (Success):
+        {
+            "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+            "user": {
+                "id": 123,
+                "username": "usuario@ejemplo.com",
+                "role": "alumno"
+            }
+        }
+
+    Response (Error):
+        {
+            "error": "Descripción del error"
+        }
+    """
+    try:
+        # Obtener el token del header
+        auth_header = request.headers.get('Authorization')
+
+        if not auth_header:
+            return jsonify({'error': 'Token no proporcionado'}), 400
+
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0] != 'JWT':
+            return jsonify({'error': 'Formato de autorización inválido. Use: JWT <token>'}), 400
+
+        token = parts[1]
+
+        # Verificar el token actual (incluso si está expirado, queremos el user_id)
+        try:
+            payload = _decode_jwt_payload(token)
+        except ValueError:
+            # Si el token está expirado, intentar decodificarlo sin verificar expiración
+            try:
+                header_b64, payload_b64, signature_b64 = token.split('.')
+                payload = json.loads(_b64url_decode(payload_b64))
+            except:
+                return jsonify({'error': 'Token inválido'}), 401
+
+        # Obtener el usuario
+        user = identity(payload)
+
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 401
+
+        # Generar un nuevo token
+        new_payload = build_jwt_payload(user)
+        new_token = _encode_jwt_payload(new_payload)
+
+        return jsonify({
+            'access_token': new_token,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'role': user.role
+            }
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error en api_refresh_token: {str(e)}", exc_info=True)
+        return jsonify({
+            'error': 'Error al refrescar el token',
+            'message': str(e) if app.debug else 'Ha ocurrido un error inesperado'
+        }), 500
+
+
 @app.route('/api/participantes')
+@jwt_required()
 def api_participantes():
     """Devuelve la lista de participantes para un PIN de cuestionario."""
     pin = request.args.get('pin')
@@ -1096,6 +1729,7 @@ def api_participantes():
     return jsonify({'participantes': participantes})
 
 @app.route('/api/iniciar_sesion/<pin>', methods=['POST'])
+@jwt_required()
 def api_iniciar_sesion(pin):
     """Marca una sesión de cuestionario como iniciada."""
     if not g.user:
@@ -1192,6 +1826,7 @@ def sesion_pregunta(pin, num_pregunta):
         return redirect(url_for('home'))
 
 @app.route('/api/sesion/responder', methods=['POST'])
+@jwt_required()
 def api_responder_pregunta():
     """API para que un usuario individual guarde su respuesta."""
     if not g.user:
@@ -1270,12 +1905,12 @@ def explore():
     if not g.user:
         flash('Debes iniciar sesión para explorar cuestionarios', 'warning')
         return redirect(url_for('login'))
-    
+
     # Solo docentes pueden explorar cuestionarios
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden explorar cuestionarios', 'error')
         return redirect(url_for('home'))
-    
+
     search_query = request.args.get('q', '').strip()
 
     db = bd.obtener_conexion()
@@ -1330,11 +1965,11 @@ def editor():
     if g.user is None:
         flash('Debes iniciar sesión para acceder al editor', 'warning')
         return redirect(url_for('login'))
-    
+
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden crear cuestionarios', 'error')
         return redirect(url_for('home'))
-    
+
     return render_template('editor.html', title='Editor', creating_quiz=True)
 
 
@@ -1344,12 +1979,12 @@ def quiz_details(cuestionario_id):
     if not g.user:
         flash('Debes iniciar sesión para ver cuestionarios', 'warning')
         return redirect(url_for('login'))
-    
+
     # Solo docentes pueden ver detalles de cuestionarios
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden ver cuestionarios', 'error')
         return redirect(url_for('home'))
-    
+
     db = bd.obtener_conexion()
     cursor = db.cursor()
 
@@ -1436,7 +2071,7 @@ def editor_edit(cuestionario_id):
     if g.user is None:
         flash('Debes iniciar sesión para editar cuestionarios', 'warning')
         return redirect(url_for('login'))
-    
+
     # Solo docentes pueden editar cuestionarios
     if g.user.get('role') != 'docente':
         flash('Solo los docentes pueden editar cuestionarios', 'error')
@@ -1459,11 +2094,12 @@ def editor_edit(cuestionario_id):
 #  API de cuestionarios
 # =====================
 @app.route('/api/cuestionario', methods=['POST'])
+@jwt_required()
 def crear_cuestionario():
     """Crear un nuevo cuestionario"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
-    
+
     # Verificar que solo los docentes puedan crear cuestionarios
     if g.user.get('role') != 'docente':
         return jsonify({'error': 'Solo los docentes pueden crear cuestionarios'}), 403
@@ -1500,11 +2136,12 @@ def crear_cuestionario():
 
 
 @app.route('/api/cuestionario/<int:cuestionario_id>', methods=['PUT', 'POST'])
+@jwt_required()
 def actualizar_cuestionario(cuestionario_id):
     """Actualizar un cuestionario existente"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
-    
+
     # Verificar que solo los docentes puedan actualizar cuestionarios
     if g.user.get('role') != 'docente':
         return jsonify({'error': 'Solo los docentes pueden actualizar cuestionarios'}), 403
@@ -1543,11 +2180,12 @@ def actualizar_cuestionario(cuestionario_id):
 
 
 @app.route('/api/cuestionario/<int:cuestionario_id>', methods=['GET'])
+@jwt_required()
 def obtener_cuestionario(cuestionario_id):
     """Obtener un cuestionario con todas sus preguntas"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
-    
+
     # Solo docentes pueden obtener cuestionarios
     if g.user.get('role') != 'docente':
         return jsonify({'error': 'Solo los docentes pueden obtener cuestionarios'}), 403
@@ -1559,11 +2197,12 @@ def obtener_cuestionario(cuestionario_id):
 
 
 @app.route('/api/cuestionario/<int:cuestionario_id>', methods=['DELETE'])
+@jwt_required()
 def eliminar_cuestionario(cuestionario_id):
     """Eliminar un cuestionario"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
-    
+
     # Solo docentes pueden eliminar cuestionarios
     if g.user.get('role') != 'docente':
         return jsonify({'error': 'Solo los docentes pueden eliminar cuestionarios'}), 403
@@ -1575,11 +2214,12 @@ def eliminar_cuestionario(cuestionario_id):
 
 
 @app.route('/api/importar-preguntas-excel', methods=['POST'])
+@jwt_required()
 def importar_preguntas_excel():
     """Importar preguntas desde un archivo Excel"""
     if g.user is None:
         return jsonify({'error': 'No autorizado'}), 401
-    
+
     # Solo docentes pueden importar preguntas
     if g.user.get('role') != 'docente':
         return jsonify({'error': 'Solo los docentes pueden importar preguntas'}), 403
@@ -1590,7 +2230,7 @@ def importar_preguntas_excel():
             return jsonify({'success': False, 'error': 'No se encontró el archivo Excel'}), 400
 
         file = request.files['excel_file']
-        
+
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No se seleccionó ningún archivo'}), 400
 
@@ -1600,14 +2240,14 @@ def importar_preguntas_excel():
 
         # Leer el archivo Excel
         from openpyxl import load_workbook
-        
+
         try:
             # Cargar el workbook
             wb = load_workbook(file, data_only=True)
             ws = wb.active
-            
+
             preguntas = []
-            
+
             # Saltar la fila de encabezados (fila 1)
             for row_num in range(2, ws.max_row + 1):
                 # Leer datos de la fila
@@ -1615,14 +2255,14 @@ def importar_preguntas_excel():
                 tipo_pregunta = ws.cell(row=row_num, column=2).value
                 puntos = ws.cell(row=row_num, column=3).value
                 tiempo = ws.cell(row=row_num, column=4).value
-                
+
                 # Leer respuestas (columnas 5-9: respuesta 1-5)
                 respuestas_texto = []
                 for col in range(5, 10):
                     resp = ws.cell(row=row_num, column=col).value
                     if resp:
                         respuestas_texto.append(str(resp).strip())
-                
+
                 # Leer respuestas correctas (columnas 10-14: correcta 1-5)
                 respuestas_correctas = []
                 for col in range(10, 15):
@@ -1634,16 +2274,16 @@ def importar_preguntas_excel():
                         respuestas_correctas.append(es_correcta)
                     else:
                         respuestas_correctas.append(False)
-                
+
                 # Validaciones básicas
                 if not pregunta_texto or str(pregunta_texto).strip() == '':
                     continue  # Saltar filas vacías
-                
+
                 # Validar tipo de pregunta
                 tipo_pregunta_str = str(tipo_pregunta).strip().lower() if tipo_pregunta else 'multiple'
                 if tipo_pregunta_str not in ['multiple', 'simple', 'verdadero-falso']:
                     tipo_pregunta_str = 'multiple'
-                
+
                 # Validar puntos
                 try:
                     puntos = int(puntos) if puntos else 1
@@ -1651,7 +2291,7 @@ def importar_preguntas_excel():
                         puntos = 1
                 except:
                     puntos = 1
-                
+
                 # Validar tiempo
                 try:
                     tiempo = int(tiempo) if tiempo else 30
@@ -1659,7 +2299,7 @@ def importar_preguntas_excel():
                         tiempo = 30
                 except:
                     tiempo = 30
-                
+
                 # Construir las respuestas
                 respuestas = []
                 for i, texto in enumerate(respuestas_texto):
@@ -1669,15 +2309,15 @@ def importar_preguntas_excel():
                             'text': texto,
                             'isCorrect': es_correcta
                         })
-                
+
                 # Validar que haya al menos 2 respuestas
                 if len(respuestas) < 2:
                     continue
-                
+
                 # Validar que haya al menos una respuesta correcta
                 if not any(r['isCorrect'] for r in respuestas):
                     continue
-                
+
                 # Agregar la pregunta
                 preguntas.append({
                     'text': str(pregunta_texto).strip(),
@@ -1686,25 +2326,25 @@ def importar_preguntas_excel():
                     'time': tiempo,
                     'answers': respuestas
                 })
-            
+
             if len(preguntas) == 0:
                 return jsonify({
                     'success': False,
                     'error': 'No se encontraron preguntas válidas en el archivo. Verifica el formato.'
                 }), 400
-            
+
             return jsonify({
                 'success': True,
                 'preguntas': preguntas,
                 'message': f'Se importaron {len(preguntas)} pregunta(s) correctamente'
             })
-            
+
         except Exception as e:
             return jsonify({
                 'success': False,
                 'error': f'Error al procesar el archivo Excel: {str(e)}'
             }), 400
-            
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1835,11 +2475,12 @@ def grupos():
                          grupos_publicos=grupos_publicos)
 
 @app.route('/api/grupos/crear', methods=['POST'])
+@jwt_required()
 def api_crear_grupo():
     """API para crear un nuevo grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     # Verificar que solo los docentes puedan crear grupos/salas
     if g.user.get('role') != 'docente':
         return jsonify({'success': False, 'message': 'Solo los docentes pueden crear salas'}), 403
@@ -1890,6 +2531,7 @@ def api_crear_grupo():
         return jsonify({'success': False, 'message': f'Error al crear grupo: {str(e)}'})
 
 @app.route('/api/grupos/unirse', methods=['POST'])
+@jwt_required()
 def api_unirse_grupo():
     """API para unirse a un grupo por código"""
     if not g.user:
@@ -1940,6 +2582,7 @@ def api_unirse_grupo():
         return jsonify({'success': False, 'message': f'Error al unirse al grupo: {str(e)}'})
 
 @app.route('/api/grupos/salir', methods=['POST'])
+@jwt_required()
 def api_salir_grupo():
     """API para salir de un grupo"""
     if not g.user:
@@ -1977,11 +2620,12 @@ def api_salir_grupo():
         return jsonify({'success': False, 'message': f'Error al salir del grupo: {str(e)}'})
 
 @app.route('/api/grupos/cuestionarios')
+@jwt_required()
 def api_grupos_cuestionarios():
     """API para obtener cuestionarios disponibles para grupos"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     # Solo docentes pueden obtener cuestionarios
     if g.user.get('role') != 'docente':
         return jsonify({'success': False, 'message': 'Solo los docentes pueden acceder a cuestionarios'}), 403
@@ -2014,11 +2658,12 @@ def api_grupos_cuestionarios():
         return jsonify({'success': False, 'message': f'Error al cargar cuestionarios: {str(e)}'})
 
 @app.route('/api/grupos/iniciar-cuestionario', methods=['POST'])
+@jwt_required()
 def api_iniciar_cuestionario_grupo():
     """API para iniciar un cuestionario en grupo"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     # Solo docentes pueden iniciar cuestionarios en grupo
     if g.user.get('role') != 'docente':
         return jsonify({'success': False, 'message': 'Solo los docentes pueden iniciar cuestionarios'}), 403
@@ -2183,11 +2828,12 @@ def unirse_sala():
     if not g.user:
         flash('Debes iniciar sesión para unirte a una sala', 'warning')
         return redirect(url_for('login'))
-    
+
     return render_template('unirse_sala.html')
 
 
 @app.route('/api/grupo/unirse-sesion', methods=['POST'])
+@jwt_required()
 def api_unirse_sesion_grupo():
     """API para unirse a una sesión de grupo usando el código de sala"""
     if not g.user:
@@ -2262,6 +2908,7 @@ def api_unirse_sesion_grupo():
         return jsonify({'success': False, 'message': f'Error al unirse a la sesión: {str(e)}'}), 500
 
 @app.route('/api/grupo/ready', methods=['POST'])
+@jwt_required()
 def api_grupo_ready():
     """API para marcar usuario como listo y, si todos los que están en la sala están listos, iniciar la sesión."""
     if not g.user:
@@ -2468,6 +3115,7 @@ def grupo_juego(sesion_id):
         return redirect(url_for('grupos'))
 
 @app.route('/api/grupo/miembros/<int:sesion_id>')
+@jwt_required()
 def api_grupo_miembros(sesion_id):
     """API para obtener la lista actualizada de miembros en una sesión"""
     if not g.user:
@@ -2499,6 +3147,7 @@ def api_grupo_miembros(sesion_id):
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/api/grupo/status/<int:sesion_id>')
+@jwt_required()
 def api_grupo_status(sesion_id):
     """API para obtener el estado de la sesión"""
     if not g.user:
@@ -2526,6 +3175,7 @@ def api_grupo_status(sesion_id):
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
 @app.route('/api/grupo/answer', methods=['POST'])
+@jwt_required()
 def api_grupo_answer():
     """API para enviar respuesta del usuario con cálculo de puntos"""
     if not g.user:
@@ -2551,18 +3201,18 @@ def api_grupo_answer():
                 VALUES (%s, %s, %s, NULL, 0, 0, %s)
                 ON DUPLICATE KEY UPDATE opcion_id = NULL, es_correcta = 0, puntos = 0, tiempo_respuesta = %s
             """, (sesion_id, g.user['id'], question_id, tiempo_respuesta, tiempo_respuesta))
-            
+
             db.commit()
-            
+
             # Actualizar pregunta actual del usuario
             cursor.execute("""
-                UPDATE usuario_estado_grupo 
-                SET pregunta_actual = %s 
+                UPDATE usuario_estado_grupo
+                SET pregunta_actual = %s
                 WHERE sesion_id = %s AND user_id = %s
             """, (question_id, sesion_id, g.user['id']))
-            
+
             db.commit()
-            
+
             return jsonify({
                 'success': True,
                 'correct': False,
@@ -2603,14 +3253,14 @@ def api_grupo_answer():
               answer_id, es_correcta, puntos, tiempo_respuesta))
 
         db.commit()
-        
+
         # Actualizar pregunta actual del usuario
         cursor.execute("""
-            UPDATE usuario_estado_grupo 
-            SET pregunta_actual = %s 
+            UPDATE usuario_estado_grupo
+            SET pregunta_actual = %s
             WHERE sesion_id = %s AND user_id = %s
         """, (question_id, sesion_id, g.user['id']))
-        
+
         db.commit()
 
         return jsonify({
@@ -2623,7 +3273,7 @@ def api_grupo_answer():
         if db:
             db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -2631,6 +3281,7 @@ def api_grupo_answer():
             db.close()
 
 @app.route('/api/grupo/pregunta-estado/<int:sesion_id>/<int:pregunta_id>')
+@jwt_required()
 def api_grupo_pregunta_estado(sesion_id, pregunta_id):
     """API para verificar si todos respondieron una pregunta"""
     if not g.user:
@@ -2670,7 +3321,7 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
 
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -2679,6 +3330,7 @@ def api_grupo_pregunta_estado(sesion_id, pregunta_id):
 
 
 @app.route('/api/grupo/obtener-pregunta-actual/<int:sesion_id>')
+@jwt_required()
 def api_grupo_obtener_pregunta_actual(sesion_id):
     """API para obtener el índice de la pregunta actual del usuario o del host"""
     if not g.user:
@@ -2696,11 +3348,11 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
             FROM sesiones_grupo sg
             WHERE sg.id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
         if not sesion:
             return jsonify({'success': False, 'message': 'Sesión no encontrada'})
-        
+
         # Obtener todas las preguntas ordenadas
         cursor.execute("""
             SELECT id
@@ -2708,9 +3360,9 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
             WHERE cuestionario_id = %s
             ORDER BY orden ASC
         """, (sesion['cuestionario_id'],))
-        
+
         preguntas = cursor.fetchall()
-        
+
         # Si es el creador (host), usar pregunta_actual_id de sesiones_grupo
         if sesion['iniciado_por'] == g.user['id']:
             if sesion['pregunta_actual_id'] is not None:
@@ -2730,16 +3382,16 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
                 'pregunta_index': 0,
                 'total_preguntas': len(preguntas)
             })
-        
+
         # Para estudiantes: Verificar si el usuario está en la sesión
         cursor.execute("""
-            SELECT pregunta_actual 
-            FROM usuario_estado_grupo 
+            SELECT pregunta_actual
+            FROM usuario_estado_grupo
             WHERE sesion_id = %s AND user_id = %s
         """, (sesion_id, g.user['id']))
-        
+
         resultado = cursor.fetchone()
-        
+
         if not resultado:
             # Usuario no registrado, empezar desde 0
             return jsonify({
@@ -2748,7 +3400,7 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
                 'pregunta_index': 0,
                 'total_preguntas': len(preguntas)
             })
-        
+
         # CORRECCIÓN: Usar pregunta_actual_id de sesiones_grupo para sincronizar todos
         # Esto asegura que todos los usuarios estén en la misma pregunta que el host
         if sesion['pregunta_actual_id'] is not None:
@@ -2761,7 +3413,7 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
                         'pregunta_index': idx,
                         'total_preguntas': len(preguntas)
                     })
-        
+
         # Si no hay pregunta actual en la sesión, buscar la última pregunta del usuario
         if resultado['pregunta_actual'] is not None:
             pregunta_id_actual = resultado['pregunta_actual']
@@ -2776,7 +3428,7 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
                         'pregunta_index': idx,
                         'total_preguntas': len(preguntas)
                     })
-        
+
         # Buscar la última pregunta que respondió
         cursor.execute("""
             SELECT pregunta_id
@@ -2785,9 +3437,9 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
             ORDER BY created_at DESC
             LIMIT 1
         """, (sesion_id, g.user['id']))
-        
+
         ultima_respuesta = cursor.fetchone()
-        
+
         if ultima_respuesta:
             pregunta_id_actual = ultima_respuesta['pregunta_id']
             # Buscar el índice de esta pregunta
@@ -2800,7 +3452,7 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
                         'pregunta_index': idx,
                         'total_preguntas': len(preguntas)
                     })
-        
+
         # No ha respondido nada, empezar desde 0
         return jsonify({
             'success': True,
@@ -2811,7 +3463,7 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
 
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -2819,36 +3471,37 @@ def api_grupo_obtener_pregunta_actual(sesion_id):
             db.close()
 
 @app.route('/api/grupo/timer-sync/<int:sesion_id>', methods=['GET'])
+@jwt_required()
 def api_grupo_timer_sync(sesion_id):
     """API para sincronizar el timer entre todos los jugadores"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     db = None
     cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Obtener información del timer actual de la sesión
         cursor.execute("""
-            SELECT 
+            SELECT
                 pregunta_actual_id,
                 pregunta_inicio_time,
                 pregunta_tiempo_limite
             FROM sesiones_grupo
             WHERE id = %s
         """, (sesion_id,))
-        
+
         sesion_info = cursor.fetchone()
-        
+
         if not sesion_info or not sesion_info['pregunta_inicio_time']:
             return jsonify({
                 'success': False,
                 'message': 'No hay pregunta activa',
                 'tiempo_restante': 0
             })
-        
+
         # Calcular tiempo transcurrido
         from datetime import datetime
         inicio = sesion_info['pregunta_inicio_time']
@@ -2856,17 +3509,17 @@ def api_grupo_timer_sync(sesion_id):
         tiempo_transcurrido = (ahora - inicio).total_seconds()
         tiempo_limite = sesion_info['pregunta_tiempo_limite'] or 30
         tiempo_restante = max(0, int(tiempo_limite - tiempo_transcurrido))
-        
+
         return jsonify({
             'success': True,
             'tiempo_restante': tiempo_restante,
             'pregunta_id': sesion_info['pregunta_actual_id'],
             'tiempo_limite': tiempo_limite
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -2874,33 +3527,34 @@ def api_grupo_timer_sync(sesion_id):
             db.close()
 
 @app.route('/api/grupo/set-pregunta-actual', methods=['POST'])
+@jwt_required()
 def api_grupo_set_pregunta_actual():
     """API para que el docente establezca la pregunta actual (inicia el timer compartido)"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     data = request.get_json()
     sesion_id = data.get('sesion_id')
     pregunta_id = data.get('pregunta_id')
     tiempo_limite = data.get('tiempo_limite', 30)
-    
+
     db = None
     cursor = None
     try:
         db = bd.obtener_conexion()
         cursor = db.cursor()
-        
+
         # Verificar que el usuario es el creador de la sesión
         cursor.execute("""
             SELECT iniciado_por
             FROM sesiones_grupo
             WHERE id = %s
         """, (sesion_id,))
-        
+
         sesion = cursor.fetchone()
         if not sesion or sesion['iniciado_por'] != g.user['id']:
             return jsonify({'success': False, 'message': 'No autorizado - solo el creador puede controlar el timer'}), 403
-        
+
         # Actualizar la pregunta actual y el timestamp de inicio
         from datetime import datetime
         cursor.execute("""
@@ -2910,19 +3564,19 @@ def api_grupo_set_pregunta_actual():
                 pregunta_tiempo_limite = %s
             WHERE id = %s
         """, (pregunta_id, datetime.now(), tiempo_limite, sesion_id))
-        
+
         db.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Timer sincronizado iniciado'
         })
-        
+
     except Exception as e:
         if db:
             db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -2930,6 +3584,7 @@ def api_grupo_set_pregunta_actual():
             db.close()
 
 @app.route('/api/grupo/start-game', methods=['POST'])
+@jwt_required()
 def api_start_game():
     """API para que el creador inicie el juego (sin necesidad de que estén listos)"""
     if not g.user:
@@ -2977,7 +3632,7 @@ def api_start_game():
         db.close()
 
         mensaje = f'Juego iniciado con {participantes} participante(s)' if participantes > 0 else 'Juego iniciado (modo prueba sin participantes)'
-        
+
         return jsonify({
             'success': True,
             'message': mensaje,
@@ -2988,6 +3643,7 @@ def api_start_game():
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/api/grupo/finalizar-sesion', methods=['POST'])
+@jwt_required()
 def api_finalizar_sesion():
     """API para marcar la sesión como finalizada y asignar recompensas"""
     if not g.user:
@@ -3010,7 +3666,7 @@ def api_finalizar_sesion():
         """, (sesion_id,))
 
         db.commit()
-        
+
         # Asignar puntosmoneda a los ganadores
         asignar_puntosmoneda_grupo(sesion_id)
 
@@ -3020,7 +3676,7 @@ def api_finalizar_sesion():
         if db:
             db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -3098,6 +3754,7 @@ def grupo_resultados(sesion_id):
         return redirect(url_for('grupos'))
 
 @app.route('/api/grupo/results/<int:sesion_id>')
+@jwt_required()
 def api_grupo_results(sesion_id):
     """API para obtener resultados del grupo"""
     if not g.user:
@@ -3148,6 +3805,7 @@ def api_grupo_results(sesion_id):
 
 
 @app.route('/api/grupo/resultados/<int:sesion_id>/compartir-creador', methods=['POST'])
+@jwt_required()
 def api_grupo_resultados_compartir_creador(sesion_id):
     """Envía un correo al creador de la sesión con el link de la carpeta de Drive donde se guardan los resultados."""
     if not g.user:
@@ -3337,11 +3995,12 @@ def resultados_quiz(pin):
 # =====================
 
 @app.route('/api/individual/iniciar-cuestionario', methods=['POST'])
+@jwt_required()
 def api_iniciar_cuestionario_individual():
     """API para iniciar un cuestionario individual con sistema de sala"""
     if not g.user:
         return jsonify({'success': False, 'message': 'No autorizado'}), 401
-    
+
     # Solo docentes pueden iniciar cuestionarios individuales
     if g.user.get('role') != 'docente':
         return jsonify({'success': False, 'message': 'Solo los docentes pueden iniciar cuestionarios'}), 403
@@ -3477,6 +4136,7 @@ def individual_quiz(sesion_id):
         return redirect(url_for('my_quizzes'))
 
 @app.route('/api/individual/unirse-sesion', methods=['POST'])
+@jwt_required()
 def api_unirse_sesion_individual():
     """API para unirse a una sesión individual usando el código de sala"""
     if not g.user:
@@ -3527,6 +4187,7 @@ def api_unirse_sesion_individual():
         return jsonify({'success': False, 'message': f'Error al unirse: {str(e)}'})
 
 @app.route('/api/individual/ready', methods=['POST'])
+@jwt_required()
 def api_individual_ready():
     """API para marcar al usuario como listo en sesión individual"""
     if not g.user:
@@ -3691,6 +4352,7 @@ def individual_juego(sesion_id):
         return redirect(url_for('my_quizzes'))
 
 @app.route('/api/individual/participantes/<int:sesion_id>')
+@jwt_required()
 def api_individual_participantes(sesion_id):
     """API para obtener la lista actualizada de participantes en una sesión"""
     if not g.user:
@@ -3721,6 +4383,7 @@ def api_individual_participantes(sesion_id):
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
 @app.route('/api/individual/status/<int:sesion_id>')
+@jwt_required()
 def api_individual_status(sesion_id):
     """API para obtener el estado de la sesión"""
     if not g.user:
@@ -3748,6 +4411,7 @@ def api_individual_status(sesion_id):
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
 @app.route('/api/individual/answer', methods=['POST'])
+@jwt_required()
 def api_individual_answer():
     """API para enviar respuesta en sesión individual (igual que grupos)"""
     if not g.user:
@@ -3771,20 +4435,20 @@ def api_individual_answer():
                 VALUES (%s, %s, %s, NULL, 0, 0, %s)
                 ON DUPLICATE KEY UPDATE opcion_id = NULL, es_correcta = 0, puntos = 0, tiempo_respuesta = %s
             """, (sesion_id, g.user['id'], question_id, tiempo_respuesta, tiempo_respuesta))
-            
+
             db.commit()
-            
+
             # Actualizar pregunta actual del usuario
             cursor.execute("""
-                UPDATE usuario_estado_individual 
-                SET pregunta_actual = %s 
+                UPDATE usuario_estado_individual
+                SET pregunta_actual = %s
                 WHERE sesion_id = %s AND user_id = %s
             """, (question_id, sesion_id, g.user['id']))
-            
+
             db.commit()
             cursor.close()
             db.close()
-            
+
             return jsonify({
                 'success': True,
                 'correct': False,
@@ -3827,14 +4491,14 @@ def api_individual_answer():
               answer_id, es_correcta, puntos, tiempo_respuesta))
 
         db.commit()
-        
+
         # Actualizar pregunta actual del usuario
         cursor.execute("""
-            UPDATE usuario_estado_individual 
-            SET pregunta_actual = %s 
+            UPDATE usuario_estado_individual
+            SET pregunta_actual = %s
             WHERE sesion_id = %s AND user_id = %s
         """, (question_id, sesion_id, g.user['id']))
-        
+
         db.commit()
         cursor.close()
         db.close()
@@ -3849,6 +4513,7 @@ def api_individual_answer():
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/api/individual/finalizar-sesion', methods=['POST'])
+@jwt_required()
 def api_finalizar_sesion_individual():
     """API para marcar sesión individual como finalizada y asignar recompensas"""
     if not g.user:
@@ -3870,7 +4535,7 @@ def api_finalizar_sesion_individual():
         """, (sesion_id,))
 
         db.commit()
-        
+
         # Asignar puntosmoneda a los ganadores
         asignar_puntosmoneda_individual(sesion_id)
 
@@ -3880,7 +4545,7 @@ def api_finalizar_sesion_individual():
         if db:
             db.rollback()
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-    
+
     finally:
         if cursor:
             cursor.close()
@@ -4266,11 +4931,11 @@ def descargar_plantilla_ejemplo():
         import os
         # La plantilla debe estar en la raíz del proyecto Kahoot
         plantilla_path = os.path.join(os.path.dirname(__file__), 'plantilla_preguntas_ejemplo.xlsx')
-        
+
         if not os.path.exists(plantilla_path):
             flash('La plantilla de ejemplo no está disponible', 'error')
             return redirect(url_for('editor'))
-        
+
         return send_file(
             plantilla_path,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -4281,6 +4946,2297 @@ def descargar_plantilla_ejemplo():
         flash(f'Error al descargar la plantilla: {str(e)}', 'error')
         return redirect(url_for('editor'))
 
+#----------------------------------------
+
+
+
+# =====================================================
+# HELPER FUNCTIONS PARA APIs
+# =====================================================
+
+def respuesta_exitosa(data, mensaje="Operación exitosa"):
+    """Formato estándar de respuesta exitosa"""
+    return jsonify({
+        "code": 1,
+        "data": data,
+        "message": mensaje
+    })
+
+
+def respuesta_error(mensaje, data=None):
+    """Formato estándar de respuesta de error"""
+    return jsonify({
+        "code": 0,
+        "data": data if data else {},
+        "message": mensaje
+    })
+
+
+def obtener_datos_request():
+    """
+    Devuelve un diccionario con los datos enviados en la petición
+    sin importar si llegaron como JSON o form-data.
+    """
+    if request.is_json:
+        data = request.get_json(silent=True)
+        if isinstance(data, dict):
+            return data
+    if request.form:
+        return request.form.to_dict(flat=True)
+    return {}
+
+
+def obtener_id_param(datos, nombre="id"):
+    """
+    Busca un identificador en el cuerpo de la petición o en los query params.
+    """
+    valor = datos.get(nombre)
+    if valor is None or valor == "":
+        valor = request.args.get(nombre)
+    return valor
+
+
+def validar_entero(valor, nombre="id"):
+    """
+    Valida que un valor sea un entero y devuelve su versión normalizada.
+    """
+    if valor is None or str(valor).strip() == "":
+        raise ValueError(f"Debe proporcionar el campo '{nombre}'")
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        raise ValueError(f"El campo '{nombre}' debe ser numérico")
+
+
+# =====================================================
+# APIs TABLA: users
+# =====================================================
+
+@app.route("/api/users/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_user():
+    """Registra un nuevo usuario (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        username = datos.get("username")
+        email = datos.get("email")
+        password = datos.get("password")
+        role = datos.get("role", "usuario")
+        puntosmoneda = datos.get("puntosmoneda", 0)
+
+        # Encriptar password antes de guardar
+        password_encriptado = encriptar_sha256(password)
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO users (username, email, password, role, puntosmoneda) VALUES (%s, %s, %s, %s, %s)",
+                    (username, email, password_encriptado, role, puntosmoneda)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Usuario registrado correctamente")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return respuesta_error(f"Error al registrar usuario: {repr(e)}")
+
+
+@app.route("/api/users/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_user():
+    """Actualiza un usuario existente (Requiere JWT)"""
+    try:
+        datos = request.json
+        id_user = datos.get("id")
+        username = datos.get("username")
+        email = datos.get("email")
+        password = datos.get("password")
+        role = datos.get("role")
+        puntosmoneda = datos.get("puntosmoneda")
+
+        # Encriptar password si se proporciona
+        if password:
+            password = encriptar_sha256(password)
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE users SET username=%s, email=%s, password=%s, role=%s, puntosmoneda=%s WHERE id=%s",
+                    (username, email, password, role, puntosmoneda, id_user)
+                )
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_user}, "Usuario actualizado correctamente")
+    except Exception as e:
+        import sys
+        import traceback
+        print("\n=== ERROR EN ACTUALIZAR USER ===", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({
+            "code": 0,
+            "data": {},
+            "message": "Error al actualizar usuario"
+        })
+
+
+@app.route("/api/users/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_user_id(id=0):
+    """Obtiene un usuario por ID"""
+    try:
+        if request.method == 'POST':
+            id = request.json.get("id")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM users WHERE id=%s", (id,))
+                usuario = cursor.fetchone()
+
+        if usuario:
+            return respuesta_exitosa(usuario, "Usuario obtenido correctamente")
+        else:
+            return respuesta_error("Usuario no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener usuario: {repr(e)}")
+
+
+@app.route("/api/users/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_users():
+    """Obtiene todos los usuarios"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM users")
+                usuarios = cursor.fetchall()
+
+        return respuesta_exitosa(usuarios, f"Se encontraron {len(usuarios)} usuarios")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener usuarios: {repr(e)}")
+
+
+@app.route("/api/users/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_user():
+    """Elimina un usuario (Requiere JWT)"""
+    try:
+        datos = {}
+        if request.is_json:
+            datos = request.get_json(silent=True) or {}
+        elif request.form:
+            datos = request.form
+
+        id_user = datos.get("id") or request.args.get("id")
+
+        if not id_user:
+            return respuesta_error("Debe proporcionar el id del usuario a eliminar")
+
+        try:
+            id_user = int(id_user)
+        except (TypeError, ValueError):
+            return respuesta_error("El id del usuario debe ser numérico")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM users WHERE id=%s", (id_user,))
+                if filas == 0:
+                    return respuesta_error("Usuario no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_user}, "Usuario eliminado correctamente")
+    except Exception as e:
+        import sys
+        import traceback
+        print("\n=== ERROR EN ELIMINAR USER ===", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({
+            "code": 0,
+            "data": {},
+            "message": "Error al eliminar usuario"
+        })
+
+
+# =====================================================
+# APIs TABLA: grupos
+# =====================================================
+
+@app.route("/api/grupos/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_grupo():
+    """Registra un nuevo grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        nombre = datos.get("nombre")
+        descripcion = datos.get("descripcion")
+        codigo = datos.get("codigo")
+        es_publico = datos.get("es_publico", 0)
+        admin_id = datos.get("admin_id")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO grupos (nombre, descripcion, codigo, es_publico, admin_id) VALUES (%s, %s, %s, %s, %s)",
+                    (nombre, descripcion, codigo, es_publico, admin_id)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Grupo registrado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar grupo: {str(e)}")
+
+
+@app.route("/api/grupos/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_grupo():
+    """Actualiza un grupo existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_grupo = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        nombre = datos.get("nombre")
+        descripcion = datos.get("descripcion")
+        codigo = datos.get("codigo")
+        es_publico = datos.get("es_publico")
+        admin_id = datos.get("admin_id")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE grupos SET nombre=%s, descripcion=%s, codigo=%s, es_publico=%s, admin_id=%s WHERE id=%s",
+                    (nombre, descripcion, codigo, es_publico, admin_id, id_grupo)
+                )
+                if filas == 0:
+                    return respuesta_error("Grupo no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_grupo}, "Grupo actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar grupo: {str(e)}")
+
+
+@app.route("/api/grupos/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_grupo_id(id=0):
+    """Obtiene un grupo por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM grupos WHERE id=%s", (target_id,))
+                grupo = cursor.fetchone()
+
+        if grupo:
+            return respuesta_exitosa(grupo, "Grupo obtenido correctamente")
+        else:
+            return respuesta_error("Grupo no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener grupo: {str(e)}")
+
+
+@app.route("/api/grupos/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_grupos():
+    """Obtiene todos los grupos"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM grupos")
+                grupos = cursor.fetchall()
+
+        return respuesta_exitosa(grupos, f"Se encontraron {len(grupos)} grupos")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener grupos: {str(e)}")
+
+
+@app.route("/api/grupos/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_grupo():
+    """Elimina un grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_grupo = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM grupos WHERE id=%s", (id_grupo,))
+                if filas == 0:
+                    return respuesta_error("Grupo no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_grupo}, "Grupo eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar grupo: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: grupo_miembros
+# =====================================================
+
+@app.route("/api/grupo_miembros/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_grupo_miembro():
+    """Registra un nuevo miembro en un grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        grupo_id = datos.get("grupo_id")
+        user_id = datos.get("user_id")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO grupo_miembros (grupo_id, user_id) VALUES (%s, %s)",
+                    (grupo_id, user_id)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Miembro agregado al grupo correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al agregar miembro: {str(e)}")
+
+
+@app.route("/api/grupo_miembros/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_grupo_miembro():
+    """Actualiza un miembro de grupo existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_miembro = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        grupo_id = datos.get("grupo_id")
+        user_id = datos.get("user_id")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE grupo_miembros SET grupo_id=%s, user_id=%s WHERE id=%s",
+                    (grupo_id, user_id, id_miembro)
+                )
+                if filas == 0:
+                    return respuesta_error("Miembro no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_miembro}, "Miembro actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar miembro: {str(e)}")
+
+
+@app.route("/api/grupo_miembros/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_grupo_miembro_id(id=0):
+    """Obtiene un miembro de grupo por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM grupo_miembros WHERE id=%s", (target_id,))
+                miembro = cursor.fetchone()
+
+        if miembro:
+            return respuesta_exitosa(miembro, "Miembro obtenido correctamente")
+        else:
+            return respuesta_error("Miembro no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener miembro: {str(e)}")
+
+
+@app.route("/api/grupo_miembros/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_grupo_miembros():
+    """Obtiene todos los miembros de grupos"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM grupo_miembros")
+                miembros = cursor.fetchall()
+
+        return respuesta_exitosa(miembros, f"Se encontraron {len(miembros)} miembros")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener miembros: {str(e)}")
+
+
+@app.route("/api/grupo_miembros/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_grupo_miembro():
+    """Elimina un miembro de un grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_miembro = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM grupo_miembros WHERE id=%s", (id_miembro,))
+                if filas == 0:
+                    return respuesta_error("Miembro no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_miembro}, "Miembro eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar miembro: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: cuestionarios
+# =====================================================
+
+@app.route("/api/cuestionarios/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_cuestionario():
+    """Registra un nuevo cuestionario (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        user_id = datos.get("user_id")
+        titulo = datos.get("titulo")
+        descripcion = datos.get("descripcion")
+        imagen_portada = datos.get("imagen_portada")
+        pin = datos.get("pin")
+        estado = datos.get("estado", "publico")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO cuestionarios (user_id, titulo, descripcion, imagen_portada, pin, estado) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (user_id, titulo, descripcion, imagen_portada, pin, estado)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Cuestionario registrado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar cuestionario: {str(e)}")
+
+
+@app.route("/api/cuestionarios/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_cuestionario():
+    """Actualiza un cuestionario existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_cuestionario = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        user_id = datos.get("user_id")
+        titulo = datos.get("titulo")
+        descripcion = datos.get("descripcion")
+        imagen_portada = datos.get("imagen_portada")
+        pin = datos.get("pin")
+        estado = datos.get("estado")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE cuestionarios SET user_id=%s, titulo=%s, descripcion=%s, imagen_portada=%s, pin=%s, estado=%s WHERE id=%s",
+                    (user_id, titulo, descripcion, imagen_portada, pin, estado, id_cuestionario)
+                )
+                if filas == 0:
+                    return respuesta_error("Cuestionario no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_cuestionario}, "Cuestionario actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar cuestionario: {str(e)}")
+
+
+@app.route("/api/cuestionarios/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_cuestionario_id(id=0):
+    """Obtiene un cuestionario por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM cuestionarios WHERE id=%s", (target_id,))
+                cuestionario = cursor.fetchone()
+
+        if cuestionario:
+            return respuesta_exitosa(cuestionario, "Cuestionario obtenido correctamente")
+        else:
+            return respuesta_error("Cuestionario no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener cuestionario: {str(e)}")
+
+
+@app.route("/api/cuestionarios/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_cuestionarios():
+    """Obtiene todos los cuestionarios"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM cuestionarios")
+                cuestionarios = cursor.fetchall()
+
+        return respuesta_exitosa(cuestionarios, f"Se encontraron {len(cuestionarios)} cuestionarios")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener cuestionarios: {str(e)}")
+
+
+@app.route("/api/cuestionarios/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_cuestionario():
+    """Elimina un cuestionario (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_cuestionario = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM cuestionarios WHERE id=%s", (id_cuestionario,))
+                if filas == 0:
+                    return respuesta_error("Cuestionario no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_cuestionario}, "Cuestionario eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar cuestionario: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: preguntas
+# =====================================================
+
+@app.route("/api/preguntas/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_pregunta():
+    """Registra una nueva pregunta (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        cuestionario_id = datos.get("cuestionario_id")
+        tipo_pregunta = datos.get("tipo_pregunta")
+        texto_pregunta = datos.get("texto_pregunta")
+        imagen_pregunta = datos.get("imagen_pregunta")
+        orden = datos.get("orden", 0)
+        tiempo_limite = datos.get("tiempo_limite", 30)
+        puntos = datos.get("puntos", 1)
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO preguntas (cuestionario_id, tipo_pregunta, texto_pregunta, imagen_pregunta, orden, tiempo_limite, puntos) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (cuestionario_id, tipo_pregunta, texto_pregunta, imagen_pregunta, orden, tiempo_limite, puntos)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Pregunta registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar pregunta: {str(e)}")
+
+
+@app.route("/api/preguntas/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_pregunta():
+    """Actualiza una pregunta existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_pregunta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        cuestionario_id = datos.get("cuestionario_id")
+        tipo_pregunta = datos.get("tipo_pregunta")
+        texto_pregunta = datos.get("texto_pregunta")
+        imagen_pregunta = datos.get("imagen_pregunta")
+        orden = datos.get("orden")
+        tiempo_limite = datos.get("tiempo_limite")
+        puntos = datos.get("puntos")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE preguntas SET cuestionario_id=%s, tipo_pregunta=%s, texto_pregunta=%s, imagen_pregunta=%s, orden=%s, tiempo_limite=%s, puntos=%s WHERE id=%s",
+                    (cuestionario_id, tipo_pregunta, texto_pregunta, imagen_pregunta, orden, tiempo_limite, puntos, id_pregunta)
+                )
+                if filas == 0:
+                    return respuesta_error("Pregunta no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_pregunta}, "Pregunta actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar pregunta: {str(e)}")
+
+
+@app.route("/api/preguntas/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_pregunta_id(id=0):
+    """Obtiene una pregunta por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM preguntas WHERE id=%s", (target_id,))
+                pregunta = cursor.fetchone()
+
+        if pregunta:
+            return respuesta_exitosa(pregunta, "Pregunta obtenida correctamente")
+        else:
+            return respuesta_error("Pregunta no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener pregunta: {str(e)}")
+
+
+@app.route("/api/preguntas/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_preguntas():
+    """Obtiene todas las preguntas"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM preguntas")
+                preguntas = cursor.fetchall()
+
+        return respuesta_exitosa(preguntas, f"Se encontraron {len(preguntas)} preguntas")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener preguntas: {str(e)}")
+
+
+@app.route("/api/preguntas/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_pregunta():
+    """Elimina una pregunta (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_pregunta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM preguntas WHERE id=%s", (id_pregunta,))
+                if filas == 0:
+                    return respuesta_error("Pregunta no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_pregunta}, "Pregunta eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar pregunta: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: opciones_respuesta
+# =====================================================
+
+@app.route("/api/opciones_respuesta/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_opcion_respuesta():
+    """Registra una nueva opción de respuesta (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        pregunta_id = datos.get("pregunta_id")
+        texto_opcion = datos.get("texto_opcion")
+        es_correcta = datos.get("es_correcta", 0)
+        orden = datos.get("orden", 0)
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO opciones_respuesta (pregunta_id, texto_opcion, es_correcta, orden) VALUES (%s, %s, %s, %s)",
+                    (pregunta_id, texto_opcion, es_correcta, orden)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Opción de respuesta registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar opción de respuesta: {str(e)}")
+
+
+@app.route("/api/opciones_respuesta/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_opcion_respuesta():
+    """Actualiza una opción de respuesta existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_opcion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        pregunta_id = datos.get("pregunta_id")
+        texto_opcion = datos.get("texto_opcion")
+        es_correcta = datos.get("es_correcta")
+        orden = datos.get("orden")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE opciones_respuesta SET pregunta_id=%s, texto_opcion=%s, es_correcta=%s, orden=%s WHERE id=%s",
+                    (pregunta_id, texto_opcion, es_correcta, orden, id_opcion)
+                )
+                if filas == 0:
+                    return respuesta_error("Opción de respuesta no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_opcion}, "Opción de respuesta actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar opción de respuesta: {str(e)}")
+
+
+@app.route("/api/opciones_respuesta/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_opcion_respuesta_id(id=0):
+    """Obtiene una opción de respuesta por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM opciones_respuesta WHERE id=%s", (target_id,))
+                opcion = cursor.fetchone()
+
+        if opcion:
+            return respuesta_exitosa(opcion, "Opción de respuesta obtenida correctamente")
+        else:
+            return respuesta_error("Opción de respuesta no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener opción de respuesta: {str(e)}")
+
+
+@app.route("/api/opciones_respuesta/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_opciones_respuesta():
+    """Obtiene todas las opciones de respuesta"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM opciones_respuesta")
+                opciones = cursor.fetchall()
+
+        return respuesta_exitosa(opciones, f"Se encontraron {len(opciones)} opciones de respuesta")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener opciones de respuesta: {str(e)}")
+
+
+@app.route("/api/opciones_respuesta/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_opcion_respuesta():
+    """Elimina una opción de respuesta (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_opcion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM opciones_respuesta WHERE id=%s", (id_opcion,))
+                if filas == 0:
+                    return respuesta_error("Opción de respuesta no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_opcion}, "Opción de respuesta eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar opción de respuesta: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: sesiones_grupo
+# =====================================================
+
+@app.route("/api/sesiones_grupo/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_sesion_grupo():
+    """Registra una nueva sesión de grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        grupo_id = datos.get("grupo_id")
+        cuestionario_id = datos.get("cuestionario_id")
+        iniciado_por = datos.get("iniciado_por")
+        session_code = datos.get("session_code")
+        estado = datos.get("estado", "esperando")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO sesiones_grupo (grupo_id, cuestionario_id, iniciado_por, session_code, estado) VALUES (%s, %s, %s, %s, %s)",
+                    (grupo_id, cuestionario_id, iniciado_por, session_code, estado)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Sesión de grupo registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar sesión de grupo: {str(e)}")
+
+
+@app.route("/api/sesiones_grupo/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_sesion_grupo():
+    """Actualiza una sesión de grupo existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_sesion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        grupo_id = datos.get("grupo_id")
+        cuestionario_id = datos.get("cuestionario_id")
+        iniciado_por = datos.get("iniciado_por")
+        session_code = datos.get("session_code")
+        estado = datos.get("estado")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE sesiones_grupo SET grupo_id=%s, cuestionario_id=%s, iniciado_por=%s, session_code=%s, estado=%s WHERE id=%s",
+                    (grupo_id, cuestionario_id, iniciado_por, session_code, estado, id_sesion)
+                )
+                if filas == 0:
+                    return respuesta_error("Sesión de grupo no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_sesion}, "Sesión de grupo actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar sesión de grupo: {str(e)}")
+
+
+@app.route("/api/sesiones_grupo/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_sesion_grupo_id(id=0):
+    """Obtiene una sesión de grupo por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM sesiones_grupo WHERE id=%s", (target_id,))
+                sesion = cursor.fetchone()
+
+        if sesion:
+            return respuesta_exitosa(sesion, "Sesión de grupo obtenida correctamente")
+        else:
+            return respuesta_error("Sesión de grupo no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener sesión de grupo: {str(e)}")
+
+
+@app.route("/api/sesiones_grupo/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_sesiones_grupo():
+    """Obtiene todas las sesiones de grupo"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM sesiones_grupo")
+                sesiones = cursor.fetchall()
+
+        return respuesta_exitosa(sesiones, f"Se encontraron {len(sesiones)} sesiones de grupo")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener sesiones de grupo: {str(e)}")
+
+
+@app.route("/api/sesiones_grupo/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_sesion_grupo():
+    """Elimina una sesión de grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_sesion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM sesiones_grupo WHERE id=%s", (id_sesion,))
+                if filas == 0:
+                    return respuesta_error("Sesión de grupo no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_sesion}, "Sesión de grupo eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar sesión de grupo: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: sesiones_individual
+# =====================================================
+
+@app.route("/api/sesiones_individual/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_sesion_individual():
+    """Registra una nueva sesión individual (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        cuestionario_id = datos.get("cuestionario_id")
+        iniciado_por = datos.get("iniciado_por")
+        session_code = datos.get("session_code")
+        estado = datos.get("estado", "esperando")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO sesiones_individual (cuestionario_id, iniciado_por, session_code, estado) VALUES (%s, %s, %s, %s)",
+                    (cuestionario_id, iniciado_por, session_code, estado)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Sesión individual registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar sesión individual: {str(e)}")
+
+
+@app.route("/api/sesiones_individual/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_sesion_individual():
+    """Actualiza una sesión individual existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_sesion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        cuestionario_id = datos.get("cuestionario_id")
+        iniciado_por = datos.get("iniciado_por")
+        session_code = datos.get("session_code")
+        estado = datos.get("estado")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE sesiones_individual SET cuestionario_id=%s, iniciado_por=%s, session_code=%s, estado=%s WHERE id=%s",
+                    (cuestionario_id, iniciado_por, session_code, estado, id_sesion)
+                )
+                if filas == 0:
+                    return respuesta_error("Sesión individual no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_sesion}, "Sesión individual actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar sesión individual: {str(e)}")
+
+
+@app.route("/api/sesiones_individual/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_sesion_individual_id(id=0):
+    """Obtiene una sesión individual por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM sesiones_individual WHERE id=%s", (target_id,))
+                sesion = cursor.fetchone()
+
+        if sesion:
+            return respuesta_exitosa(sesion, "Sesión individual obtenida correctamente")
+        else:
+            return respuesta_error("Sesión individual no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener sesión individual: {str(e)}")
+
+
+@app.route("/api/sesiones_individual/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_sesiones_individual():
+    """Obtiene todas las sesiones individuales"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM sesiones_individual")
+                sesiones = cursor.fetchall()
+
+        return respuesta_exitosa(sesiones, f"Se encontraron {len(sesiones)} sesiones individuales")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener sesiones individuales: {str(e)}")
+
+
+@app.route("/api/sesiones_individual/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_sesion_individual():
+    """Elimina una sesión individual (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_sesion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM sesiones_individual WHERE id=%s", (id_sesion,))
+                if filas == 0:
+                    return respuesta_error("Sesión individual no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_sesion}, "Sesión individual eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar sesión individual: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: sesiones_juego
+# =====================================================
+
+@app.route("/api/sesiones_juego/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_sesion_juego():
+    """Registra una nueva sesión de juego (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        cuestionario_id = datos.get("cuestionario_id")
+        user_id = datos.get("user_id")
+        created_by = datos.get("created_by")
+        estado = datos.get("estado", "esperando")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO sesiones_juego (cuestionario_id, user_id, created_by, estado) VALUES (%s, %s, %s, %s)",
+                    (cuestionario_id, user_id, created_by, estado)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Sesión de juego registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar sesión de juego: {str(e)}")
+
+
+@app.route("/api/sesiones_juego/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_sesion_juego():
+    """Actualiza una sesión de juego existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_sesion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        cuestionario_id = datos.get("cuestionario_id")
+        user_id = datos.get("user_id")
+        created_by = datos.get("created_by")
+        estado = datos.get("estado")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE sesiones_juego SET cuestionario_id=%s, user_id=%s, created_by=%s, estado=%s WHERE id=%s",
+                    (cuestionario_id, user_id, created_by, estado, id_sesion)
+                )
+                if filas == 0:
+                    return respuesta_error("Sesión de juego no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_sesion}, "Sesión de juego actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar sesión de juego: {str(e)}")
+
+
+@app.route("/api/sesiones_juego/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_sesion_juego_id(id=0):
+    """Obtiene una sesión de juego por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM sesiones_juego WHERE id=%s", (target_id,))
+                sesion = cursor.fetchone()
+
+        if sesion:
+            return respuesta_exitosa(sesion, "Sesión de juego obtenida correctamente")
+        else:
+            return respuesta_error("Sesión de juego no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener sesión de juego: {str(e)}")
+
+
+@app.route("/api/sesiones_juego/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_sesiones_juego():
+    """Obtiene todas las sesiones de juego"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM sesiones_juego")
+                sesiones = cursor.fetchall()
+
+        return respuesta_exitosa(sesiones, f"Se encontraron {len(sesiones)} sesiones de juego")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener sesiones de juego: {str(e)}")
+
+
+@app.route("/api/sesiones_juego/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_sesion_juego():
+    """Elimina una sesión de juego (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_sesion = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM sesiones_juego WHERE id=%s", (id_sesion,))
+                if filas == 0:
+                    return respuesta_error("Sesión de juego no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_sesion}, "Sesión de juego eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar sesión de juego: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: respuestas_grupo
+# =====================================================
+
+@app.route("/api/respuestas_grupo/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_respuesta_grupo():
+    """Registra una nueva respuesta de grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        pregunta_id = datos.get("pregunta_id")
+        opcion_id = datos.get("opcion_id")
+        es_correcta = datos.get("es_correcta", 0)
+        puntos = datos.get("puntos", 0)
+        tiempo_respuesta = datos.get("tiempo_respuesta")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO respuestas_grupo (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Respuesta de grupo registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar respuesta de grupo: {str(e)}")
+
+
+@app.route("/api/respuestas_grupo/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_respuesta_grupo():
+    """Actualiza una respuesta de grupo existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_respuesta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        pregunta_id = datos.get("pregunta_id")
+        opcion_id = datos.get("opcion_id")
+        es_correcta = datos.get("es_correcta")
+        puntos = datos.get("puntos")
+        tiempo_respuesta = datos.get("tiempo_respuesta")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE respuestas_grupo SET sesion_id=%s, user_id=%s, pregunta_id=%s, opcion_id=%s, es_correcta=%s, puntos=%s, tiempo_respuesta=%s WHERE id=%s",
+                    (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta, id_respuesta)
+                )
+                if filas == 0:
+                    return respuesta_error("Respuesta de grupo no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_respuesta}, "Respuesta de grupo actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar respuesta de grupo: {str(e)}")
+
+
+@app.route("/api/respuestas_grupo/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_respuesta_grupo_id(id=0):
+    """Obtiene una respuesta de grupo por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM respuestas_grupo WHERE id=%s", (target_id,))
+                respuesta = cursor.fetchone()
+
+        if respuesta:
+            return respuesta_exitosa(respuesta, "Respuesta de grupo obtenida correctamente")
+        else:
+            return respuesta_error("Respuesta de grupo no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener respuesta de grupo: {str(e)}")
+
+
+@app.route("/api/respuestas_grupo/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_respuestas_grupo():
+    """Obtiene todas las respuestas de grupo"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM respuestas_grupo")
+                respuestas = cursor.fetchall()
+
+        return respuesta_exitosa(respuestas, f"Se encontraron {len(respuestas)} respuestas de grupo")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener respuestas de grupo: {str(e)}")
+
+
+@app.route("/api/respuestas_grupo/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_respuesta_grupo():
+    """Elimina una respuesta de grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_respuesta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM respuestas_grupo WHERE id=%s", (id_respuesta,))
+                if filas == 0:
+                    return respuesta_error("Respuesta de grupo no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_respuesta}, "Respuesta de grupo eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar respuesta de grupo: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: respuestas_individual
+# =====================================================
+
+@app.route("/api/respuestas_individual/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_respuesta_individual():
+    """Registra una nueva respuesta individual (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        pregunta_id = datos.get("pregunta_id")
+        opcion_id = datos.get("opcion_id")
+        es_correcta = datos.get("es_correcta", 0)
+        puntos = datos.get("puntos", 0)
+        tiempo_respuesta = datos.get("tiempo_respuesta")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO respuestas_individual (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Respuesta individual registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar respuesta individual: {str(e)}")
+
+
+@app.route("/api/respuestas_individual/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_respuesta_individual():
+    """Actualiza una respuesta individual existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_respuesta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        pregunta_id = datos.get("pregunta_id")
+        opcion_id = datos.get("opcion_id")
+        es_correcta = datos.get("es_correcta")
+        puntos = datos.get("puntos")
+        tiempo_respuesta = datos.get("tiempo_respuesta")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE respuestas_individual SET sesion_id=%s, user_id=%s, pregunta_id=%s, opcion_id=%s, es_correcta=%s, puntos=%s, tiempo_respuesta=%s WHERE id=%s",
+                    (sesion_id, user_id, pregunta_id, opcion_id, es_correcta, puntos, tiempo_respuesta, id_respuesta)
+                )
+                if filas == 0:
+                    return respuesta_error("Respuesta individual no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_respuesta}, "Respuesta individual actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar respuesta individual: {str(e)}")
+
+
+@app.route("/api/respuestas_individual/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_respuesta_individual_id(id=0):
+    """Obtiene una respuesta individual por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM respuestas_individual WHERE id=%s", (target_id,))
+                respuesta = cursor.fetchone()
+
+        if respuesta:
+            return respuesta_exitosa(respuesta, "Respuesta individual obtenida correctamente")
+        else:
+            return respuesta_error("Respuesta individual no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener respuesta individual: {str(e)}")
+
+
+@app.route("/api/respuestas_individual/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_respuestas_individual():
+    """Obtiene todas las respuestas individuales"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM respuestas_individual")
+                respuestas = cursor.fetchall()
+
+        return respuesta_exitosa(respuestas, f"Se encontraron {len(respuestas)} respuestas individuales")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener respuestas individuales: {str(e)}")
+
+
+@app.route("/api/respuestas_individual/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_respuesta_individual():
+    """Elimina una respuesta individual (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_respuesta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM respuestas_individual WHERE id=%s", (id_respuesta,))
+                if filas == 0:
+                    return respuesta_error("Respuesta individual no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_respuesta}, "Respuesta individual eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar respuesta individual: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: respuestas_participantes
+# =====================================================
+
+@app.route("/api/respuestas_participantes/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_respuesta_participante():
+    """Registra una nueva respuesta de participante (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        sesion_juego_id = datos.get("sesion_juego_id")
+        user_id = datos.get("user_id")
+        pregunta_id = datos.get("pregunta_id")
+        opcion_id = datos.get("opcion_id")
+        es_correcta = datos.get("es_correcta", 0)
+        tiempo_respuesta = datos.get("tiempo_respuesta")
+        puntos_obtenidos = datos.get("puntos_obtenidos", 0)
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO respuestas_participantes (sesion_juego_id, user_id, pregunta_id, opcion_id, es_correcta, tiempo_respuesta, puntos_obtenidos) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (sesion_juego_id, user_id, pregunta_id, opcion_id, es_correcta, tiempo_respuesta, puntos_obtenidos)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Respuesta de participante registrada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar respuesta de participante: {str(e)}")
+
+
+@app.route("/api/respuestas_participantes/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_respuesta_participante():
+    """Actualiza una respuesta de participante existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_respuesta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        sesion_juego_id = datos.get("sesion_juego_id")
+        user_id = datos.get("user_id")
+        pregunta_id = datos.get("pregunta_id")
+        opcion_id = datos.get("opcion_id")
+        es_correcta = datos.get("es_correcta")
+        tiempo_respuesta = datos.get("tiempo_respuesta")
+        puntos_obtenidos = datos.get("puntos_obtenidos")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE respuestas_participantes SET sesion_juego_id=%s, user_id=%s, pregunta_id=%s, opcion_id=%s, es_correcta=%s, tiempo_respuesta=%s, puntos_obtenidos=%s WHERE id=%s",
+                    (sesion_juego_id, user_id, pregunta_id, opcion_id, es_correcta, tiempo_respuesta, puntos_obtenidos, id_respuesta)
+                )
+                if filas == 0:
+                    return respuesta_error("Respuesta de participante no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_respuesta}, "Respuesta de participante actualizada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar respuesta de participante: {str(e)}")
+
+
+@app.route("/api/respuestas_participantes/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_respuesta_participante_id(id=0):
+    """Obtiene una respuesta de participante por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM respuestas_participantes WHERE id=%s", (target_id,))
+                respuesta = cursor.fetchone()
+
+        if respuesta:
+            return respuesta_exitosa(respuesta, "Respuesta de participante obtenida correctamente")
+        else:
+            return respuesta_error("Respuesta de participante no encontrada")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener respuesta de participante: {str(e)}")
+
+
+@app.route("/api/respuestas_participantes/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_respuestas_participantes():
+    """Obtiene todas las respuestas de participantes"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM respuestas_participantes")
+                respuestas = cursor.fetchall()
+
+        return respuesta_exitosa(respuestas, f"Se encontraron {len(respuestas)} respuestas de participantes")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener respuestas de participantes: {str(e)}")
+
+
+@app.route("/api/respuestas_participantes/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_respuesta_participante():
+    """Elimina una respuesta de participante (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_respuesta = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM respuestas_participantes WHERE id=%s", (id_respuesta,))
+                if filas == 0:
+                    return respuesta_error("Respuesta de participante no encontrada")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_respuesta}, "Respuesta de participante eliminada correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar respuesta de participante: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: resultados
+# =====================================================
+
+@app.route("/api/resultados/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_resultado():
+    """Registra un nuevo resultado (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        user_id = datos.get("user_id")
+        cuestionario_id = datos.get("cuestionario_id")
+        sesion_id = datos.get("sesion_id")
+        puntaje_obtenido = datos.get("puntaje_obtenido", 0)
+        puntaje_maximo = datos.get("puntaje_maximo")
+        total_preguntas = datos.get("total_preguntas")
+        respuestas_correctas = datos.get("respuestas_correctas", 0)
+        tiempo_total = datos.get("tiempo_total")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO resultados (user_id, cuestionario_id, sesion_id, puntaje_obtenido, puntaje_maximo, total_preguntas, respuestas_correctas, tiempo_total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    (user_id, cuestionario_id, sesion_id, puntaje_obtenido, puntaje_maximo, total_preguntas, respuestas_correctas, tiempo_total)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Resultado registrado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar resultado: {str(e)}")
+
+
+@app.route("/api/resultados/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_resultado():
+    """Actualiza un resultado existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_resultado = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        user_id = datos.get("user_id")
+        cuestionario_id = datos.get("cuestionario_id")
+        sesion_id = datos.get("sesion_id")
+        puntaje_obtenido = datos.get("puntaje_obtenido")
+        puntaje_maximo = datos.get("puntaje_maximo")
+        total_preguntas = datos.get("total_preguntas")
+        respuestas_correctas = datos.get("respuestas_correctas")
+        tiempo_total = datos.get("tiempo_total")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE resultados SET user_id=%s, cuestionario_id=%s, sesion_id=%s, puntaje_obtenido=%s, puntaje_maximo=%s, total_preguntas=%s, respuestas_correctas=%s, tiempo_total=%s WHERE id=%s",
+                    (user_id, cuestionario_id, sesion_id, puntaje_obtenido, puntaje_maximo, total_preguntas, respuestas_correctas, tiempo_total, id_resultado)
+                )
+                if filas == 0:
+                    return respuesta_error("Resultado no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_resultado}, "Resultado actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar resultado: {str(e)}")
+
+
+@app.route("/api/resultados/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_resultado_id(id=0):
+    """Obtiene un resultado por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM resultados WHERE id=%s", (target_id,))
+                resultado = cursor.fetchone()
+
+        if resultado:
+            return respuesta_exitosa(resultado, "Resultado obtenido correctamente")
+        else:
+            return respuesta_error("Resultado no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener resultado: {str(e)}")
+
+
+@app.route("/api/resultados/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_resultados():
+    """Obtiene todos los resultados"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM resultados")
+                resultados = cursor.fetchall()
+
+        return respuesta_exitosa(resultados, f"Se encontraron {len(resultados)} resultados")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener resultados: {str(e)}")
+
+
+@app.route("/api/resultados/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_resultado():
+    """Elimina un resultado (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_resultado = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM resultados WHERE id=%s", (id_resultado,))
+                if filas == 0:
+                    return respuesta_error("Resultado no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_resultado}, "Resultado eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar resultado: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: usuario_estado_grupo
+# =====================================================
+
+@app.route("/api/usuario_estado_grupo/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_usuario_estado_grupo():
+    """Registra un nuevo estado de usuario en grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        esta_listo = datos.get("esta_listo", 0)
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO usuario_estado_grupo (sesion_id, user_id, esta_listo) VALUES (%s, %s, %s)",
+                    (sesion_id, user_id, esta_listo)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Estado de usuario en grupo registrado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar estado de usuario en grupo: {str(e)}")
+
+
+@app.route("/api/usuario_estado_grupo/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_usuario_estado_grupo():
+    """Actualiza un estado de usuario en grupo existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_estado = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        esta_listo = datos.get("esta_listo")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE usuario_estado_grupo SET sesion_id=%s, user_id=%s, esta_listo=%s WHERE id=%s",
+                    (sesion_id, user_id, esta_listo, id_estado)
+                )
+                if filas == 0:
+                    return respuesta_error("Estado de usuario en grupo no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_estado}, "Estado de usuario en grupo actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar estado de usuario en grupo: {str(e)}")
+
+
+@app.route("/api/usuario_estado_grupo/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_usuario_estado_grupo_id(id=0):
+    """Obtiene un estado de usuario en grupo por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM usuario_estado_grupo WHERE id=%s", (target_id,))
+                estado = cursor.fetchone()
+
+        if estado:
+            return respuesta_exitosa(estado, "Estado de usuario en grupo obtenido correctamente")
+        else:
+            return respuesta_error("Estado de usuario en grupo no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener estado de usuario en grupo: {str(e)}")
+
+
+@app.route("/api/usuario_estado_grupo/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_usuario_estados_grupo():
+    """Obtiene todos los estados de usuarios en grupo"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM usuario_estado_grupo")
+                estados = cursor.fetchall()
+
+        return respuesta_exitosa(estados, f"Se encontraron {len(estados)} estados de usuarios en grupo")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener estados de usuarios en grupo: {str(e)}")
+
+
+@app.route("/api/usuario_estado_grupo/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_usuario_estado_grupo():
+    """Elimina un estado de usuario en grupo (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_estado = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM usuario_estado_grupo WHERE id=%s", (id_estado,))
+                if filas == 0:
+                    return respuesta_error("Estado de usuario en grupo no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_estado}, "Estado de usuario en grupo eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar estado de usuario en grupo: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: usuario_estado_individual
+# =====================================================
+
+@app.route("/api/usuario_estado_individual/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_usuario_estado_individual():
+    """Registra un nuevo estado de usuario individual (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        esta_listo = datos.get("esta_listo", 0)
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO usuario_estado_individual (sesion_id, user_id, esta_listo) VALUES (%s, %s, %s)",
+                    (sesion_id, user_id, esta_listo)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Estado de usuario individual registrado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar estado de usuario individual: {str(e)}")
+
+
+@app.route("/api/usuario_estado_individual/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_usuario_estado_individual():
+    """Actualiza un estado de usuario individual existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_estado = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        sesion_id = datos.get("sesion_id")
+        user_id = datos.get("user_id")
+        esta_listo = datos.get("esta_listo")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE usuario_estado_individual SET sesion_id=%s, user_id=%s, esta_listo=%s WHERE id=%s",
+                    (sesion_id, user_id, esta_listo, id_estado)
+                )
+                if filas == 0:
+                    return respuesta_error("Estado de usuario individual no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_estado}, "Estado de usuario individual actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar estado de usuario individual: {str(e)}")
+
+
+@app.route("/api/usuario_estado_individual/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_usuario_estado_individual_id(id=0):
+    """Obtiene un estado de usuario individual por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM usuario_estado_individual WHERE id=%s", (target_id,))
+                estado = cursor.fetchone()
+
+        if estado:
+            return respuesta_exitosa(estado, "Estado de usuario individual obtenido correctamente")
+        else:
+            return respuesta_error("Estado de usuario individual no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener estado de usuario individual: {str(e)}")
+
+
+@app.route("/api/usuario_estado_individual/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_usuario_estados_individual():
+    """Obtiene todos los estados de usuarios individuales"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM usuario_estado_individual")
+                estados = cursor.fetchall()
+
+        return respuesta_exitosa(estados, f"Se encontraron {len(estados)} estados de usuarios individuales")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener estados de usuarios individuales: {str(e)}")
+
+
+@app.route("/api/usuario_estado_individual/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_usuario_estado_individual():
+    """Elimina un estado de usuario individual (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_estado = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM usuario_estado_individual WHERE id=%s", (id_estado,))
+                if filas == 0:
+                    return respuesta_error("Estado de usuario individual no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_estado}, "Estado de usuario individual eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar estado de usuario individual: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: rangos
+# Estructura: id, nombre, puntos_minimos, puntos_maximos, icono, color, orden
+# =====================================================
+
+@app.route("/api/rangos/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_rango():
+    """Registra un nuevo rango (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        nombre = datos.get("nombre")
+        puntos_minimos = datos.get("puntos_minimos", 0)
+        puntos_maximos = datos.get("puntos_maximos")
+        icono = datos.get("icono")
+        color = datos.get("color")
+        orden = datos.get("orden")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO rangos (nombre, puntos_minimos, puntos_maximos, icono, color, orden) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (nombre, puntos_minimos, puntos_maximos, icono, color, orden)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Rango registrado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar rango: {str(e)}")
+
+
+@app.route("/api/rangos/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_rango():
+    """Actualiza un rango existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_rango = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        nombre = datos.get("nombre")
+        puntos_minimos = datos.get("puntos_minimos")
+        puntos_maximos = datos.get("puntos_maximos")
+        icono = datos.get("icono")
+        color = datos.get("color")
+        orden = datos.get("orden")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE rangos SET nombre=%s, puntos_minimos=%s, puntos_maximos=%s, icono=%s, color=%s, orden=%s WHERE id=%s",
+                    (nombre, puntos_minimos, puntos_maximos, icono, color, orden, id_rango)
+                )
+                if filas == 0:
+                    return respuesta_error("Rango no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_rango}, "Rango actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar rango: {str(e)}")
+
+
+@app.route("/api/rangos/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_rango_id(id=0):
+    """Obtiene un rango por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM rangos WHERE id=%s", (target_id,))
+                rango = cursor.fetchone()
+
+        if rango:
+            return respuesta_exitosa(rango, "Rango obtenido correctamente")
+        else:
+            return respuesta_error("Rango no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener rango: {str(e)}")
+
+
+@app.route("/api/rangos/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_rangos():
+    """Obtiene todos los rangos"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM rangos")
+                rangos = cursor.fetchall()
+
+        return respuesta_exitosa(rangos, f"Se encontraron {len(rangos)} rangos")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener rangos: {str(e)}")
+
+
+@app.route("/api/rangos/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_rango():
+    """Elimina un rango (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_rango = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM rangos WHERE id=%s", (id_rango,))
+                if filas == 0:
+                    return respuesta_error("Rango no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_rango}, "Rango eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar rango: {str(e)}")
+
+
+# =====================================================
+# APIs TABLA: historial_recompensas
+# Estructura: id, user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales
+# =====================================================
+
+@app.route("/api/historial_recompensas/registrar", methods=['POST'])
+@jwt_required()
+def api_registrar_historial_recompensa():
+    """Registra un nuevo historial de recompensa (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        user_id = datos.get("user_id")
+        sesion_id = datos.get("sesion_id")
+        tipo_sesion = datos.get("tipo_sesion")  # 'grupo' o 'individual'
+        posicion = datos.get("posicion")
+        puntosmoneda_ganados = datos.get("puntosmoneda_ganados")
+        puntos_totales = datos.get("puntos_totales")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO historial_recompensas (user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales)
+                )
+                conexion.commit()
+                id_generado = cursor.lastrowid
+
+        return respuesta_exitosa({"id": id_generado}, "Historial de recompensa registrado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al registrar historial de recompensa: {str(e)}")
+
+
+@app.route("/api/historial_recompensas/actualizar", methods=['POST', 'PUT'])
+@jwt_required()
+def api_actualizar_historial_recompensa():
+    """Actualiza un historial de recompensa existente (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_historial = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+        user_id = datos.get("user_id")
+        sesion_id = datos.get("sesion_id")
+        tipo_sesion = datos.get("tipo_sesion")
+        posicion = datos.get("posicion")
+        puntosmoneda_ganados = datos.get("puntosmoneda_ganados")
+        puntos_totales = datos.get("puntos_totales")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute(
+                    "UPDATE historial_recompensas SET user_id=%s, sesion_id=%s, tipo_sesion=%s, posicion=%s, puntosmoneda_ganados=%s, puntos_totales=%s WHERE id=%s",
+                    (user_id, sesion_id, tipo_sesion, posicion, puntosmoneda_ganados, puntos_totales, id_historial)
+                )
+                if filas == 0:
+                    return respuesta_error("Historial de recompensa no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_historial}, "Historial de recompensa actualizado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar historial de recompensa: {str(e)}")
+
+
+@app.route("/api/historial_recompensas/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_historial_recompensa_id(id=0):
+    """Obtiene un historial de recompensa por ID"""
+    try:
+        target_id = id
+        if request.method == 'POST':
+            datos = obtener_datos_request()
+            target_id = datos.get("id")
+        try:
+            target_id = validar_entero(target_id, "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM historial_recompensas WHERE id=%s", (target_id,))
+                historial = cursor.fetchone()
+
+        if historial:
+            return respuesta_exitosa(historial, "Historial de recompensa obtenido correctamente")
+        else:
+            return respuesta_error("Historial de recompensa no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener historial de recompensa: {str(e)}")
+
+
+@app.route("/api/historial_recompensas/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_historial_recompensas():
+    """Obtiene todos los historiales de recompensas"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM historial_recompensas")
+                historiales = cursor.fetchall()
+
+        return respuesta_exitosa(historiales, f"Se encontraron {len(historiales)} historiales de recompensas")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener historiales de recompensas: {str(e)}")
+
+
+@app.route("/api/historial_recompensas/eliminar", methods=['POST', 'DELETE'])
+@jwt_required()
+def api_eliminar_historial_recompensa():
+    """Elimina un historial de recompensa (Requiere JWT)"""
+    try:
+        datos = obtener_datos_request()
+        try:
+            id_historial = validar_entero(obtener_id_param(datos), "id")
+        except ValueError as err:
+            return respuesta_error(str(err))
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                filas = cursor.execute("DELETE FROM historial_recompensas WHERE id=%s", (id_historial,))
+                if filas == 0:
+                    return respuesta_error("Historial de recompensa no encontrado")
+                conexion.commit()
+
+        return respuesta_exitosa({"id": id_historial}, "Historial de recompensa eliminado correctamente")
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar historial de recompensa: {str(e)}")
+
+
+# =====================================================
+# APIs VISTA: usuarios_con_rangos (VISTA - SOLO LECTURA)
+# Esta es una VISTA calculada, no una tabla
+# Estructura: id, username, email, puntosmoneda, rango_nombre, rango_icono,
+#             rango_color, rango_orden, puntos_minimos, puntos_maximos,
+#             puntos_para_siguiente_rango, siguiente_rango
+# NOTA: Solo tiene operaciones GET (no se puede INSERT/UPDATE/DELETE en una vista)
+# =====================================================
+
+
+@app.route("/api/usuarios_con_rangos/obtener/<int:id>", methods=['GET', 'POST'])
+@jwt_required()
+def api_obtener_usuario_con_rango_id(id=0):
+    """Obtiene información de un usuario con su rango asignado por ID"""
+    try:
+        if request.method == 'POST':
+            id = request.json.get("id")
+
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM usuarios_con_rangos WHERE id=%s", (id,))
+                usuario_rango = cursor.fetchone()
+
+        if usuario_rango:
+            return respuesta_exitosa(usuario_rango, "Usuario con rango obtenido correctamente")
+        else:
+            return respuesta_error("Usuario con rango no encontrado")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener usuario con rango: {str(e)}")
+
+
+@app.route("/api/usuarios_con_rangos/obtener", methods=['GET'])
+@jwt_required()
+def api_obtener_usuarios_con_rangos():
+    """Obtiene todos los usuarios con sus rangos asignados"""
+    try:
+        with bd.obtener_conexion_segura() as conexion:
+            with conexion.cursor() as cursor:
+                cursor.execute("SELECT * FROM usuarios_con_rangos")
+                usuarios_rangos = cursor.fetchall()
+
+        return respuesta_exitosa(usuarios_rangos, f"Se encontraron {len(usuarios_rangos)} usuarios con rangos")
+    except Exception as e:
+        return respuesta_error(f"Error al obtener usuarios con rangos: {str(e)}")
+
+
+
+#--------------------------------------------
+
+
+
+
 if __name__ == '__main__':
-    # Ya no es necesario crear la carpeta aquí; se crea arriba en tiempo de carga.
     app.run(debug=True)

@@ -1,5 +1,5 @@
 from bd import obtener_conexion
-from werkzeug.security import generate_password_hash, check_password_hash
+from app import encriptar_sha256
 
 import psycopg2
 
@@ -16,7 +16,7 @@ def insertar_usuario(username, email, password):
     
     with conexion.cursor() as cursor:
         cursor.execute("INSERT INTO users (username, email, password, role) VALUES (%s, %s, %s, %s)",
-                       (username, email, generate_password_hash(password), role))
+                       (username, email, encriptar_sha256(password), role))
     conexion.commit()
     conexion.close()
 
@@ -85,14 +85,14 @@ def actualizar_password(user_id, old_password, new_password):
         return False, "Usuario no encontrado"
 
     # Verificar contraseña anterior
-    if not check_password_hash(usuario['password'], old_password):
+    if usuario['password'] != encriptar_sha256(old_password):
         return False, "La contraseña anterior es incorrecta"
 
     # Actualizar contraseña
     conexion = obtener_conexion()
     with conexion.cursor() as cursor:
         cursor.execute("UPDATE users SET password = %s WHERE id = %s",
-                      (generate_password_hash(new_password), user_id))
+                      (encriptar_sha256(new_password), user_id))
     conexion.commit()
     conexion.close()
     return True, "Contraseña actualizada correctamente"
@@ -112,7 +112,7 @@ def actualizar_password_por_email(email, new_password):
     with conexion.cursor() as cursor:
         cursor.execute(
             "UPDATE users SET password = %s WHERE email = %s",
-            (generate_password_hash(new_password), email)
+            (encriptar_sha256(new_password), email)
         )
     conexion.commit()
     conexion.close()

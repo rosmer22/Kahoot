@@ -2,14 +2,18 @@
    Variables y Reset
    ============================================== */
 :root {
-    --color-primary: #6366f1;
-    --color-success: #22c55e;
+    --color-principal-naranja: #fca94d;
+    --color-principal-naranja-hover: #e89a45;
+    --color-secundario-amarillo: #fdd867;
+    --color-success: #c4d89f;
     --color-danger: #ef4444;
     --color-warning: #f59e0b;
-    --color-bg: #0f172a;
-    --color-card: #1e293b;
-    --color-text: #f1f5f9;
-    --color-text-secondary: #cbd5e1;
+    --color-bg: #f3f3f3;
+    --color-card: #ffffff;
+    --color-text: #333333;
+    --color-text-secondary: #666666;
+    --color-border: #dcdcdc;
+    --color-hover: #eeeeee;
 }
 
 * {
@@ -21,8 +25,25 @@
 body {
     background: var(--color-bg);
     color: var(--color-text);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: Georgia, 'Times New Roman', Times, serif;
     overflow-x: hidden;
+    position: relative;
+}
+
+/* Línea decorativa superior característica */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 50%, 
+        var(--color-principal-naranja) 100%);
+    z-index: 9999;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* ==============================================
@@ -31,6 +52,7 @@ body {
 .juego-grupo-container {
     min-height: 100vh;
     padding: 2rem;
+    padding-top: 2.5rem; /* Espacio para la línea decorativa */
     max-width: 1200px;
     margin: 0 auto;
 }
@@ -44,15 +66,32 @@ body {
     align-items: center;
     background: var(--color-card);
     padding: 1.5rem 2rem;
-    border-radius: 1rem;
+    border-radius: 12px;
     margin-bottom: 2rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--color-border);
+    position: relative;
+    overflow: hidden;
+}
+
+.game-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 50%, 
+        var(--color-principal-naranja) 100%);
 }
 
 .group-info h2 {
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
+    color: var(--color-text);
 }
 
 .group-info p {
@@ -68,20 +107,22 @@ body {
     text-align: right;
     margin-bottom: 0.5rem;
     font-weight: 600;
-    color: var(--color-primary);
+    color: var(--color-principal-naranja);
 }
 
 .progress-bar-bg {
     width: 100%;
     height: 8px;
-    background: rgba(99, 102, 241, 0.2);
+    background: rgba(252, 169, 77, 0.2);
     border-radius: 999px;
     overflow: hidden;
 }
 
 .progress-bar-fill {
     height: 100%;
-    background: var(--color-primary);
+    background: linear-gradient(90deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 100%);
     border-radius: 999px;
     transition: width 0.3s ease;
 }
@@ -105,6 +146,7 @@ body {
     position: relative;
     width: 120px;
     height: 120px;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
 }
 
 .timer-svg {
@@ -115,13 +157,13 @@ body {
 
 .timer-bg {
     fill: none;
-    stroke: rgba(99, 102, 241, 0.2);
+    stroke: rgba(252, 169, 77, 0.2);
     stroke-width: 8;
 }
 
 .timer-progress {
     fill: none;
-    stroke: var(--color-primary);
+    stroke: url(#timerGradient);
     stroke-width: 8;
     stroke-linecap: round;
     transition: stroke 0.3s ease, stroke-dashoffset 0.5s linear;
@@ -141,9 +183,25 @@ body {
 .question-card {
     width: 100%;
     background: var(--color-card);
-    border-radius: 1.5rem;
+    border-radius: 12px;
     padding: 3rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--color-border);
+    position: relative;
+    overflow: hidden;
+}
+
+.question-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 50%, 
+        var(--color-principal-naranja) 100%);
 }
 
 .question-text {
@@ -164,17 +222,19 @@ body {
 }
 
 .answer-btn {
-    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
-    border: 3px solid transparent;
+    background: #ffffff;
+    border: 2px solid var(--color-border);
     color: var(--color-text);
     padding: 2rem;
-    border-radius: 1rem;
+    border-radius: 12px;
     font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    font-family: Georgia, 'Times New Roman', Times, serif;
 }
 
 .answer-btn::before {
@@ -184,15 +244,18 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, var(--color-primary), var(--color-primary));
+    background: linear-gradient(135deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 100%);
     opacity: 0;
     transition: opacity 0.2s ease;
 }
 
 .answer-btn:hover:not(:disabled) {
-    border-color: var(--color-primary);
+    border-color: var(--color-principal-naranja);
     transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 8px 20px rgba(252, 169, 77, 0.3);
+    background: var(--color-hover);
 }
 
 .answer-btn:disabled {
@@ -201,34 +264,56 @@ body {
 }
 
 .answer-btn.selected {
-    border-color: var(--color-primary);
-    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    border-color: var(--color-principal-naranja);
+    background: linear-gradient(135deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 100%);
+    color: #ffffff;
     transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(252, 169, 77, 0.4);
+}
+
+.answer-btn.selected span {
+    position: relative;
+    z-index: 1;
+}
+
+.answer-btn.correct {
+    border-color: var(--color-success);
+    background: var(--color-success);
+    color: #ffffff;
+}
+
+.answer-btn.incorrect {
+    border-color: var(--color-danger);
+    background: var(--color-danger);
+    color: #ffffff;
 }
 
 /* Mensaje de Espera */
 .waiting-message {
     text-align: center;
     padding: 2rem;
-    background: rgba(99, 102, 241, 0.1);
-    border-radius: 1rem;
-    border: 2px solid var(--color-primary);
+    background: rgba(252, 169, 77, 0.1);
+    border-radius: 12px;
+    border: 2px solid var(--color-principal-naranja);
 }
 
 .waiting-message p {
     font-size: 1.1rem;
     margin-bottom: 0.5rem;
+    color: var(--color-text);
 }
 
 .waiting-count {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--color-principal-naranja);
 }
 
 .spinner {
-    border: 4px solid rgba(99, 102, 241, 0.2);
-    border-left-color: var(--color-primary);
+    border: 4px solid rgba(252, 169, 77, 0.2);
+    border-left-color: var(--color-principal-naranja);
     border-radius: 50%;
     width: 40px;
     height: 40px;
@@ -249,12 +334,26 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(15, 23, 42, 0.95);
+    background: rgba(243, 243, 243, 0.98);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     animation: fadeIn 0.3s ease;
+}
+
+.transition-screen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 50%, 
+        var(--color-principal-naranja) 100%);
+    z-index: 1001;
 }
 
 @keyframes fadeIn {
@@ -307,7 +406,7 @@ body {
 
 #transitionPoints {
     font-size: 2rem;
-    color: var(--color-primary);
+    color: var(--color-principal-naranja);
     font-weight: 700;
     margin-bottom: 1rem;
 }
@@ -333,13 +432,27 @@ body {
     z-index: 1000;
 }
 
+.loading-screen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, 
+        var(--color-principal-naranja) 0%, 
+        var(--color-secundario-amarillo) 50%, 
+        var(--color-principal-naranja) 100%);
+    z-index: 1001;
+}
+
 .loading-content {
     text-align: center;
 }
 
 .spinner-large {
-    border: 6px solid rgba(99, 102, 241, 0.2);
-    border-left-color: var(--color-primary);
+    border: 6px solid rgba(252, 169, 77, 0.2);
+    border-left-color: var(--color-principal-naranja);
     border-radius: 50%;
     width: 80px;
     height: 80px;
@@ -350,6 +463,7 @@ body {
 .loading-content h2 {
     font-size: 2.5rem;
     margin-bottom: 0.5rem;
+    color: var(--color-text);
 }
 
 .loading-content p {

@@ -44,7 +44,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     // Crear preview de las respuestas
     const previewAnswers = document.createElement('div');
     previewAnswers.className = 'question-preview-answers';
-    
+
     question.answers.forEach(answer => {
       const answerDiv = document.createElement('div');
       answerDiv.className = 'preview-answer';
@@ -85,7 +85,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   // Renderizar todas las preguntas en el sidebar
   function renderSidebar() {
     sidebarContent.innerHTML = '';
-    
+
     questions.forEach((question, index) => {
       const card = createQuestionCard(question, index);
       sidebarContent.appendChild(card);
@@ -100,7 +100,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   function addNewQuestion() {
     // Primero guardar la pregunta actual
     saveCurrentQuestion();
-    
+
     const newQuestion = {
       text: '',
       type: 'multiple',
@@ -128,12 +128,12 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     }
 
     questions.splice(index, 1);
-    
+
     // Ajustar el índice actual si es necesario
     if (currentQuestionIndex >= questions.length) {
       currentQuestionIndex = questions.length - 1;
     }
-    
+
     renderSidebar();
     loadQuestion(currentQuestionIndex);
   }
@@ -190,16 +190,16 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     if (questionText) questionText.value = question.text || '';
     if (pointsSelect) pointsSelect.value = question.points;
     if (timeSelect) timeSelect.value = question.time;
-    
+
     // Limpiar el contenedor de respuestas completamente
     answersContainer.innerHTML = '';
-    
+
     // Actualizar el tipo de pregunta
     if (questionTypeSelect) questionTypeSelect.value = question.type;
 
     // Recrear las alternativas según el tipo
     const answerCount = question.answers.length;
-    
+
     if (question.type === 'verdadero-falso') {
       // Crear alternativas de Verdadero/Falso
       const verdadero = document.createElement('div');
@@ -211,7 +211,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
         </div>
         <input class="answer-input" placeholder="Escriba la alternativa aqui" value="Verdadero" readonly>
       `;
-      
+
       const falso = document.createElement('div');
       falso.className = 'answer pink';
       falso.innerHTML = `
@@ -221,10 +221,10 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
         </div>
         <input class="answer-input" placeholder="Escriba la alternativa aqui" value="Falso" readonly>
       `;
-      
+
       answersContainer.appendChild(verdadero);
       answersContainer.appendChild(falso);
-      
+
       // Marcar la correcta
       if (question.answers[0] && question.answers[0].isCorrect) {
         verdadero.classList.add('selected');
@@ -244,35 +244,35 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
           </div>
           <input class="answer-input" placeholder="Escriba la alternativa aqui" value="">
         `;
-        
+
         // Establecer el texto y si es correcta
         const input = answer.querySelector('.answer-input');
         if (input && question.answers[i]) {
           input.value = question.answers[i].text || '';
         }
-        
+
         if (question.answers[i] && question.answers[i].isCorrect) {
           answer.classList.add('selected');
         }
-        
+
         answersContainer.appendChild(answer);
       }
     }
-    
+
     // Re-adjuntar eventos a todas las alternativas
     const allAnswers = answersContainer.querySelectorAll('.answer');
     allAnswers.forEach(answer => {
       // Evento de clic para seleccionar
       answer.addEventListener('click', function(e) {
-        if (e.target.classList.contains('delete-answer-btn') || 
+        if (e.target.classList.contains('delete-answer-btn') ||
             e.target.classList.contains('answer-input') ||
             e.target.tagName === 'INPUT') {
           return;
         }
-        
+
         const isSelected = this.classList.contains('selected');
         const currentMode = questionTypeSelect ? questionTypeSelect.value : 'multiple';
-        
+
         if (currentMode === 'multiple') {
           // Opción Múltiple: Se pueden seleccionar varias
           if (isSelected) {
@@ -390,19 +390,19 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   const file = document.getElementById('cfgFile');
   const cuestionarioIdInput = document.getElementById('cuestionario_id');
 
-  function open(){ modal.classList.remove('hidden'); backdrop.classList.remove('hidden'); }
-  function close(){ modal.classList.add('hidden'); backdrop.classList.add('hidden'); }
+  function open(){ modal.classList.remove('hidden'); backdrop.classList.remove('hidden'); document.body.classList.add('modal-open');}
+  function close(){ modal.classList.add('hidden'); backdrop.classList.add('hidden'); document.body.classList.remove('modal-open');}
 
   // Validar que el título esté completo
   function validateForm() {
     const title = cfgTitleInput.value.trim();
-    
+
     if (!title) {
       alert('Por favor, ingresa un título para el cuestionario.');
       cfgTitleInput.focus();
       return false;
     }
-    
+
     return true;
   }
 
@@ -415,10 +415,10 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   }));
 
   // Done/Cancel - Solo sincroniza el título, NO guarda en base de datos
-  btnCancel && btnCancel.addEventListener('click', () => { 
-    close(); 
+  btnCancel && btnCancel.addEventListener('click', () => {
+    close();
   });
-  
+
   btnDone && btnDone.addEventListener('click', () => {
     if (!validateForm()) {
       return;
@@ -427,7 +427,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     if (cfgTitleInput && titleInputEditor) {
       titleInputEditor.value = cfgTitleInput.value;
     }
-    
+
     // Solo cierra el modal, NO guarda en base de datos
     close();
   });
@@ -456,13 +456,13 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     if (cfgTitleInput) cfgTitleInput.value = data.titulo || '';
     if (cfgDescInput) cfgDescInput.value = data.descripcion || '';
     if (titleInputEditor) titleInputEditor.value = data.titulo || '';
-    
+
     // Cargar el PIN en el header
     const pinInput = document.querySelector('.pin-input');
     if (pinInput && data.pin) {
       pinInput.value = data.pin;
     }
-    
+
     // Cargar el estado de privacidad
     const cfgPublico = document.getElementById('cfgPublico');
     const cfgPrivado = document.getElementById('cfgPrivado');
@@ -510,15 +510,15 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   // Actualizar el estado del botón agregar
   function updateAddButton() {
     const currentCount = answersContainer.querySelectorAll('.answer').length;
-    
+
     // Si es verdadero/falso, ocultar el botón
     if (currentMode === 'verdadero-falso') {
       addAnswerBtn.style.display = 'none';
       return;
     }
-    
+
     addAnswerBtn.style.display = 'inline-block';
-    
+
     if (currentCount >= MAX_ANSWERS) {
       addAnswerBtn.disabled = true;
       addAnswerBtn.textContent = `Máximo ${MAX_ANSWERS} alternativas`;
@@ -545,20 +545,20 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   function createTrueFalseAnswers() {
     // Limpiar alternativas existentes
     answersContainer.innerHTML = '';
-    
+
     // Crear exactamente 2 alternativas
     const verdadero = createAnswer('Verdadero');
     const falso = createAnswer('Falso');
-    
+
     // Deshabilitar inputs para que no se puedan editar
     verdadero.querySelector('.answer-input').setAttribute('readonly', 'readonly');
     falso.querySelector('.answer-input').setAttribute('readonly', 'readonly');
-    
+
     answersContainer.appendChild(verdadero);
     answersContainer.appendChild(falso);
-    
+
     attachAllEvents();
-    
+
     // Ocultar botones de eliminar en modo verdadero/falso
     const deleteButtons = answersContainer.querySelectorAll('.delete-answer-btn');
     deleteButtons.forEach(btn => {
@@ -578,7 +578,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   // Función para manejar el clic en una respuesta
   function handleAnswerClick(answerElement) {
     const isSelected = answerElement.classList.contains('selected');
-    
+
     if (currentMode === 'multiple') {
       // Opción Múltiple: Se pueden seleccionar varias
       if (isSelected) {
@@ -600,14 +600,14 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     if (currentMode === 'verdadero-falso') {
       return;
     }
-    
+
     const currentCount = answersContainer.querySelectorAll('.answer').length;
-    
+
     if (currentCount <= MIN_ANSWERS) {
       alert(`Debe haber al menos ${MIN_ANSWERS} alternativas`);
       return;
     }
-    
+
     answerElement.remove();
     updateAddButton();
   }
@@ -616,7 +616,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   function attachAllEvents() {
     // Remover todos los event listeners existentes clonando el contenedor
     const answers = answersContainer.querySelectorAll('.answer');
-    
+
     answers.forEach(answer => {
       // Clonar para eliminar listeners antiguos
       const newAnswer = answer.cloneNode(true);
@@ -625,12 +625,12 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
 
     // Ahora agregar eventos a todas las alternativas
     const freshAnswers = answersContainer.querySelectorAll('.answer');
-    
+
     freshAnswers.forEach(answer => {
       // Evento de clic para seleccionar
       answer.addEventListener('click', function(e) {
         // No seleccionar si se hizo clic en el botón de eliminar o en el input
-        if (e.target.classList.contains('delete-answer-btn') || 
+        if (e.target.classList.contains('delete-answer-btn') ||
             e.target.classList.contains('answer-input') ||
             e.target.tagName === 'INPUT') {
           return;
@@ -653,7 +653,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
   if (addAnswerBtn) {
     addAnswerBtn.addEventListener('click', function() {
       const currentCount = answersContainer.querySelectorAll('.answer').length;
-      
+
       if (currentCount < MAX_ANSWERS && currentMode !== 'verdadero-falso') {
         const newAnswer = createAnswer();
         answersContainer.appendChild(newAnswer);
@@ -668,7 +668,7 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
     questionTypeSelect.addEventListener('change', function() {
       const previousMode = currentMode;
       currentMode = this.value;
-      
+
       // Si cambió a verdadero/falso
       if (currentMode === 'verdadero-falso') {
         createTrueFalseAnswers();
@@ -680,9 +680,9 @@ let currentQuestionIndex = 0; // Índice de la pregunta actual
         const allAnswers = answersContainer.querySelectorAll('.answer');
         allAnswers.forEach(ans => ans.classList.remove('selected'));
       }
-      
+
       updateAddButton();
-      
+
       // Guardar cambios automáticamente
       if (typeof saveCurrentQuestion === 'function') {
         saveCurrentQuestion();
@@ -709,16 +709,16 @@ document.addEventListener('DOMContentLoaded', function() {
   if (saveBtn) {
     saveBtn.addEventListener('click', function(e) {
       e.preventDefault();
-      
+
       // Guardar la pregunta actual
       if (typeof saveCurrentQuestion === 'function') {
         saveCurrentQuestion();
       }
-      
+
       // Validar que haya título
       const cfgTitleInput = document.getElementById('cfgTitleInput');
       const titulo = cfgTitleInput ? cfgTitleInput.value.trim() : '';
-      
+
       if (!titulo) {
         alert('Por favor, configura el título del cuestionario primero.\nHaz clic en "Configuración".');
         // Abrir el modal de configuración
@@ -731,7 +731,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return;
       }
-      
+
       // Guardar el cuestionario
       guardarCuestionario();
     });
@@ -753,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cuando se selecciona un archivo
     fileInput.addEventListener('change', function(e) {
       const file = e.target.files[0];
-      
+
       if (!file) return;
 
       // Validar que sea un archivo Excel
@@ -829,7 +829,7 @@ function guardarCuestionario() {
   const descripcion = document.getElementById('cfgDescInput').value.trim();
   const imagenFile = document.getElementById('cfgFile').files[0];
   const cuestionarioId = document.getElementById('cuestionario_id').value;
-  
+
   // Obtener configuración de privacidad - verificar cuál radio está seleccionado
   const radioPrivacidad = document.querySelector('input[name="privacy"]:checked');
   const estado = radioPrivacidad ? radioPrivacidad.value : 'publico';
@@ -884,8 +884,8 @@ function guardarCuestionario() {
 
   // Determinar si es creación o actualización
   const isUpdate = cuestionarioId && cuestionarioId !== '';
-  const url = isUpdate 
-    ? `/api/cuestionario/${cuestionarioId}` 
+  const url = isUpdate
+    ? `/api/cuestionario/${cuestionarioId}`
     : '/api/cuestionario';
   const method = isUpdate ? 'PUT' : 'POST';
 
@@ -909,7 +909,7 @@ function guardarCuestionario() {
   // Mostrar indicador de carga solo en el botón Guardar del header
   const btnSave = document.getElementById('saveQuizBtn');
   const originalTextSave = btnSave ? btnSave.textContent : '';
-  
+
   if (btnSave) {
     btnSave.textContent = 'Guardando...';
     btnSave.disabled = true;
@@ -931,7 +931,7 @@ function guardarCuestionario() {
     if (result.success) {
       // Mensaje de éxito simple
       alert('Cuestionario registrado correctamente');
-      
+
       // Si se creó un nuevo cuestionario, actualizar el ID
       if (!isUpdate && result.cuestionario_id) {
         document.getElementById('cuestionario_id').value = result.cuestionario_id;

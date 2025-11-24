@@ -50,11 +50,12 @@
         .creator-message {
             text-align: center;
             padding: 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 1rem;
+            background: linear-gradient(135deg, #fca94d 0%, #fdd867 100%);
+            color: #333333;
+            border-radius: 12px;
             margin: 1rem 0;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(252, 169, 77, 0.3);
+            border: 2px solid #e89a45;
         }
         .creator-icon {
             font-size: 3rem;
@@ -63,10 +64,12 @@
         .creator-message p {
             margin: 0.5rem 0;
             font-size: 1.1rem;
+            font-weight: 600;
         }
         .creator-subtitle {
             opacity: 0.8;
             font-size: 0.9rem !important;
+            font-weight: 400 !important;
         }
     </style>
 </head>
@@ -104,6 +107,12 @@
         <div class="timer-container">
             <div class="timer-circle">
                 <svg class="timer-svg" viewBox="0 0 100 100">
+                    <defs>
+                        <linearGradient id="timerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#fca94d;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#fdd867;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
                     <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
                     <circle class="timer-progress" id="timerProgress" cx="50" cy="50" r="45"></circle>
                 </svg>
@@ -280,12 +289,49 @@ async function showQuestion(index) {
         answersGrid.appendChild(answerBtn);
     });
 
-    // Iniciar temporizador sincronizado
-    timeLeft = currentQuestion.time_limit || 30;
-    
     // Si es el creador, registrar el inicio de la pregunta en el servidor
     if (esCreador) {
-        await registrarInicioPregunta(currentQuestion.id, timeLeft);
+        // Primero intentar sincronizar con el servidor (por si hubo refresh)
+        try {
+            const syncResponse = await fetch(`/api/grupo/timer-sync/${sesionId}`);
+            const syncResult = await syncResponse.json();
+            
+            // Si la pregunta ya está registrada en el servidor, usar el tiempo restante
+            if (syncResult.success && syncResult.pregunta_id === currentQuestion.id) {
+                timeLeft = syncResult.tiempo_restante;
+                console.log(`⏰ [CREADOR] Timer recuperado del servidor (refresh detectado): ${timeLeft}s`);
+            } else {
+                // Si es una nueva pregunta, registrarla
+                timeLeft = currentQuestion.time_limit || 30;
+                await registrarInicioPregunta(currentQuestion.id, timeLeft);
+            }
+        } catch (error) {
+            // Si hay error, usar el tiempo límite completo
+            timeLeft = currentQuestion.time_limit || 30;
+            console.error('❌ Error al sincronizar timer del creador:', error);
+            // Intentar registrar la pregunta de todos modos
+            await registrarInicioPregunta(currentQuestion.id, timeLeft);
+        }
+    } else {
+        // Si NO es el creador, sincronizar con el servidor para obtener el tiempo real restante
+        try {
+            const syncResponse = await fetch(`/api/grupo/timer-sync/${sesionId}`);
+            const syncResult = await syncResponse.json();
+            
+            if (syncResult.success && syncResult.pregunta_id === currentQuestion.id) {
+                // Usar el tiempo restante real del servidor
+                timeLeft = syncResult.tiempo_restante;
+                console.log(`⏱ [JUGADOR] Timer sincronizado: ${timeLeft}s restantes`);
+            } else {
+                // Si no se pudo sincronizar, usar el tiempo límite completo
+                timeLeft = currentQuestion.time_limit || 30;
+                console.log(`⚠️ No se pudo sincronizar timer, usando tiempo completo: ${timeLeft}s`);
+            }
+        } catch (error) {
+            // Si hay error, usar el tiempo límite completo
+            timeLeft = currentQuestion.time_limit || 30;
+            console.error('❌ Error al sincronizar timer:', error);
+        }
     }
     
     startTimer();
@@ -317,7 +363,7 @@ async function registrarInicioPregunta(preguntaId, tiempoLimite) {
                 tiempo_limite: tiempoLimite
             })
         });
-        console.log('⏰ Timer sincronizado iniciado en servidor');
+        console.log('⏰ Nuevo timer iniciado en servidor');
     } catch (error) {
         console.error('Error al registrar inicio de pregunta:', error);
     }

@@ -149,18 +149,95 @@ const loadingScreen = document.getElementById('loadingScreen');
 // ==========================================
 // Inicialización
 // ==========================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('🎮 Iniciando juego individual...');
     console.log(`Total de preguntas: ${totalQuestions}`);
     
-    // Mostrar primera pregunta
-    showQuestion(0);
+    // Intentar sincronizar con el servidor por si hubo refresh
+    try {
+        console.log('🔄 Sincronizando con el servidor...');
+        const response = await fetch(`/api/individual/obtener-pregunta-actual/${sesionId}`);
+        const result = await response.json();
+        
+        if (result.success && result.pregunta_inicio_timestamp && result.pregunta_index !== undefined) {
+            console.log(`📍 Recuperando progreso: pregunta ${result.pregunta_index + 1}`);
+            await showQuestionWithTimestamp(result.pregunta_index, result.pregunta_inicio_timestamp);
+        } else {
+            console.log('🆕 Iniciando desde pregunta 1');
+            await showQuestion(0);
+        }
+    } catch (error) {
+        console.warn('⚠️ Error al sincronizar, iniciando desde pregunta 1:', error);
+        await showQuestion(0);
+    }
 });
+
+// ==========================================
+// Función para mostrar pregunta con timestamp existente (después de refresh)
+// ==========================================
+function showQuestionWithTimestamp(index, savedTimestamp) {
+    if (index >= questions.length) {
+        finishGame();
+        return;
+    }
+
+    currentQuestionIndex = index;
+    currentQuestion = questions[index];
+    hasAnswered = false;
+    selectedAnswer = null;
+    
+    // Usar el timestamp guardado
+    questionStartTime = savedTimestamp;
+    console.log(`🔄 Recuperando pregunta con timestamp: ${savedTimestamp}`);
+
+    // Resetear UI
+    questionSection.style.display = 'block';
+    transitionScreen.style.display = 'none';
+
+    // Actualizar progreso
+    const progress = ((index + 1) / totalQuestions) * 100;
+    progressBar.style.width = progress + '%';
+    progressText.textContent = `Pregunta ${index + 1} de ${totalQuestions}`;
+
+    // Mostrar pregunta
+    questionText.textContent = currentQuestion.texto_pregunta;
+
+    // Generar opciones
+    answersGrid.innerHTML = '';
+    currentQuestion.opciones.forEach((option, idx) => {
+        const answerBtn = document.createElement('button');
+        answerBtn.className = 'answer-btn';
+        answerBtn.dataset.optionId = option.id;
+        answerBtn.dataset.correct = option.es_correcta;
+        answerBtn.textContent = option.texto_opcion;
+        answerBtn.onclick = () => selectAnswer(option.id, option.es_correcta, answerBtn);
+        answersGrid.appendChild(answerBtn);
+    });
+
+    // Calcular tiempo restante basado en el timestamp guardado
+    const totalTime = currentQuestion.tiempo_limite || 30;
+    const elapsedTime = Math.floor((Date.now() - savedTimestamp) / 1000);
+    timeLeft = Math.max(0, totalTime - elapsedTime);
+    
+    console.log(`⏰ Tiempo total: ${totalTime}s, Transcurrido: ${elapsedTime}s, Restante: ${timeLeft}s`);
+    
+    // Si ya se acabó el tiempo, manejar timeout inmediatamente
+    if (timeLeft <= 0) {
+        console.log('⏰ El tiempo ya se agotó para esta pregunta');
+        handleTimeOut();
+        return;
+    }
+
+    // Iniciar temporizador con el tiempo restante
+    startTimer();
+
+    console.log(`📝 Mostrando pregunta ${index + 1} (recuperada): ${currentQuestion.texto_pregunta}`);
+}
 
 // ==========================================
 // Función Principal: Mostrar Pregunta
 // ==========================================
-function showQuestion(index) {
+async function showQuestion(index) {
     if (index >= questions.length) {
         // Juego terminado
         finishGame();
@@ -171,7 +248,25 @@ function showQuestion(index) {
     currentQuestion = questions[index];
     hasAnswered = false;
     selectedAnswer = null;
-    questionStartTime = Date.now();
+    
+    // Guardar el timestamp de inicio en el servidor para sincronización
+    const currentTimestamp = Date.now();
+    questionStartTime = currentTimestamp;
+    
+    // Guardar en el servidor
+    try {
+        await fetch('/api/individual/guardar-pregunta-inicio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sesion_id: sesionId,
+                pregunta_id: currentQuestion.id,
+                timestamp: currentTimestamp
+            })
+        });
+    } catch (error) {
+        console.warn('No se pudo guardar timestamp:', error);
+    }
 
     // Resetear UI
     questionSection.style.display = 'block';
