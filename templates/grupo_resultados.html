@@ -375,7 +375,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Datos de respuestas por jugador (inyectados desde el servidor)
-const detalleRespuestas = {{ detalle_respuestas | tojson }};
+const detalleRespuestas = {{ detalle_respuestas | tojson | safe }};
 
 // Función para expandir/colapsar detalles del jugador desde la tabla
 function togglePlayerDetails(userId) {

@@ -4,11 +4,10 @@ from contextlib import contextmanager
 def obtener_conexion():
     """Obtiene una conexión a la base de datos de PythonAnywhere"""
     return pymysql.connect(
-        host='localhost',
-        user='root',
-        password='',  # ¡ADVERTENCIA DE SEGURIDAD!
-        db='robot',
-        port=3327,
+        host='Grupo2dawb.mysql.pythonanywhere-services.com',
+        user='Grupo2dawb',
+        password='clavegrupo2',  # ¡ADVERTENCIA DE SEGURIDAD!
+        db='Grupo2dawb$Kahoot',
         charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=False  # Importante para que el rollback funcione

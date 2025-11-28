@@ -3736,21 +3736,153 @@ def grupo_resultados(sesion_id):
             GROUP BY u.id, u.username
             ORDER BY score DESC, correct_answers DESC
         """, (sesion_id, sesion_id))
-        resultados = cursor.fetchall()
+        resultados_raw = cursor.fetchall()
+
+        # Limpiar datos de resultados para asegurar serialización JSON
+        resultados = []
+        for r in resultados_raw:
+            resultados.append({
+                'id': int(r.get('id', 0)) if r.get('id') is not None else 0,
+                'username': str(r.get('username', 'Usuario desconocido')),
+                'score': int(r.get('score', 0)) if r.get('score') is not None else 0,
+                'correct_answers': int(r.get('correct_answers', 0)) if r.get('correct_answers') is not None else 0,
+                'preguntas_respondidas': int(r.get('preguntas_respondidas', 0)) if r.get('preguntas_respondidas') is not None else 0
+            })
+
+        # Obtener detalle de respuestas para el template (solo si es necesario)
+        detalle_respuestas = []
+        if es_creador or g.user['id'] in [r['id'] for r in resultados]:
+            # Obtener todas las respuestas de esta sesión
+            cursor.execute("""
+                SELECT
+                    rg.user_id,
+                    rg.pregunta_id,
+                    p.texto_pregunta,
+                    p.orden,
+                    p.puntos as puntos_pregunta,
+                    rg.es_correcta,
+                    rg.puntos as puntos_obtenidos,
+                    rg.tiempo_respuesta,
+                    op_seleccionada.texto_opcion as texto_respuesta,
+                    op_correcta.texto_opcion as texto_correcta,
+                    CASE WHEN rg.opcion_id IS NOT NULL THEN 1 ELSE 0 END as opcion_seleccionada
+                FROM respuestas_grupo rg
+                JOIN preguntas p ON rg.pregunta_id = p.id
+                LEFT JOIN opciones_respuesta op_seleccionada ON rg.opcion_id = op_seleccionada.id
+                LEFT JOIN opciones_respuesta op_correcta ON op_correcta.pregunta_id = p.id AND op_correcta.es_correcta = 1
+                WHERE rg.sesion_id = %s
+                ORDER BY rg.user_id, p.orden
+            """, (sesion_id,))
+            detalle_raw = cursor.fetchall()
+
+            # Limpiar datos de detalle
+            for d in detalle_raw:
+                detalle_respuestas.append({
+                    'user_id': int(d.get('user_id', 0)) if d.get('user_id') is not None else 0,
+                    'pregunta_id': int(d.get('pregunta_id', 0)) if d.get('pregunta_id') is not None else 0,
+                    'texto_pregunta': str(d.get('texto_pregunta', '')) if d.get('texto_pregunta') is not None else '',
+                    'orden': int(d.get('orden', 0)) if d.get('orden') is not None else 0,
+                    'puntos_pregunta': int(d.get('puntos_pregunta', 0)) if d.get('puntos_pregunta') is not None else 0,
+                    'es_correcta': bool(d.get('es_correcta')) if d.get('es_correcta') is not None else False,
+                    'puntos_obtenidos': int(d.get('puntos_obtenidos', 0)) if d.get('puntos_obtenidos') is not None else 0,
+                    'tiempo_respuesta': float(d.get('tiempo_respuesta', 0)) if d.get('tiempo_respuesta') is not None else 0.0,
+                    'texto_respuesta': str(d.get('texto_respuesta', '')) if d.get('texto_respuesta') is not None else '',
+                    'texto_correcta': str(d.get('texto_correcta', '')) if d.get('texto_correcta') is not None else '',
+                    'opcion_seleccionada': bool(d.get('opcion_seleccionada')) if d.get('opcion_seleccionada') is not None else False
+                })
 
         cursor.close()
         db.close()
 
-        return render_template('grupo_resultados.html',
-                             sesion_id=sesion_id,
-                             grupo_nombre=sesion['grupo_nombre'],
-                             cuestionario_titulo=sesion['cuestionario_titulo'],
-                             resultados=resultados,
-                             total_preguntas=total_preguntas,
-                             es_creador=es_creador)
+        # Logging para depuración
+        import sys
+        sys.stderr.write(f"\n=== DEBUG grupo_resultados ===\n")
+        sys.stderr.write(f"Sesión ID: {sesion_id}\n")
+        sys.stderr.write(f"Resultados count: {len(resultados)}\n")
+        sys.stderr.write(f"Detalle respuestas count: {len(detalle_respuestas)}\n")
+        sys.stderr.write(f"Total preguntas: {total_preguntas}\n")
+        sys.stderr.flush()
+
+        # Intentar renderizar el template con manejo de errores
+        try:
+            # Asegurar que detalle_respuestas sea serializable
+            detalle_respuestas_clean = json.dumps(detalle_respuestas, default=str, ensure_ascii=False)
+            sys.stderr.write(f"Detalle respuestas serializado OK\n")
+            sys.stderr.flush()
+        except Exception as json_err:
+            sys.stderr.write(f"ERROR al serializar detalle_respuestas: {str(json_err)}\n")
+            sys.stderr.write(f"Tipo de detalle_respuestas: {type(detalle_respuestas)}\n")
+            if detalle_respuestas:
+                sys.stderr.write(f"Primer elemento tipo: {type(detalle_respuestas[0]) if detalle_respuestas else 'N/A'}\n")
+                if detalle_respuestas:
+                    sys.stderr.write(f"Primer elemento keys: {list(detalle_respuestas[0].keys()) if isinstance(detalle_respuestas[0], dict) else 'N/A'}\n")
+            sys.stderr.flush()
+            detalle_respuestas = []  # Usar lista vacía si falla
+
+        try:
+            template_result = render_template('grupo_resultados.html',
+                                 sesion_id=sesion_id,
+                                 grupo_nombre=sesion.get('grupo_nombre', 'Grupo desconocido'),
+                                 cuestionario_titulo=sesion.get('cuestionario_titulo', 'Cuestionario'),
+                                 resultados=resultados,
+                                 total_preguntas=int(total_preguntas) if total_preguntas is not None else 0,
+                                 es_creador=es_creador,
+                                 detalle_respuestas=detalle_respuestas)
+            sys.stderr.write(f"Template renderizado OK\n")
+            sys.stderr.flush()
+            return template_result
+        except Exception as render_err:
+            import traceback
+            error_traceback = traceback.format_exc()
+            sys.stderr.write(f"\n=== ERROR AL RENDERIZAR TEMPLATE ===\n")
+            sys.stderr.write(f"Error: {str(render_err)}\n")
+            sys.stderr.write(f"Traceback:\n{error_traceback}\n")
+            sys.stderr.flush()
+            raise  # Re-lanzar para que sea capturado por el except externo
 
     except Exception as e:
-        flash(f'Error al cargar resultados: {str(e)}', 'error')
+        import sys
+        import traceback
+
+        if db:
+            try:
+                cursor.close()
+            except:
+                pass
+            try:
+                db.close()
+            except:
+                pass
+
+        error_msg = f'Error al cargar resultados: {str(e)}'
+        error_traceback = traceback.format_exc()
+
+        # SIEMPRE escribir en stderr (esto siempre funciona)
+        sys.stderr.write(f"\n{'='*70}\n")
+        sys.stderr.write(f"ERROR EN grupo_resultados - {datetime.now().isoformat()}\n")
+        sys.stderr.write(f"{'='*70}\n")
+        sys.stderr.write(f"Error: {error_msg}\n")
+        sys.stderr.write(f"Traceback completo:\n{error_traceback}\n")
+        sys.stderr.write(f"{'='*70}\n")
+        sys.stderr.flush()
+
+        # Intentar escribir en archivo de log (opcional, no crítico)
+        try:
+            import os
+            log_path = os.path.join(os.path.dirname(__file__), 'error_log.txt')
+            with open(log_path, 'a', encoding='utf-8') as log_file:
+                log_file.write(f"\n{'='*70}\n")
+                log_file.write(f"ERROR EN grupo_resultados - {datetime.now().isoformat()}\n")
+                log_file.write(f"{'='*70}\n")
+                log_file.write(f"Error: {error_msg}\n")
+                log_file.write(f"Traceback completo:\n{error_traceback}\n")
+                log_file.write(f"{'='*70}\n")
+        except Exception as log_error:
+            # Si falla escribir en archivo, no importa, ya está en stderr
+            sys.stderr.write(f"Nota: No se pudo escribir en archivo de log: {log_error}\n")
+            sys.stderr.flush()
+
+        flash(error_msg, 'error')
         return redirect(url_for('grupos'))
 
 @app.route('/api/grupo/results/<int:sesion_id>')
@@ -3922,7 +4054,19 @@ def resultados_quiz(pin):
             FROM preguntas
             WHERE cuestionario_id = %s ORDER BY orden
         """, (cuestionario_id,))
-        game_data['questions'] = cursor.fetchall()
+        preguntas_raw = cursor.fetchall()
+        # Limpiar datos de preguntas para asegurar serialización JSON
+        game_data['questions'] = []
+        for p in preguntas_raw:
+            pregunta_id = p.get('id')
+            texto = p.get('text')
+            orden = p.get('orden')
+
+            game_data['questions'].append({
+                "id": int(pregunta_id) if pregunta_id is not None else 0,
+                "text": str(texto) if texto is not None else "",
+                "orden": int(orden) if orden is not None else 0
+            })
 
         # 3. Obtener todas las sesiones de juego para este cuestionario
         cursor.execute("""
@@ -3946,6 +4090,10 @@ def resultados_quiz(pin):
                 total_game_duration = max(total_game_duration, duration)
 
             # Obtener respuestas de esta sesión
+            sesion_id = sesion.get('id')
+            if not sesion_id:
+                continue
+
             cursor.execute("""
                 SELECT
                     rp.user_id,
@@ -3959,35 +4107,145 @@ def resultados_quiz(pin):
                 JOIN users u ON rp.user_id = u.id
                 LEFT JOIN opciones_respuesta op ON rp.opcion_id = op.id
                 WHERE rp.sesion_juego_id = %s
-            """, (sesion['id'],))
+            """, (sesion_id,))
             respuestas = cursor.fetchall()
 
             for r in respuestas:
-                user_id = r['user_id']
+                user_id = r.get('user_id')
+                if user_id is None:
+                    continue
+
                 if user_id not in participants_map:
                     participants_map[user_id] = {
-                        "id": user_id,
-                        "name": r['username'],
+                        "id": int(user_id) if user_id is not None else 0,
+                        "name": str(r.get('username', 'Usuario desconocido')),
                         "answers": []
                     }
 
+                # Limpiar cada valor antes de agregarlo
+                pregunta_id = r.get('pregunta_id')
+                es_correcta = r.get('es_correcta')
+                puntos = r.get('puntos_obtenidos')
+                tiempo = r.get('tiempo_respuesta')
+                choice = r.get('choice')
+
                 participants_map[user_id]['answers'].append({
-                    "questionId": r['pregunta_id'],
-                    "correct": bool(r['es_correcta']),
-                    "points": r['puntos_obtenidos'],
-                    "time": float(r['tiempo_respuesta']) if r['tiempo_respuesta'] is not None else 0,
-                    "choice": r['choice'] or "N/A"
+                    "questionId": int(pregunta_id) if pregunta_id is not None else 0,
+                    "correct": bool(es_correcta) if es_correcta is not None else False,
+                    "points": int(puntos) if puntos is not None else 0,
+                    "time": float(tiempo) if tiempo is not None else 0.0,
+                    "choice": str(choice) if choice is not None else "N/A"
                 })
 
         game_data['participants'] = list(participants_map.values())
-        game_data['totalTime'] = total_game_duration
+        game_data['totalTime'] = float(total_game_duration) if total_game_duration is not None else 0.0
+
+        # Función helper para limpiar datos antes de serializar
+        def clean_for_json(obj):
+            import decimal
+            from datetime import datetime, date, timedelta
+
+            if obj is None:
+                return None
+            elif isinstance(obj, bool):
+                return obj
+            elif isinstance(obj, (int, float)):
+                return obj
+            elif isinstance(obj, str):
+                return obj
+            elif isinstance(obj, decimal.Decimal):
+                return float(obj)
+            elif isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            elif isinstance(obj, timedelta):
+                return obj.total_seconds()
+            elif isinstance(obj, dict):
+                return {str(k): clean_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [clean_for_json(item) for item in obj]
+            elif hasattr(obj, '__dict__'):
+                return clean_for_json(obj.__dict__)
+            else:
+                try:
+                    return str(obj)
+                except:
+                    return None
+
+        game_data_clean = clean_for_json(game_data)
+
+        cursor.close()
+        db.close()
+
+        # Intentar serializar y capturar errores específicos
+        try:
+            game_data_json = json.dumps(game_data_clean, default=str, ensure_ascii=False)
+        except TypeError as e:
+            # Si hay un error de serialización, intentar con una función default más robusta
+            def json_default(obj):
+                import decimal
+                from datetime import datetime, date, timedelta
+                if isinstance(obj, decimal.Decimal):
+                    return float(obj)
+                elif isinstance(obj, (datetime, date)):
+                    return obj.isoformat()
+                elif isinstance(obj, timedelta):
+                    return obj.total_seconds()
+                elif hasattr(obj, '__dict__'):
+                    return obj.__dict__
+                else:
+                    return str(obj)
+
+            try:
+                game_data_json = json.dumps(game_data_clean, default=json_default, ensure_ascii=False)
+            except Exception as e2:
+                # Si aún falla, registrar el error y usar un objeto vacío
+                import traceback
+                error_msg = f"Error al serializar JSON: {str(e2)}\n"
+                error_msg += f"Traceback: {traceback.format_exc()}\n"
+                error_msg += f"game_data_clean type: {type(game_data_clean)}\n"
+                error_msg += f"game_data_clean keys: {game_data_clean.keys() if isinstance(game_data_clean, dict) else 'N/A'}\n"
+
+                # Escribir en archivo de log y también imprimir
+                try:
+                    with open('error_log.txt', 'a', encoding='utf-8') as f:
+                        f.write(f"\n{'='*50}\n")
+                        f.write(f"Error en resultados_quiz - {datetime.now().isoformat()}\n")
+                        f.write(f"{'='*50}\n")
+                        f.write(error_msg)
+                except Exception as log_error:
+                    print(f"No se pudo escribir en log: {log_error}")
+
+                print(error_msg)
+                game_data_json = json.dumps({"error": "Error al cargar datos", "totalTime": 0, "questions": [], "participants": []})
 
         return render_template('resultados_quiz.html',
                                title=f"Resultados de {quiz_info['titulo']}",
-                               game_data_json=json.dumps(game_data, default=str))
+                               game_data_json=game_data_json)
 
     except Exception as e:
-        flash(f'Error al cargar los resultados: {str(e)}', 'error')
+        if db:
+            try:
+                cursor.close()
+            except:
+                pass
+            db.close()
+        import traceback
+        error_msg = f'Error al cargar los resultados: {str(e)}'
+        error_traceback = traceback.format_exc()
+
+        # Escribir en archivo de log y también imprimir
+        try:
+            with open('error_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"\n{'='*50}\n")
+                f.write(f"Error en resultados_quiz - {datetime.now().isoformat()}\n")
+                f.write(f"{'='*50}\n")
+                f.write(f"Error: {error_msg}\n")
+                f.write(f"Traceback completo:\n{error_traceback}\n")
+        except Exception as log_error:
+            print(f"No se pudo escribir en log: {log_error}")
+
+        print(f"Error completo: {error_traceback}")
+        flash(error_msg, 'error')
         return redirect(url_for('home'))
 
 # =====================
@@ -5079,7 +5337,7 @@ def api_actualizar_user():
             "code": 0,
             "data": {},
             "message": "Error al actualizar usuario"
-        })
+        }), 400
 
 
 @app.route("/api/users/obtener/<int:id>", methods=['GET', 'POST'])
@@ -5098,7 +5356,7 @@ def api_obtener_user_id(id=0):
         if usuario:
             return respuesta_exitosa(usuario, "Usuario obtenido correctamente")
         else:
-            return respuesta_error("Usuario no encontrado")
+            return respuesta_error("Usuario no encontrado"), 401
     except Exception as e:
         return respuesta_error(f"Error al obtener usuario: {repr(e)}")
 

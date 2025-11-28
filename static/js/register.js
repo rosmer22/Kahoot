@@ -7,7 +7,7 @@ const submitBtn = document.querySelector('.submit-btn');
 const feedback = document.getElementById('passwordFeedback');
 
 // Regex
-const RE_EMAIL = /^\d{8}@usat\.pe$/;
+const RE_EMAIL = /^(\d{8}@usat\.pe|[A-Za-z0-9._%+-]+@usat\.edu\.pe)$/;
 const RE_LENGTH = /^.{8,}$/;
 const RE_UPPER = /[A-Z]/;
 const RE_LOWER = /[a-z]/;
